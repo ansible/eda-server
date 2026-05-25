@@ -218,6 +218,7 @@ def activations_table(
         "k8s_pod_labels",
         "k8s_pod_annotations",
         "k8s_pod_node_selector",
+        "k8s_pod_tolerations",
         "source_mappings",
         "skip_audit_events",
     )

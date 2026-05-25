@@ -654,3 +654,99 @@ def check_if_field_exists(schema: dict, name: str):
         raise serializers.ValidationError(
             f"Field : {name} missing in source credential"
         )
+
+
+_TOLERATION_EFFECTS = frozenset(
+    {"NoSchedule", "PreferNoSchedule", "NoExecute"}
+)
+_TOLERATION_OPERATORS = frozenset({"Exists", "Equal", "Lt", "Gt"})
+
+
+def _validate_toleration_seconds(idx: int, item: dict, effect: str) -> None:
+    """Validate tolerationSeconds within a single toleration entry."""
+    tol_seconds = item.get("tolerationSeconds")
+    if tol_seconds is None:
+        return
+    if not isinstance(tol_seconds, int) or isinstance(tol_seconds, bool):
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}]."
+            "tolerationSeconds must be an integer"
+        )
+    if effect != "NoExecute":
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}]."
+            "tolerationSeconds is only valid "
+            "with effect 'NoExecute'"
+        )
+
+
+def _validate_single_toleration(idx: int, item: dict) -> None:
+    """Validate a single toleration entry at *idx*."""
+    if not isinstance(item, dict):
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}] must be a JSON object"
+        )
+
+    allowed = {
+        "key",
+        "operator",
+        "value",
+        "effect",
+        "tolerationSeconds",
+    }
+    unknown = set(item.keys()) - allowed
+    if unknown:
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}] has unknown "
+            f"keys: {sorted(unknown)}"
+        )
+
+    key = item.get("key")
+    if key is not None and not isinstance(key, str):
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}].key must be a string"
+        )
+    value = item.get("value")
+    if value is not None and not isinstance(value, str):
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}].value must be a string"
+        )
+
+    operator = item.get("operator", "Equal")
+    if operator not in _TOLERATION_OPERATORS:
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}].operator must be "
+            f"one of {sorted(_TOLERATION_OPERATORS)}"
+        )
+
+    if (key is None or key == "") and operator != "Exists":
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}].operator must be "
+            "'Exists' when key is empty or omitted"
+        )
+
+    effect = item.get("effect")
+    if effect not in (None, "") and effect not in _TOLERATION_EFFECTS:
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}].effect must be "
+            f"one of {sorted(_TOLERATION_EFFECTS)} or omitted"
+        )
+
+    if operator == "Exists" and "value" in item:
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}]: 'value' must not "
+            "be set when operator is 'Exists'"
+        )
+
+    _validate_toleration_seconds(idx, item, effect)
+
+
+def validate_k8s_pod_tolerations(data: list) -> None:
+    """Validate user-supplied Kubernetes tolerations list."""
+    if not isinstance(data, list):
+        raise serializers.ValidationError(
+            "k8s_pod_tolerations must be a JSON array"
+        )
+
+    for idx, item in enumerate(data):
+        _validate_single_toleration(idx, item)
