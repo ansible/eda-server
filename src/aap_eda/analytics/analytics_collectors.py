@@ -214,11 +214,6 @@ def activations_table(
         "log_level",
         "eda_system_vault_credential_id",
         "k8s_service_name",
-        "k8s_pod_service_account_name",
-        "k8s_pod_labels",
-        "k8s_pod_annotations",
-        "k8s_pod_node_selector",
-        "k8s_pod_tolerations",
         "source_mappings",
         "skip_audit_events",
     )
