@@ -931,7 +931,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2026.5.11.0.dev24+gfdccb0673"
+version = "2026.5.21.0.dev33+g964366e08"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.11"
@@ -955,13 +955,14 @@ sqlparse = ">=0.5.2"
 urllib3 = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 
 [package.extras]
-all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular (<1.0)", "ldap-filter", "lxml (==5.3.0)", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "referencing (<0.37.0)", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
+all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular (<1.0)", "jwcrypto (>=1.5.7)", "ldap-filter", "lxml (==5.3.0)", "opentelemetry-api", "opentelemetry-exporter-otlp-proto-grpc", "opentelemetry-instrumentation-django", "opentelemetry-instrumentation-grpc", "opentelemetry-instrumentation-logging", "opentelemetry-instrumentation-psycopg", "opentelemetry-instrumentation-psycopg2", "opentelemetry-instrumentation-requests", "opentelemetry-sdk", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "referencing (<0.37.0)", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
 api-documentation = ["drf-spectacular (<1.0)", "referencing (<0.37.0)"]
 authentication = ["django-auth-ldap", "ldap-filter", "lxml (==5.3.0)", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
 feature-flags = ["django-flags"]
 jwt-consumer = ["pyjwt", "requests"]
-oauth2-provider = ["django-oauth-toolkit (<2.4.0)"]
+oauth2-provider = ["django-oauth-toolkit (<2.4.0)", "jwcrypto (>=1.5.7)"]
+observability = ["opentelemetry-api", "opentelemetry-exporter-otlp-proto-grpc", "opentelemetry-instrumentation-django", "opentelemetry-instrumentation-grpc", "opentelemetry-instrumentation-logging", "opentelemetry-instrumentation-psycopg", "opentelemetry-instrumentation-psycopg2", "opentelemetry-instrumentation-requests", "opentelemetry-sdk"]
 redis-client = ["django-redis", "redis"]
 resource-registry = ["asgiref", "pyjwt", "requests", "urllib3"]
 testing = ["cryptography", "pytest", "pytest-django"]
@@ -970,7 +971,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "fdccb0673645092a1b7edd5fdb9a4c562d661c6c"
+resolved_reference = "964366e08cd2ca6ec9f96fc2f9fa54d794cc615e"
 
 [[package]]
 name = "django-crum"
@@ -1504,14 +1505,14 @@ testing = ["Django", "attrs", "colorama", "docopt", "pytest (<7.0.0)"]
 
 [[package]]
 name = "jinja2"
-version = "3.1.3"
+version = "3.1.6"
 description = "A very fast and expressive template engine."
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "Jinja2-3.1.3-py3-none-any.whl", hash = "sha256:7d6d50dd97d52cbc355597bd845fabfbac3f551e1f99619e39a35ce8c370b5fa"},
-    {file = "Jinja2-3.1.3.tar.gz", hash = "sha256:ac8bd6544d4bb2c9792bf3a159e80bba8fda7f07e81bc3aed565432d5925ba90"},
+    {file = "jinja2-3.1.6-py3-none-any.whl", hash = "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67"},
+    {file = "jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d"},
 ]
 
 [package.dependencies]
