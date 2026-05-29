@@ -54,6 +54,9 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # Required for OIDC: https://github.com/codecov/codecov-action?tab=readme-ov-file#using-oidc
+    permissions:
+      id-token: write
     strategy:
       matrix:
         python-version:
