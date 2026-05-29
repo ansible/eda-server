@@ -12,12 +12,19 @@ resources:
 
 namespace: aap-eda
 
-commonLabels:
-  app: eda
+labels:
+- pairs:
+    app: eda
+  includeSelectors: true
 
 generatorOptions:
   labels:
     app: eda
+
+images:
+- name: postgresql
+  newName: quay.io/sclorg/postgresql-15-c9s
+  newTag: latest
 
 configMapGenerator:
 - name: eda-env-properties

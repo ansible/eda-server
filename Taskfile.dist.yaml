@@ -3,12 +3,13 @@ version: "3"
 env:
   EDA_MODE: development
   DJANGO_SETTINGS_MODULE: "aap_eda.settings.default"
+  KIND_EXPERIMENTAL_PROVIDER: '{{.CONTAINER_ENGINE}}'
 
 vars:
   DOCKER_COMPOSE: '{{ default "docker-compose" .DOCKER_COMPOSE }}'
   DOCKER_COMPOSE_ARGS: '{{ default "-p eda -f tools/docker/docker-compose-dev.yaml" .DOCKER_COMPOSE_ARGS }}'
   PYTEST_CMD: "poetry run python -m pytest"
-  MINIKUBE_CMD: "scripts/eda_kube.sh"
+  CONTAINER_ENGINE: '{{ default "podman" .CONTAINER_ENGINE }}'
   SUSER_CMD: "scripts/create_superuser.sh"
   PODMAN_CMD: "scripts/eda_podman.sh"
 
@@ -219,106 +220,84 @@ tasks:
     cmds:
       - "{{.SUSER_CMD}} {{.CLI_ARGS}}"
 
-  minikube:
-    desc: "Run eda_kube.sh with specified CLI arguments."
-    summary: |
-      Run eda_kube.sh with specified CLI arguments.
-
-      Example:
-        $ task minikube -- build
+  kind:build:
+    desc: "Build EDA API image and load into kind cluster"
     cmds:
-      - "{{.MINIKUBE_CMD}} {{.CLI_ARGS}}"
+      - "{{.CONTAINER_ENGINE}} build -t localhost/aap-eda:latest -f tools/docker/Dockerfile ."
+      - kind load docker-image localhost/aap-eda:latest --name ${KIND_CLUSTER_NAME:-kind}
 
-  minikube:build:
-    desc: "Build docker image and push to minikube"
+  kind:deploy:
+    desc: "Deploy EDA to kind cluster using kustomize"
     cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: build {{.CLI_ARGS}}
+      - kubectl create namespace ${NAMESPACE:-aap-eda} --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl config set-context --current --namespace=${NAMESPACE:-aap-eda}
+      - >-
+        kubectl create secret generic eda-ui-certs
+        --from-file=wildcard.crt=tools/docker/nginx/certs/wildcard.crt
+        --from-file=wildcard.key=tools/docker/nginx/certs/wildcard.key
+        --from-file=client.crt=tools/docker/nginx/certs/client.crt
+        -n ${NAMESPACE:-aap-eda} --dry-run=client -o yaml | kubectl apply -f -
+      - >-
+        kubectl create configmap eda-ui-nginx-config
+        --from-file=default.conf.template=tools/docker/nginx/default.conf.template
+        -n ${NAMESPACE:-aap-eda} --dry-run=client -o yaml | kubectl apply -f -
+      - kustomize build tools/deploy | kubectl apply -f -
 
-  minikube:build:api:
-    desc: "Build EDA api image and push to minikube"
+  kind:clean:
+    desc: "Remove all EDA resources from kind cluster"
     cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: build-api {{.CLI_ARGS}}
+      - kustomize build tools/deploy | kubectl delete --ignore-not-found -f -
+      - kubectl delete secret eda-ui-certs -n ${NAMESPACE:-aap-eda} --ignore-not-found
+      - kubectl delete configmap eda-ui-nginx-config -n ${NAMESPACE:-aap-eda} --ignore-not-found
 
-  minikube:build:ui:
-    desc: "Build EDA UI image and push to minikube"
+  kind:clean:api:
+    desc: "Restart API, worker, and scheduler pods"
     cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: build-ui {{.CLI_ARGS}}
+      - kubectl delete pods -l 'comp in (worker, api, scheduler)' -n ${NAMESPACE:-aap-eda} --ignore-not-found
 
-  minikube:deploy:
-    desc: "Build deployment and deploy to minikube"
+  kind:fp:ui:
+    desc: "Forward local port to EDA UI (default: 8443)"
     cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: deploy {{.CLI_ARGS}}
+      - kubectl port-forward svc/eda-ui {{.CLI_ARGS | default "8443"}}:8443 -n ${NAMESPACE:-aap-eda}
 
-  minikube:quay-deploy:
-    desc: "Build deployment from quay deploy to minikube"
+  kind:fp:api:
+    desc: "Forward local port to EDA API (default: 8000)"
     cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: quay-deploy {{.CLI_ARGS}}
+      - kubectl port-forward svc/eda-api {{.CLI_ARGS | default "8000"}}:8000 -n ${NAMESPACE:-aap-eda}
 
-  minikube:clean:
-    desc: "Clean deployment directory and clean minikube resources"
+  kind:fp:pg:
+    desc: "Forward local port to PostgreSQL (default: 5432)"
     cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: clean {{.CLI_ARGS}}
+      - kubectl port-forward svc/eda-postgres {{.CLI_ARGS | default "5432"}}:5432 -n ${NAMESPACE:-aap-eda}
 
-  minikube:clean:api:
-    desc: "Clean API related minikube resources"
-    cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: clean-api {{.CLI_ARGS}}
-
-  minikube:fp:ui:
-    desc: "Forward local port to ui instance port in minikube"
-    cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: port-forward-ui {{.CLI_ARGS}}
-
-  minikube:fp:api:
-    desc: "Forward local port to api instance port in minikube"
-    cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: port-forward-api {{.CLI_ARGS}}
-
-  minikube:fp:pg:
-    desc: "Forward local port to postgres instance port in minikube"
-    cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: port-forward-pg {{.CLI_ARGS}}
-
-  minikube:logs:eda:
+  kind:logs:eda:
     desc: "Stream logs for EDA application"
     cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: eda-logs {{.CLI_ARGS}}
+      - kubectl logs -n ${NAMESPACE:-aap-eda} -l app=eda --max-log-requests=10 -f
 
-  minikube:all:
-    desc: "clean, build, deploy"
+  kind:all:
+    desc: "Clean, build, and deploy EDA to kind cluster"
     cmds:
-      - task: minikube:clean
-      - task: minikube:build
-      - task: minikube:deploy
+      - task: kind:clean
+      - task: kind:build
+      - task: kind:deploy
 
-  minikube:api:
-    desc: "build, deploy api pods"
+  kind:api:
+    desc: "Rebuild and redeploy API pods"
     cmds:
-      - task: minikube:clean:api
-      - task: minikube:build:api
-      - task: minikube:deploy
+      - task: kind:clean:api
+      - task: kind:build
+      - task: kind:deploy
+
+  kind:cluster:create:
+    desc: "Create a kind cluster for local development"
+    cmds:
+      - kind create cluster --name ${KIND_CLUSTER_NAME:-kind}
+
+  kind:cluster:delete:
+    desc: "Delete the kind cluster"
+    cmds:
+      - kind delete cluster --name ${KIND_CLUSTER_NAME:-kind}
 
   macpodman:
     desc: "Run eda_podman.sh with specified CLI arguments."
