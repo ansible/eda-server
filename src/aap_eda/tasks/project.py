@@ -214,8 +214,7 @@ def _handle_post_sync_activations(project: models.Project):
         _resume_waiting_activations(project)
     except Exception as e:
         logger.error(
-            f"Resume waiting activations failed for "
-            f"project {project.id}: {e}",
+            f"Resume waiting activations failed for project {project.id}: {e}",
             exc_info=True,
         )
 
@@ -223,10 +222,11 @@ def _handle_post_sync_activations(project: models.Project):
 def _auto_restart_activations(project: models.Project):
     """Auto-restart enabled activations when rulebook content changes.
 
+    Skips activations with source_mappings when content changes,
+    as those require manual update through the serializer flow
+    to re-apply swap_event_stream_sources().
     Excludes activations with awaiting_project_sync=True since
     those will be handled by _resume_waiting_activations.
-    Skips activations with source_mappings when content changes,
-    as those require manual source mapping updates.
     """
     activations = models.Activation.objects.filter(
         project=project,
@@ -243,8 +243,7 @@ def _auto_restart_activations(project: models.Project):
             restart_count += _check_and_restart_activation(activation, project)
         except ObjectDoesNotExist:
             logger.warning(
-                f"Rulebook for activation "
-                f"'{activation.name}' no longer exists"
+                f"Rulebook for activation '{activation.name}' no longer exists"
             )
         except Exception as e:
             logger.error(
@@ -310,9 +309,7 @@ def _check_and_restart_activation(
         else "Recovering failed activation"
     )
     logger.info(
-        f"{reason} for activation "
-        f"'{activation.name}', "
-        f"triggering auto-restart"
+        f"{reason} for activation '{activation.name}', triggering auto-restart"
     )
     restarted = _restart_activation(activation)
     if activation_failed and restarted:
