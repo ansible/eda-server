@@ -90,12 +90,12 @@ class PGNotify:
                                 "Chunked Length %d", len(json.dumps(chunked))
                             )
                             cursor.execute(
-                                f"NOTIFY {self.channel}, "
-                                f"$${json.dumps(chunked)}$$;"
+                                "SELECT pg_notify(%s, %s)",
+                                [self.channel, json.dumps(chunked)],
                             )
                     else:
                         cursor.execute(
-                            f"NOTIFY {self.channel}, $${payload}$$;"
+                            "SELECT pg_notify(%s, %s)", [self.channel, payload]
                         )
         except psycopg.OperationalError as e:
             logger.error("PG Notify operational error %s", str(e))
