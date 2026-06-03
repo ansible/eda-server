@@ -17,20 +17,30 @@ from typing import Any, Dict, List, Union
 
 import jinja2
 import yaml
-from django.conf import settings
-from jinja2.nativetypes import NativeTemplate
-
-from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
-from aap_eda.api.vault import encrypt_string
+from jinja2.exceptions import SecurityError
+from jinja2.nativetypes import NativeEnvironment
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 LOGGER = logging.getLogger(__name__)
 
 
+class _NativeSandboxedEnvironment(
+    ImmutableSandboxedEnvironment, NativeEnvironment
+):
+    """Sandboxed Jinja2 environment that preserves native Python types."""
+
+    pass
+
+
+_SANDBOXED_ENV = _NativeSandboxedEnvironment(undefined=jinja2.StrictUndefined)
+
+
 def _render_string(value: str, context: dict) -> str:
     if "{{" in value and "}}" in value:
-        return NativeTemplate(value, undefined=jinja2.StrictUndefined).render(
-            context
-        )
+        try:
+            return _SANDBOXED_ENV.from_string(value).render(context)
+        except SecurityError:
+            raise ValueError(f"Template contains unsafe operations: {value}")
 
     return value
 
@@ -73,26 +83,6 @@ def substitute_variables(
         return new_value
     else:
         return value
-
-
-def substitute_extra_vars(
-    event_stream, extra_vars, encrypt_keys, password
-) -> dict:
-    context = {
-        "settings": settings.__dict__["_wrapped"].__dict__,
-        "event_stream": event_stream,
-    }
-    extra_vars = substitute_variables(extra_vars, context)
-
-    for key in encrypt_keys:
-        if key in extra_vars:
-            extra_vars[key] = encrypt_string(
-                password=password,
-                plaintext=extra_vars[key],
-                vault_id=EDA_SERVER_VAULT_LABEL,
-            )
-
-    return extra_vars
 
 
 def swap_sources(data: str, sources: list[dict]) -> str:
