@@ -1156,7 +1156,11 @@ def default_event_streams(
     default_user: models.User,
     default_hmac_credential: models.EdaCredential,
 ) -> List[models.EventStream]:
-    return models.EventStream.objects.bulk_create(
+    from ansible_base.rbac.caching import compute_object_role_permissions
+    from ansible_base.rbac.models import ObjectRole
+    from django.contrib.contenttypes.models import ContentType
+
+    event_streams = models.EventStream.objects.bulk_create(
         [
             models.EventStream(
                 uuid=uuid.uuid4(),
@@ -1178,6 +1182,17 @@ def default_event_streams(
             ),
         ]
     )
+
+    # bulk_create bypasses signals, so manually trigger RBAC permission cache update
+    # for the organization roles that should grant access to these EventStreams
+    org_ct = ContentType.objects.get_for_model(default_organization)
+    org_roles = ObjectRole.objects.filter(
+        content_type_id=org_ct.id, object_id=default_organization.pk
+    )
+    if org_roles.exists():
+        compute_object_role_permissions(object_roles=org_roles)
+
+    return event_streams
 
 
 @pytest.fixture
