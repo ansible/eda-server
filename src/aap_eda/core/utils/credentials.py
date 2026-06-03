@@ -31,13 +31,13 @@ from cryptography.x509.oid import NameOID
 from django.core.exceptions import ValidationError
 from django.forms import model_to_dict
 from django.utils.translation import gettext_lazy as _
-from jinja2.nativetypes import NativeTemplate
 from rest_framework import serializers
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import enums
 from aap_eda.core.utils.crypto.base import SecretValue
 from aap_eda.core.utils.external_sms import get_external_secrets
+from aap_eda.core.utils.strings import _SANDBOXED_ENV
 
 if typing.TYPE_CHECKING:
     from aap_eda.core import models
@@ -512,13 +512,13 @@ def _default_context(schema: dict, injectors: dict) -> dict:
 def _check_jinja_string(value: str, context: dict) -> str:
     try:
         if "{{" in value and "}}" in value:
-            result = NativeTemplate(
-                value, undefined=jinja2.StrictUndefined
-            ).render(context)
+            result = _SANDBOXED_ENV.from_string(value).render(context)
             if isinstance(result, jinja2.runtime.StrictUndefined):
                 raise InjectorMissingKeyException(f"{value} is undefined")
     except jinja2.exceptions.UndefinedError:
         raise InjectorMissingKeyException(f"{value} is undefined")
+    except jinja2.exceptions.SecurityError as e:
+        raise InjectorInvalidTemplateKey(str(e))
 
 
 def _validate_format(
