@@ -1183,7 +1183,7 @@ def default_event_streams(
         ]
     )
 
-    # bulk_create bypasses signals, so manually trigger RBAC permission cache update
+    # bulk_create bypasses signals, trigger RBAC permission cache update
     # for the organization roles that should grant access to these EventStreams
     org_ct = ContentType.objects.get_for_model(default_organization)
     org_roles = ObjectRole.objects.filter(
