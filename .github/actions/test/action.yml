@@ -77,6 +77,8 @@ runs:
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
+        token: ${{ env.CODECOV_TOKEN }}
+        url: ${{ env.CODECOV_SERVER }}
         env_vars: OS,PYTHON
         fail_ci_if_error: false
         files: ./coverage.xml
