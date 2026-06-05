@@ -35,3 +35,6 @@ dispatcherd/
 
 # OpenAPI
 openapi.json
+
+.DS_Store
+.claude/
