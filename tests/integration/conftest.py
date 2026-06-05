@@ -20,6 +20,7 @@ from unittest.mock import MagicMock, create_autospec
 import pytest
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
+from ansible_base.rbac.caching import compute_object_role_permissions
 from django.contrib.auth.models import AnonymousUser
 from django.test import override_settings
 from rest_framework.test import APIClient
@@ -705,13 +706,13 @@ def default_activation_instances(
             ),
         ]
     )
-
     for instance in instances:
         models.RulebookProcessQueue.objects.create(
             process=instance,
             queue_name="activation",
         )
-
+    # bulk_create bypasses signals; recompute all RBAC permissions
+    compute_object_role_permissions()
     return instances
 
 
@@ -1156,10 +1157,6 @@ def default_event_streams(
     default_user: models.User,
     default_hmac_credential: models.EdaCredential,
 ) -> List[models.EventStream]:
-    from ansible_base.rbac.caching import compute_object_role_permissions
-    from ansible_base.rbac.models import ObjectRole
-    from django.contrib.contenttypes.models import ContentType
-
     event_streams = models.EventStream.objects.bulk_create(
         [
             models.EventStream(
@@ -1182,16 +1179,8 @@ def default_event_streams(
             ),
         ]
     )
-
-    # bulk_create bypasses signals, trigger RBAC permission cache update
-    # for the organization roles that should grant access to these EventStreams
-    org_ct = ContentType.objects.get_for_model(default_organization)
-    org_roles = ObjectRole.objects.filter(
-        content_type_id=org_ct.id, object_id=default_organization.pk
-    )
-    if org_roles.exists():
-        compute_object_role_permissions(object_roles=org_roles)
-
+    # bulk_create bypasses signals; recompute all RBAC permissions
+    compute_object_role_permissions()
     return event_streams
 
 
