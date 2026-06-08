@@ -1,12 +1,11 @@
 import contextlib
 import logging
 
-import jinja2
 import yaml
 from django.conf import settings
-from jinja2.exceptions import UndefinedError
-from jinja2.nativetypes import NativeTemplate
+from jinja2.exceptions import SecurityError, UndefinedError
 
+from aap_eda.core.utils.strings import _SANDBOXED_ENV
 from aap_eda.services.activation import exceptions
 
 LOGGER = logging.getLogger(__name__)
@@ -14,9 +13,7 @@ LOGGER = logging.getLogger(__name__)
 
 def render_string(value: str, context: dict) -> str:
     if "{{" in value and "}}" in value:
-        return NativeTemplate(value, undefined=jinja2.StrictUndefined).render(
-            context
-        )
+        return _SANDBOXED_ENV.from_string(value).render(context)
 
     return value
 
@@ -69,6 +66,8 @@ def find_ports(rulebook_text: str, context: dict = None) -> list[tuple]:
                 LOGGER.error(f"find_ports error: {e}")
                 raise exceptions.ActivationStartError(str(e))
             except UndefinedError as e:
+                raise exceptions.ActivationStartError(str(e))
+            except SecurityError as e:
                 raise exceptions.ActivationStartError(str(e))
 
     return found_ports
