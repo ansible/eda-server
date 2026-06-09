@@ -16,6 +16,7 @@ import base64
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -46,6 +47,10 @@ from .common import (
 
 LOGGER = logging.getLogger(__name__)
 KEEP_JOBS_FOR_SECONDS = 300
+
+K8S_API_RETRIES = 3
+K8S_API_RETRY_BACKOFF = 1.0
+K8S_API_TRANSIENT_STATUS_CODES = {401, 403, 500, 502, 503, 504}
 
 INVALID_IMAGE_NAME = "InvalidImageName"
 IMAGE_PULL_BACK_OFF = "ImagePullBackOff"
@@ -265,20 +270,61 @@ class Engine(ContainerEngine):
     def _set_log_timestamp(self, log_timestamp: str) -> int:
         return int(parser.isoparse(log_timestamp).timestamp())
 
+    def _refresh_client(self) -> None:
+        """Re-read the SA token from disk and rebuild the K8s client."""
+        try:
+            self.client = get_k8s_client()
+            LOGGER.info("Refreshed K8s client with new token from disk")
+        except ContainerEngineInitError:
+            LOGGER.warning("Failed to refresh K8s client, keeping old one")
+
+    def _handle_transient_api_error(
+        self,
+        exc: ApiException,
+        attempt: int,
+        job_label: str,
+    ) -> None:
+        """Raise immediately for non-transient errors, back off otherwise."""
+        if exc.status == status.HTTP_404_NOT_FOUND:
+            raise ContainerNotFoundError(str(exc)) from exc
+        if exc.status not in K8S_API_TRANSIENT_STATUS_CODES:
+            raise ContainerEngineError(str(exc)) from exc
+        LOGGER.warning(
+            "Transient K8s API error (HTTP %s) on attempt %d/%d "
+            "for pod lookup %s: %s",
+            exc.status,
+            attempt,
+            K8S_API_RETRIES,
+            job_label,
+            exc.reason,
+        )
+        if attempt < K8S_API_RETRIES:
+            time.sleep(K8S_API_RETRY_BACKOFF * attempt)
+            if exc.status in {401, 403}:
+                self._refresh_client()
+
     def _get_job_pod(self, job_name: str) -> k8sclient.V1Pod:
         job_label = f"job-name={job_name}"
-        try:
-            result = self.client.core_api.list_namespaced_pod(
-                namespace=self.namespace, label_selector=job_label
-            )
-            if not result.items:
-                raise ContainerNotFoundError(
-                    f"Pod with label {job_label} not found"
+        last_exc = None
+
+        for attempt in range(1, K8S_API_RETRIES + 1):
+            try:
+                result = self.client.core_api.list_namespaced_pod(
+                    namespace=self.namespace, label_selector=job_label
                 )
-            return result.items[0]
-        except ApiException as e:
-            LOGGER.error(f"API Exception {e}")
-            raise ContainerNotFoundError(str(e)) from e
+                if not result.items:
+                    raise ContainerNotFoundError(
+                        f"Pod with label {job_label} not found"
+                    )
+                return result.items[0]
+            except ApiException as e:
+                last_exc = e
+                self._handle_transient_api_error(e, attempt, job_label)
+
+        raise ContainerEngineError(
+            f"K8s API call failed after {K8S_API_RETRIES} retries: "
+            f"{last_exc}"
+        ) from last_exc
 
     def _create_container_spec(
         self,
