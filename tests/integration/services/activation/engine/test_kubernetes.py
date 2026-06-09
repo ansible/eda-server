@@ -28,12 +28,14 @@ from aap_eda.services.activation.engine.exceptions import (
     ContainerEngineError,
     ContainerEngineInitError,
     ContainerImagePullError,
+    ContainerNotFoundError,
     ContainerStartError,
 )
 from aap_eda.services.activation.engine.kubernetes import (
     IMAGE_PULL_BACK_OFF,
     IMAGE_PULL_ERROR,
     INVALID_IMAGE_NAME,
+    K8S_API_RETRIES,
     Engine,
     get_k8s_client,
 )
@@ -303,7 +305,12 @@ def test_engine_start_applies_k8s_pod_metadata(
         created_body = body
         return mock.Mock()
 
-    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
+    with mock.patch(
+        "aap_eda.services.activation.engine.kubernetes.watch"
+    ) as watch_mock:
+        watch_mock.Watch.return_value.stream.return_value = iter(
+            [{"object": get_pod("Running"), "type": "MODIFIED"}]
+        )
         with mock.patch.object(engine.client, "core_api") as core_api_mock:
             core_api_mock.list_namespaced_service.return_value.items = None
             with mock.patch.object(
@@ -363,7 +370,12 @@ def test_engine_start_applies_k8s_resource_limits(
         created_body = body
         return mock.Mock()
 
-    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
+    with mock.patch(
+        "aap_eda.services.activation.engine.kubernetes.watch"
+    ) as watch_mock:
+        watch_mock.Watch.return_value.stream.return_value = iter(
+            [{"object": get_pod("Running"), "type": "MODIFIED"}]
+        )
         with mock.patch.object(engine.client, "core_api") as core_api_mock:
             core_api_mock.list_namespaced_service.return_value.items = None
             with mock.patch.object(
@@ -410,7 +422,12 @@ def test_engine_start_no_resource_limits_by_default(
         created_body = body
         return mock.Mock()
 
-    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
+    with mock.patch(
+        "aap_eda.services.activation.engine.kubernetes.watch"
+    ) as watch_mock:
+        watch_mock.Watch.return_value.stream.return_value = iter(
+            [{"object": get_pod("Running"), "type": "MODIFIED"}]
+        )
         with mock.patch.object(engine.client, "core_api") as core_api_mock:
             core_api_mock.list_namespaced_service.return_value.items = None
             with mock.patch.object(
@@ -439,7 +456,12 @@ def test_engine_start(
     )
     log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
 
-    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
+    with mock.patch(
+        "aap_eda.services.activation.engine.kubernetes.watch"
+    ) as watch_mock:
+        watch_mock.Watch.return_value.stream.return_value = iter(
+            [{"object": get_pod("Running"), "type": "MODIFIED"}]
+        )
         with mock.patch.object(engine.client, "core_api") as core_api_mock:
             core_api_mock.list_namespaced_service.return_value.items = None
             engine.start(request, log_handler)
@@ -507,7 +529,7 @@ def test_engine_start_with_pod_status(
         ) as watch_mock:
             watcher = mock.Mock()
             watch_mock.Watch.return_value = watcher
-            for phase in ["Pending", "Running", "Succeeded"]:
+            for phase in ["Running", "Succeeded"]:
                 watcher.stream.return_value = get_stream_event(phase)
                 engine.start(request, log_handler)
 
@@ -783,8 +805,9 @@ def test_pod_cleanup_exception_handling(
         )
         assert models.RulebookProcessLog.objects.last().log.endswith(log_msg)
 
-        # Test generic API error
-        mock_watch.return_value.stream.side_effect = ApiException(status=500)
+        # Test non-transient API error (400 is not in
+        # K8S_API_TRANSIENT_STATUS_CODES so it raises immediately)
+        mock_watch.return_value.stream.side_effect = ApiException(status=400)
         with pytest.raises(ContainerCleanupError):
             engine._delete_job(log_handler)
 
@@ -904,3 +927,318 @@ def test_engine_start_no_tolerations_by_default(
             )
             pod_spec = job_body.spec.template.spec
             assert pod_spec.tolerations is None
+
+
+@pytest.mark.django_db
+def test_get_job_pod_returns_pod_on_success(kubernetes_engine):
+    """_get_job_pod returns the first pod when the API call succeeds."""
+    engine = kubernetes_engine
+    expected_pod = get_pod("Running")
+
+    engine.client.core_api.list_namespaced_pod.return_value = mock.Mock(
+        items=[expected_pod]
+    )
+
+    result = engine._get_job_pod("test-job")
+    assert result == expected_pod
+
+
+@pytest.mark.django_db
+def test_get_job_pod_raises_not_found_when_no_pods(kubernetes_engine):
+    """_get_job_pod raises ContainerNotFoundError when no pods match."""
+    engine = kubernetes_engine
+
+    engine.client.core_api.list_namespaced_pod.return_value = mock.Mock(
+        items=[]
+    )
+
+    with pytest.raises(ContainerNotFoundError, match="not found"):
+        engine._get_job_pod("test-job")
+
+
+@pytest.mark.django_db
+def test_get_job_pod_raises_engine_error_on_404(kubernetes_engine):
+    """_get_job_pod raises ContainerEngineError on HTTP 404 (non-transient)."""
+    engine = kubernetes_engine
+
+    engine.client.core_api.list_namespaced_pod.side_effect = ApiException(
+        status=404, reason="Not Found"
+    )
+
+    with pytest.raises(ContainerEngineError):
+        engine._get_job_pod("test-job")
+    assert engine.client.core_api.list_namespaced_pod.call_count == 1
+
+
+@pytest.mark.django_db
+def test_get_job_pod_raises_engine_error_on_non_transient(
+    kubernetes_engine,
+):
+    """_get_job_pod raises ContainerEngineError on non-transient."""
+    engine = kubernetes_engine
+
+    engine.client.core_api.list_namespaced_pod.side_effect = ApiException(
+        status=422, reason="Unprocessable Entity"
+    )
+
+    with pytest.raises(ContainerEngineError):
+        engine._get_job_pod("test-job")
+    assert engine.client.core_api.list_namespaced_pod.call_count == 1
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.activation.engine.kubernetes.time.sleep")
+def test_call_k8s_api_retries_on_transient_errors(
+    sleep_mock, kubernetes_engine
+):
+    """_call_k8s_api retries on transient HTTP errors before failing."""
+    engine = kubernetes_engine
+    func = mock.Mock(
+        side_effect=ApiException(status=500, reason="Server Error")
+    )
+
+    with pytest.raises(ContainerEngineError, match="retries"):
+        engine._call_k8s_api(func, description="test call")
+
+    assert func.call_count == K8S_API_RETRIES
+    assert sleep_mock.call_count == K8S_API_RETRIES - 1
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.activation.engine.kubernetes.time.sleep")
+def test_call_k8s_api_succeeds_after_transient_error(
+    sleep_mock, kubernetes_engine
+):
+    """_call_k8s_api recovers when a transient error is followed by success."""
+    engine = kubernetes_engine
+    func = mock.Mock(
+        side_effect=[
+            ApiException(status=500, reason="Server Error"),
+            "result",
+        ]
+    )
+
+    result = engine._call_k8s_api(func, description="test call")
+    assert result == "result"
+    assert func.call_count == 2
+
+
+@pytest.mark.django_db
+def test_call_k8s_api_raises_immediately_on_non_transient(
+    kubernetes_engine,
+):
+    """_call_k8s_api raises error_cls immediately on non-transient errors."""
+    engine = kubernetes_engine
+    func = mock.Mock(
+        side_effect=ApiException(status=422, reason="Unprocessable")
+    )
+
+    with pytest.raises(ContainerStartError):
+        engine._call_k8s_api(
+            func,
+            error_cls=ContainerStartError,
+            description="test",
+        )
+    assert func.call_count == 1
+
+
+@pytest.mark.django_db
+@mock.patch(
+    "aap_eda.services.activation.engine.kubernetes.get_k8s_client",
+)
+@mock.patch("aap_eda.services.activation.engine.kubernetes.time.sleep")
+def test_call_k8s_api_refreshes_client_on_401(
+    sleep_mock, get_client_mock, kubernetes_engine
+):
+    """_call_k8s_api refreshes the K8s client on 401 before retrying."""
+    engine = kubernetes_engine
+    func = mock.Mock(
+        side_effect=[
+            ApiException(status=401, reason="Unauthorized"),
+            "ok",
+        ]
+    )
+    get_client_mock.return_value = mock.Mock()
+
+    result = engine._call_k8s_api(func, description="test call")
+    assert result == "ok"
+    get_client_mock.assert_called_once()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.activation.engine.kubernetes.time.sleep")
+def test_call_k8s_api_uses_custom_error_cls(sleep_mock, kubernetes_engine):
+    """_call_k8s_api raises the specified error_cls after retries."""
+    engine = kubernetes_engine
+    func = mock.Mock(
+        side_effect=ApiException(status=503, reason="Unavailable")
+    )
+
+    with pytest.raises(ContainerCleanupError, match="retries"):
+        engine._call_k8s_api(
+            func,
+            error_cls=ContainerCleanupError,
+            description="cleanup",
+        )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.activation.engine.kubernetes.time.sleep")
+def test_get_job_pod_retries_on_transient_errors(
+    sleep_mock, kubernetes_engine
+):
+    """_get_job_pod retries via _call_k8s_api on transient errors."""
+    engine = kubernetes_engine
+
+    engine.client.core_api.list_namespaced_pod.side_effect = ApiException(
+        status=500, reason="Internal Server Error"
+    )
+
+    with pytest.raises(ContainerEngineError, match="retries"):
+        engine._get_job_pod("test-job")
+
+    call_count = engine.client.core_api.list_namespaced_pod.call_count
+    assert call_count == K8S_API_RETRIES
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.activation.engine.kubernetes.time.sleep")
+def test_delete_job_retries_on_transient_errors(
+    sleep_mock, init_kubernetes_data, kubernetes_engine
+):
+    """_delete_job retries list_namespaced_job on transient errors."""
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+
+    engine.client.batch_api.list_namespaced_job.side_effect = ApiException(
+        status=401, reason="Unauthorized"
+    )
+
+    with pytest.raises(ContainerCleanupError, match="retries"):
+        engine._delete_job(log_handler)
+
+    call_count = engine.client.batch_api.list_namespaced_job.call_count
+    assert call_count == K8S_API_RETRIES
+
+
+@pytest.mark.django_db
+def test_refresh_client_keeps_old_on_failure(kubernetes_engine):
+    """_refresh_client keeps the existing client when init fails."""
+    engine = kubernetes_engine
+    original_client = engine.client
+
+    with mock.patch(
+        "aap_eda.services.activation.engine.kubernetes.get_k8s_client",
+        side_effect=ContainerEngineInitError("init failed"),
+    ):
+        engine._refresh_client()
+
+    assert engine.client is original_client
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@mock.patch("aap_eda.services.activation.engine.kubernetes.time.sleep")
+@pytest.mark.django_db
+def test_watch_pod_deletion_retries_on_transient(
+    sleep_mock,
+    mock_watch,
+    init_kubernetes_data,
+    kubernetes_engine,
+):
+    """_watch_pod_deletion retries then raises on transient errors."""
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+
+    mock_watch.return_value.stream.side_effect = ApiException(status=503)
+
+    with pytest.raises(ContainerCleanupError, match="retries"):
+        engine._watch_pod_deletion(log_handler)
+
+    assert mock_watch.return_value.stream.call_count == K8S_API_RETRIES
+    assert mock_watch.return_value.stop.call_count == K8S_API_RETRIES
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@mock.patch("aap_eda.services.activation.engine.kubernetes.time.sleep")
+@pytest.mark.django_db
+def test_wait_for_pod_to_start_retries_on_transient(
+    sleep_mock,
+    mock_watch,
+    init_kubernetes_data,
+    kubernetes_engine,
+):
+    """_wait_for_pod_to_start retries then raises on transient errors."""
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    engine.pod_name = "test-pod"
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+
+    mock_watch.return_value.stream.side_effect = ApiException(status=500)
+
+    with pytest.raises(ContainerStartError, match="retries"):
+        engine._wait_for_pod_to_start(log_handler)
+
+    assert mock_watch.return_value.stream.call_count == K8S_API_RETRIES
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@pytest.mark.django_db
+def test_wait_for_pod_to_start_raises_on_non_transient(
+    mock_watch,
+    init_kubernetes_data,
+    kubernetes_engine,
+):
+    """_wait_for_pod_to_start raises immediately on non-transient."""
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    engine.pod_name = "test-pod"
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+
+    mock_watch.return_value.stream.side_effect = ApiException(status=400)
+
+    with pytest.raises(ContainerStartError, match="failed with error"):
+        engine._wait_for_pod_to_start(log_handler)
+
+    assert mock_watch.return_value.stream.call_count == 1
+
+
+@pytest.mark.django_db
+def test_process_pod_start_event_pending(kubernetes_engine):
+    """_process_pod_start_event returns False for Pending."""
+    engine = kubernetes_engine
+    event = {"object": get_pod("Pending")}
+    assert engine._process_pod_start_event(event) is False
+
+
+@pytest.mark.django_db
+def test_process_pod_start_event_unknown_raises(kubernetes_engine):
+    """_process_pod_start_event raises for Unknown phase."""
+    engine = kubernetes_engine
+    pod = k8sclient.V1Pod(
+        metadata=k8sclient.V1ObjectMeta(name="test-pod", namespace="aap-eda"),
+        status=k8sclient.V1PodStatus(
+            phase="Unknown",
+            container_statuses=None,
+        ),
+    )
+    event = {"object": pod}
+
+    with pytest.raises(ContainerStartError, match="Unknown"):
+        engine._process_pod_start_event(event)
+
+
+@pytest.mark.django_db
+def test_process_pod_start_event_unrecognized(kubernetes_engine):
+    """_process_pod_start_event returns False for unrecognized phase."""
+    engine = kubernetes_engine
+    pod = k8sclient.V1Pod(
+        metadata=k8sclient.V1ObjectMeta(name="test-pod", namespace="aap-eda"),
+        status=k8sclient.V1PodStatus(
+            phase="SomeOtherPhase",
+            container_statuses=None,
+        ),
+    )
+    event = {"object": pod}
+    assert engine._process_pod_start_event(event) is False
