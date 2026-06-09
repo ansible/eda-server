@@ -387,12 +387,45 @@ def _validate_type(key: str, value, key_type) -> None:
         )
 
 
+def apply_resource_server_auth(settings: Dynaconf) -> None:
+    """Apply RESOURCE_SERVER authentication configuration.
+
+    When deployed as part of AAP (RESOURCE_SERVER__URL is set), restrict
+    authentication to JWT-only. WebsocketJWTAuthentication is retained
+    because rulebook workers connect back via websocket with HS256 JWT.
+    However, websocket workers (WORKER_KIND=websocket) should only use
+    WebsocketJWTAuthentication, as configured in post_loading().
+    """
+    worker_kind = settings.get("WORKER_KIND", "api")
+    if (
+        settings.get("RESOURCE_SERVER__URL", None)
+        and worker_kind.lower() != "websocket"
+    ):
+        settings.set(
+            "REST_FRAMEWORK__DEFAULT_AUTHENTICATION_CLASSES",
+            [
+                "ansible_base.jwt_consumer.eda.auth.EDAJWTAuthentication",
+                "aap_eda.api.authentication.WebsocketJWTAuthentication",
+            ],
+        )
+
+
 def post_loading(loaded_settings: Dynaconf):
     # working on a copy first
     settings = Dynaconf()
     settings.update(loaded_settings.to_dict())
 
     _enforce_types(settings)
+
+    # Configure authentication classes based on worker kind
+    # WebSocket workers only need WebsocketJWTAuthentication
+    # for ansible-rulebook workers
+    worker_kind = settings.get("WORKER_KIND", "api").lower()
+    if worker_kind == "websocket":
+        settings.REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] = [
+            "aap_eda.api.authentication.WebsocketJWTAuthentication",
+        ]
+    # Note: REST_FRAMEWORK is already configured in core.py with default values
 
     settings.SECRET_KEY = _get_secret_key(settings)
     settings.DATABASES = _get_databases_settings(settings)
