@@ -99,13 +99,6 @@ class ActivationViewSet(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Check if activation workers are available for enabled activations
-        is_enabled = serializer.validated_data.get(
-            "is_enabled", models.activation.DEFAULT_ENABLED
-        )
-        if is_enabled:
-            check_dispatcherd_workers_health(raise_exceptions=True)
-
         with transaction.atomic():
             response = serializer.create(serializer.validated_data)
             check_related_permissions(
@@ -433,12 +426,6 @@ class ActivationViewSet(
             return Response(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
-
-        # Check if activation workers are available before enabling
-        queue_name = self._get_activation_queue_name(activation)
-        check_dispatcherd_workers_health(
-            raise_exceptions=True, queue_name=queue_name
-        )
 
         sync_response = self._sync_project_if_needed(activation)
         if sync_response:
