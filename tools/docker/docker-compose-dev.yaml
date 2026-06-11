@@ -133,7 +133,9 @@ services:
 
   eda-ws:
     image: ${EDA_IMAGE:-localhost/aap-eda}
-    environment: *common-env
+    environment:
+      <<: *common-env
+      EDA_WORKER_KIND: 'websocket'
     command:
       - /bin/bash
       - -c

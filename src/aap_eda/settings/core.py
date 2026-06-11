@@ -113,6 +113,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "core.User"
 
+# Determine authentication classes based on worker kind
+# Authentication classes are configured in post_load.py based on
+# WORKER_KIND setting:
+# - WebSocket workers (WORKER_KIND=websocket): Only WebsocketJWTAuthentication
+# - API/other workers: Session/Basic/EDAJWTAuthentication
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "aap_eda.api.pagination.DefaultPagination",
@@ -120,7 +125,6 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "aap_eda.api.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
-        "aap_eda.api.authentication.WebsocketJWTAuthentication",
         "ansible_base.jwt_consumer.eda.auth.EDAJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [

@@ -120,6 +120,7 @@ RENAMED_USERNAME_PREFIX: str = "eda_"
 # DEPLOYMENT SETTINGS
 # ---------------------------------------------------------
 DEPLOYMENT_TYPE: str = "podman"
+WORKER_KIND: str = "api"
 WEBSOCKET_BASE_URL: str = "ws://localhost:8000"
 WEBSOCKET_SSL_VERIFY: Union[bool, str] = "yes"
 WEBSOCKET_TOKEN_BASE_URL: Optional[str] = None
