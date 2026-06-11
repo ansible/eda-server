@@ -21,7 +21,7 @@ from ansible_base.lib.dynamic_config import (
     load_standard_settings_files,
 )
 
-from .post_load import post_loading
+from .post_load import apply_resource_server_auth, post_loading
 
 EDA_SETTINGS_FILE = os.environ.get(
     "EDA_SETTINGS_FILE", "/etc/eda/settings.yaml"
@@ -49,6 +49,7 @@ load_standard_settings_files(
 load_envvars(DYNACONF)  # load envvars prefixed with EDA_
 DYNACONF.load_file("core.py")  # load internal non-overwritable settings
 post_loading(DYNACONF)
+apply_resource_server_auth(DYNACONF)
 load_dab_settings(DYNACONF)
 
 export(__name__, DYNACONF)  # export back to django.conf.settings
