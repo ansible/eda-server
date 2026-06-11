@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from ansible_base.rbac import permission_registry
+from ansible_base.rbac.caching import compute_object_role_permissions
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.contrib.auth.models import AnonymousUser
 from django.test import override_settings
@@ -705,13 +706,13 @@ def default_activation_instances(
             ),
         ]
     )
-
     for instance in instances:
         models.RulebookProcessQueue.objects.create(
             process=instance,
             queue_name="activation",
         )
-
+    # bulk_create bypasses signals; recompute all RBAC permissions
+    compute_object_role_permissions()
     return instances
 
 
@@ -1156,7 +1157,7 @@ def default_event_streams(
     default_user: models.User,
     default_hmac_credential: models.EdaCredential,
 ) -> List[models.EventStream]:
-    return models.EventStream.objects.bulk_create(
+    event_streams = models.EventStream.objects.bulk_create(
         [
             models.EventStream(
                 uuid=uuid.uuid4(),
@@ -1178,6 +1179,9 @@ def default_event_streams(
             ),
         ]
     )
+    # bulk_create bypasses signals; recompute all RBAC permissions
+    compute_object_role_permissions()
+    return event_streams
 
 
 @pytest.fixture
