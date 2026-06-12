@@ -339,3 +339,30 @@ def test_mq_tls_conversion_and_redis_ssl(
     # Check that the Redis queue configuration uses the correct SSL parameter
     queues = get_rq_queues(mock_settings)
     assert queues["default"]["SSL"] == expected_ssl_param
+
+
+def test_websocket_worker_authentication_classes(mock_settings):
+    """Test that websocket workers use only WebsocketJWTAuthentication."""
+    mock_settings.WORKER_KIND = "websocket"
+    post_loading(mock_settings)
+
+    assert mock_settings.REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] == [
+        "aap_eda.api.authentication.WebsocketJWTAuthentication",
+    ]
+
+
+def test_non_websocket_worker_authentication_classes(mock_settings):
+    """Test non-websocket workers use default authentication classes."""
+    mock_settings.WORKER_KIND = "api"
+    post_loading(mock_settings)
+
+    # Should have the default authentication classes from core.py
+    expected_classes = [
+        "aap_eda.api.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+        "ansible_base.jwt_consumer.eda.auth.EDAJWTAuthentication",
+    ]
+    assert (
+        mock_settings.REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"]
+        == expected_classes
+    )
