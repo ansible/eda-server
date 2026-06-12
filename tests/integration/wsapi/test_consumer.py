@@ -292,7 +292,7 @@ async def test_handle_actions_multiple_firing(
     )
     await ws_communicator.send_json_to(payload1)
     await ws_communicator.send_json_to(payload2)
-    await ws_communicator.wait()
+    await ws_communicator.wait(timeout=TIMEOUT)
 
     assert (await get_audit_rule_count()) == 2
     assert (await get_audit_action_count()) == 2
@@ -394,7 +394,7 @@ async def test_rule_status_with_multiple_failed_actions(
     )
     await ws_communicator.send_json_to(action1)
     await ws_communicator.send_json_to(action2)
-    await ws_communicator.wait()
+    await ws_communicator.wait(timeout=TIMEOUT)
 
     assert (await get_audit_action_count()) == 2
     assert (await get_audit_rule_count()) == 1
@@ -459,7 +459,7 @@ async def test_handle_heartbeat(
     for payload in payloads:
         await ws_communicator.send_json_to(payload)
 
-    await ws_communicator.wait()
+    await ws_communicator.wait(timeout=TIMEOUT)
 
     updated_rulebook_process = await get_rulebook_process(rulebook_process_id)
     assert (
@@ -517,7 +517,7 @@ async def test_handle_heartbeat_running_status(
     for payload in payloads:
         await ws_communicator.send_json_to(payload)
 
-    await ws_communicator.wait()
+    await ws_communicator.wait(timeout=TIMEOUT)
 
     activation = await monitor_activation(activation)
     assert activation.status == ActivationStatus.RUNNING
@@ -561,7 +561,7 @@ async def test_multiple_rules_for_one_event(
 
     await ws_communicator.send_json_to(action1)
     await ws_communicator.send_json_to(action2)
-    await ws_communicator.wait()
+    await ws_communicator.wait(timeout=TIMEOUT)
 
     assert (await get_audit_action_count()) == 2
     assert (await get_audit_rule_count()) == 2
