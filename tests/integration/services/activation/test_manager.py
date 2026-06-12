@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 """Activation Manager tests."""
+
 # TODO(alex) dedup code and fixtures across all the tests
 
 from unittest.mock import MagicMock, create_autospec, patch
@@ -382,11 +383,16 @@ def test_monitor_to_running_status(
 
 
 @pytest.mark.django_db
-def test_monitor_to_unexpected_error_status(
+def test_monitor_container_engine_error_sets_workers_offline(
     running_activation: models.Activation,
     container_engine_mock: MagicMock,
 ):
-    """Test monitor when get_status returns an unexpected error."""
+    """Test monitor sets WORKERS_OFFLINE on transient ContainerEngineError.
+
+    When the K8s API is temporarily unreachable the activation should
+    transition to WORKERS_OFFLINE (recoverable) instead of ERROR
+    (terminal), so the monitor loop can retry on the next cycle.
+    """
     activation_manager = ActivationManager(
         db_instance=running_activation,
         container_engine=container_engine_mock,
@@ -394,9 +400,8 @@ def test_monitor_to_unexpected_error_status(
     container_engine_mock.get_status.side_effect = (
         engine_exceptions.ContainerEngineError("unexpected error")
     )
-    with pytest.raises(exceptions.ActivationMonitorError):
-        activation_manager.monitor()
-    assert running_activation.status == enums.ActivationStatus.ERROR
+    activation_manager.monitor()
+    assert running_activation.status == enums.ActivationStatus.WORKERS_OFFLINE
     assert "unexpected error" in running_activation.status_message
 
 
