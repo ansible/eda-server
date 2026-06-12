@@ -1,26 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: eda-default-worker
+  name: eda-ws
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: eda
-      comp: default-worker
+      comp: ws
   strategy: {}
   template:
     metadata:
       labels:
         app: eda
-        comp: default-worker
+        comp: ws
     spec:
-      serviceAccountName: eda-default-sa
       containers:
         - args:
             - /bin/bash
             - -c
-            - aap-eda-manage dispatcherd --worker-class DefaultWorker
+            - daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application
           env:
             - name: EDA_DATABASE_URL
               value: postgresql+asyncpg://postgres:secret@postgres/eda
@@ -32,6 +31,8 @@ spec:
               value: secret
             - name: EDA_MQ_HOST
               value: eda-redis
+            - name: EDA_ALLOWED_HOSTS
+              value: "['*']"
             - name: EDA_DEPLOYMENT_TYPE
               value: k8s
           envFrom:
@@ -39,18 +40,11 @@ spec:
               name: eda-env-properties
           image: aap-eda
           imagePullPolicy: Never
-          name: eda-default-worker
+          name: eda-ws
           ports:
             - containerPort: 8000
           resources: {}
-#          volumeMounts:
-#            - mountPath: /app/src
-#              name: app-src
       restartPolicy: Always
-#      volumes:
-#        - name: app-src
-#          persistentVolumeClaim:
-#            claimName: app-src
       initContainers:
         - name: wait-for-postgres
           image: postgresql

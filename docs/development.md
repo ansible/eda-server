@@ -212,7 +212,7 @@ ansible/eda-server              12146d8     51fb0c850b94   10 minutes ago   682M
 ### Running services
 
 AAP EDA requires some services, such as database to be running. We recommend running such services
-in a containerized environment (e.g. docker / podman / minikube etc.).
+in a containerized environment (e.g. docker / podman / kind etc.).
 
 You can start all minimal required containers by running:
 
