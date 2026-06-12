@@ -765,7 +765,7 @@ def test_recover_stuck_projects_deleted_during_recovery(
 
     # Simulate deletion between queryset iteration and select_for_update
     with patch(
-        "aap_eda.tasks.project.models.Project.objects" ".select_for_update"
+        "aap_eda.tasks.project.models.Project.objects.select_for_update"
     ) as mock_select:
         mock_qs = Mock()
         mock_select.return_value = mock_qs
@@ -796,7 +796,7 @@ def test_recover_stuck_projects_database_error(
     models.Project.objects.filter(id=project.id).update(modified_at=old_time)
 
     with patch(
-        "aap_eda.tasks.project.models.Project.objects" ".select_for_update"
+        "aap_eda.tasks.project.models.Project.objects.select_for_update"
     ) as mock_select:
         mock_qs = Mock()
         mock_select.return_value = mock_qs
@@ -846,7 +846,7 @@ def test_handle_project_error_recovery_database_error(
     )
 
     with patch(
-        "aap_eda.tasks.project.models.Project.objects" ".select_for_update"
+        "aap_eda.tasks.project.models.Project.objects.select_for_update"
     ) as mock_select:
         mock_qs = Mock()
         mock_select.return_value = mock_qs
@@ -1066,7 +1066,10 @@ def test_auto_restart_mixed_source_mappings_activations(
 def test_sync_rulebook_preserves_sha256_for_source_mapped_activations(
     default_organization,
 ):
-    """_sync_rulebook preserves SHA256 for source-mapped activations."""
+    """_sync_rulebook preserves rulesets and SHA256 for source-mapped
+    activations, only updating the rulebook_hash inside source_mappings."""
+    import yaml as _yaml
+
     from aap_eda.services.project.imports import (
         ProjectImportService,
         RulebookInfo,
@@ -1084,6 +1087,7 @@ def test_sync_rulebook_preserves_sha256_for_source_mapped_activations(
         rulesets="old-content",
     )
     old_sha256 = get_rulebook_hash("old-content")
+    new_sha256 = get_rulebook_hash("new-content")
     activation = _create_test_activation(
         project,
         default_organization,
@@ -1091,7 +1095,16 @@ def test_sync_rulebook_preserves_sha256_for_source_mapped_activations(
         name="source-mapped-activation",
         restart_on_project_update=False,
         rulebook_rulesets="old-content",
-        source_mappings="[{source: src1, event_stream: es1}]",
+        source_mappings=_yaml.dump(
+            [
+                {
+                    "source": "src1",
+                    "event_stream": "es1",
+                    "rulebook_hash": old_sha256,
+                }
+            ],
+            default_flow_style=False,
+        ),
     )
 
     service = ProjectImportService()
@@ -1103,9 +1116,10 @@ def test_sync_rulebook_preserves_sha256_for_source_mapped_activations(
     service._sync_rulebook(rulebook, rulebook_info, "new-hash")
 
     activation.refresh_from_db()
-    assert activation.rulebook_rulesets == "new-content"
+    assert activation.rulebook_rulesets == "old-content"
     assert activation.rulebook_rulesets_sha256 == old_sha256
-    assert activation.git_hash == "new-hash"
+    updated_mappings = _yaml.safe_load(activation.source_mappings)
+    assert updated_mappings[0]["rulebook_hash"] == new_sha256
 
 
 @pytest.mark.django_db

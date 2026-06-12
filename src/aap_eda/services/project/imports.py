@@ -26,6 +26,7 @@ from django.conf import settings
 from django.core import exceptions
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 from aap_eda.core.types import StrPath
 from aap_eda.core.utils.rulebook import get_rulebook_hash
 from aap_eda.services.project.scm import ScmRepository
@@ -56,7 +57,7 @@ class MalformedError(Exception):
 
 
 def _project_import_wrapper(
-    func: Callable[[ProjectImportService, models.Project], None]
+    func: Callable[[ProjectImportService, models.Project], None],
 ):
     @wraps(func)
     def wrapper(self: ProjectImportService, project: models.Project):
@@ -206,25 +207,92 @@ class ProjectImportService:
         rulebook.rulesets = rulebook_info.raw_content
         rulebook.rulesets_sha256 = new_sha256
         rulebook.save(update_fields=["rulesets", "rulesets_sha256"])
-        # Update activations without auto-restart. Those with
-        # restart_on_project_update=True are handled by
-        # _auto_restart_activations which needs to detect
-        # the change via SHA256 comparison.
-        base_qs = models.Activation.objects.filter(
+        self._update_activations_for_rulebook(rulebook, new_sha256, git_hash)
+
+    def _update_activations_for_rulebook(
+        self,
+        rulebook: models.Rulebook,
+        new_sha256: str,
+        git_hash: str,
+    ):
+        """Update activations after a rulebook content change.
+
+        For activations without auto-restart and without source_mappings,
+        update the cached rulesets and hash immediately (bulk).
+
+        For activations with source_mappings, only update the embedded
+        rulebook_hash inside source_mappings so that the enable/restart
+        validation does not reject the activation with a stale hash.
+        The cached rulebook_rulesets are intentionally left unchanged
+        because they contain the post-swap content produced by
+        swap_event_stream_sources() at activation creation time.
+
+        Activations with restart_on_project_update=True and no
+        source_mappings are handled entirely by
+        _auto_restart_activations() and are not touched here.
+        """
+        models.Activation.objects.filter(
             rulebook=rulebook,
             restart_on_project_update=False,
-        )
-        base_qs.filter(source_mappings="").update(
+            source_mappings="",
+        ).update(
             rulebook_rulesets=rulebook.rulesets,
             rulebook_rulesets_sha256=new_sha256,
             git_hash=git_hash,
         )
-        # Source-mapped activations: preserve SHA256 for stale
-        # warning detection (AAP-72873).
-        base_qs.exclude(source_mappings="").update(
-            rulebook_rulesets=rulebook.rulesets,
-            git_hash=git_hash,
-        )
+
+        mapped_activations = models.Activation.objects.filter(
+            rulebook=rulebook,
+        ).exclude(source_mappings="")
+
+        for activation in mapped_activations:
+            updated = self._update_source_mappings_hash(
+                activation.source_mappings, new_sha256
+            )
+            if updated is not None:
+                activation.source_mappings = updated
+                activation.save(update_fields=["source_mappings"])
+            else:
+                logger.error(
+                    "Activation %s (id=%s) has unparseable "
+                    "source_mappings; marking as error",
+                    activation.name,
+                    activation.id,
+                )
+                activation.status = ActivationStatus.ERROR
+                activation.status_message = (
+                    "source_mappings could not be updated after "
+                    "project sync. Please reattach event streams."
+                )
+                activation.save(update_fields=["status", "status_message"])
+
+    @staticmethod
+    def _update_source_mappings_hash(
+        source_mappings: str, new_hash: str
+    ) -> str | None:
+        """Rewrite the rulebook_hash in each source mapping entry.
+
+        Returns the updated YAML string, or None if parsing failed.
+        """
+        try:
+            mappings = yaml.safe_load(source_mappings)
+        except yaml.YAMLError:
+            logger.warning("Failed to parse source_mappings for hash update")
+            return None
+
+        if not isinstance(mappings, list):
+            return None
+
+        for mapping in mappings:
+            if not isinstance(mapping, dict):
+                logger.warning(
+                    "source_mappings contains non-dict entry: %s",
+                    type(mapping),
+                )
+                return None
+            mapping["rulebook_hash"] = new_hash
+
+        return yaml.dump(mappings, default_flow_style=False)
 
     def _find_rulebooks(self, repo: StrPath) -> Iterator[RulebookInfo]:
         rulebooks_dir = None
