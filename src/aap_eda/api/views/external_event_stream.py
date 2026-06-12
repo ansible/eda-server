@@ -243,8 +243,6 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
         except (EventStream.DoesNotExist, ValidationError) as exc:
             raise ParseError("bad uuid specified") from exc
 
-        logger.debug("Body %s", request.body)
-
         try:
             inputs = get_resolved_secrets(self.event_stream.eda_credential)
         except CredentialPluginError as err:
@@ -276,8 +274,6 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
             data = body
         else:
             data = {"body": body}
-
-        logger.debug("Data: %s", data)
 
         payload = self._create_payload(
             event_headers,
