@@ -26,7 +26,6 @@ def find_ports(rulebook_text: str, context: dict = None) -> list[tuple]:
     Assume the rulebook is valid if it imported
     """
     rulebook = yaml.safe_load(rulebook_text)
-    LOGGER.debug(f"Context: {context}")
 
     # Make a list of host, port pairs found in all sources in
     # rulesets in a rulebook
