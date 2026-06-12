@@ -5,7 +5,7 @@ Currently there are three supported ways to deploy the EDA-Controller:
 
 * Using the eda-server-operator for k8s/ocp (recommended one)
 * Using docker-compose
-* Using minikube
+* Using kind (Kubernetes in Docker)
 
 If you are looking for a development environment, please refer to the [development](development.md) document.
 
@@ -74,17 +74,17 @@ docker-compose -p eda -f docker-compose-stage.yaml up
 
 Note: **You can use the environment variables `EDA_IMAGE_URL` and `EDA_UI_IMAGE` to use a different image url. By default is the latest code from the main branch.**
 
-## Deploy using Minikube and Taskfile
+## Deploy using Kind and Taskfile
 
-Minikube is the recommended method for macOS users
+Kind is the recommended method for local Kubernetes deployments
 
 ### Requirements
 
+* [Docker](https://www.docker.com/) or [Podman](https://podman.io/)
 * [Kubernetes CLI (kubectl)](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
 * [kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/)
-* [minikube](https://minikube.sigs.k8s.io/docs/start/)
+* [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 * [Taskfile](https://taskfile.dev/installation/#binary)
-* bash, version 3.* or above
 
 ### Deployment steps
 
@@ -96,33 +96,39 @@ Minikube is the recommended method for macOS users
 
 2. Edit ./tools/deploy/environment.properties file and add your values.
 
-3. Start minikube if it is not already running:
+3. Create a kind cluster if one is not already running:
 
    ```shell
-   minikube start
+   kind create cluster
    ```
 
-4. Ensure minikube instance is up and running:
+4. Ensure the kind cluster is up and running:
 
    ```shell
-   minikube status
+   kind get clusters
    ```
 
 5. Run the deployment:
 
    ```shell
-   task minikube:all
+   task kind:all
    ```
 
 6. Forward the webserver port to the localhost:
 
    ```shell
-   task minikube:fp:ui
+   task kind:fp:ui
    ```
+
+7. Access the UI at <https://localhost:8443/> with the default credentials `admin`/`testpass`.
+
+   You can also inspect the API documentation at <https://localhost:8443/api/eda/v1/docs>
+   or navigate through the resources with the DRF browsable API at <https://localhost:8443/api/eda/v1/>.
 
 **Note**: For fedora, the binary may be `go-task`.
 
-You can now inspect the API documentation at <https://localhost:8443/api/eda/v1/docs>
-or navigate through the resources with the DRF browsable API at <https://localhost:8443/api/eda/v1/>
+**Note**: Image builds use `podman` by default. To use Docker instead, set the `CONTAINER_ENGINE` variable:
 
-You can also access the standalone UI at <http://localhost:8443/> with the default credentials `admin`/`testpass`.
+```shell
+CONTAINER_ENGINE=docker task kind:all
+```

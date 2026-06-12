@@ -3,11 +3,12 @@ kind: Kustomization
 
 labels:
 - pairs:
-    comp: worker
+    comp: webhook-api
   includeSelectors: true
 
 resources:
 - deployment.yaml
+- service.yaml
 
 images:
 - name: aap-eda

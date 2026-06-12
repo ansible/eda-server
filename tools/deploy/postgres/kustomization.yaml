@@ -1,6 +1,8 @@
-commonLabels:
-  app: eda
-  comp: postgres
+labels:
+- pairs:
+    app: eda
+    comp: postgres
+  includeSelectors: true
 resources:
   - deployment.yaml
   - service.yaml

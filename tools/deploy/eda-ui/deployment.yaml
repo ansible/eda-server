@@ -22,9 +22,49 @@ spec:
               value: eda-api:8000
             - name: EDA_SERVER
               value: http://eda-api:8000
+            - name: EDA_WEBHOOK_SERVER
+              value: http://eda-webhook-api:8000
+            - name: EDA_SERVER_UUID
+              value: edgecafe-beef-feed-fade-decadeedgecafe
+            - name: SSL_CERTIFICATE
+              value: /certs/wildcard.crt
+            - name: SSL_CERTIFICATE_KEY
+              value: /certs/wildcard.key
+            - name: SSL_CLIENT_CERTIFICATE
+              value: /certs/client.crt
           name: eda-ui
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           image: eda-ui
           ports:
-            - containerPort: 8080
+            - containerPort: 443
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 443
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 443
+              scheme: HTTPS
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          volumeMounts:
+            - name: nginx-certs
+              mountPath: /certs
+              readOnly: true
+            - name: nginx-config
+              mountPath: /etc/nginx/templates/default.conf.template
+              subPath: default.conf.template
+              readOnly: true
+      volumes:
+        - name: nginx-certs
+          secret:
+            secretName: eda-ui-certs
+        - name: nginx-config
+          configMap:
+            name: eda-ui-nginx-config
 status: {}

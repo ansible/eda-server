@@ -3,5 +3,25 @@ EDA_CONTROLLER_URL=<MUST SET>
 EDA_CONTROLLER_SSL_VERIFY=no
 
 # EDA Server
-EDA_WEBSOCKET_BASE_URL=ws://eda-api:8000
+EDA_MODE=development
+EDA_WEBSOCKET_BASE_URL=ws://eda-ws:8000
 EDA_WEBSOCKET_SSL_VERIFY=no
+EDA_HOST=eda-api:8000
+EDA_SERVER=http://eda-api:8000
+EDA_SERVER_UUID=edgecafe-beef-feed-fade-decadeedgecafe
+
+# Webhook / Event Streams
+EDA_WEBHOOK_HOST=eda-webhook-api:8000
+EDA_WEBHOOK_SERVER=http://eda-webhook-api:8000
+EDA_EVENT_STREAM_BASE_URL=https://localhost:8443/edgecafe-beef-feed-fade-decadeedgecafe/
+EDA_EVENT_STREAM_MTLS_BASE_URL=https://localhost:8443/mtls/edgecafe-beef-feed-fade-decadeedgecafe/
+
+# Event Persistence Database
+EDA_EVENT_PERSISTENCE_DB_HOST=eda-postgres
+EDA_EVENT_PERSISTENCE_DB_PORT=5432
+EDA_EVENT_PERSISTENCE_DB_NAME=eda_event_persistence
+EDA_EVENT_PERSISTENCE_DB_USER=eda
+EDA_EVENT_PERSISTENCE_DB_PASSWORD=secret
+
+# PG Notify
+EDA_PG_NOTIFY_DSN_SERVER=host=eda-postgres port=5432 dbname=eda user=postgres password=secret
