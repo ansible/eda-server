@@ -569,7 +569,7 @@ class Engine(ContainerEngine):
         finally:
             watcher.stop()
 
-    def _wait_for_pod_to_start(self, log_handler: LogHandler) -> None:
+    def _wait_for_pod_to_start(self, _log_handler: LogHandler) -> None:
         watcher = watch.Watch()
         LOGGER.info("Waiting for pod to start")
         try:

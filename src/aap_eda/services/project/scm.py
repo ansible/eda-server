@@ -132,7 +132,7 @@ class ScmRepository:
         self._executor = _executor
         self.git_hash = None
 
-    def rev_parse(self, rev: str) -> str:
+    def rev_parse(self, _rev: str) -> str:
         """
         Return object identifier for the given revision specifier.
 
