@@ -230,7 +230,11 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
             if self.event_stream.test_mode:
                 self._update_test_data(
                     error_message=err,
-                    headers=yaml.dump(dict(request.headers)),
+                    headers=yaml.dump(
+                        self._redacted_headers(
+                            request.headers, inputs["http_header_key"]
+                        )
+                    ),
                 )
             raise
 
