@@ -66,10 +66,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Generate ephemeral read-only token
+        id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.ANSIBLE_CICD_BOT_ORG_RW_TOKEN_APP_ID }}
+          owner: ${{ github.repository_owner }}
+          private-key: ${{ secrets.ANSIBLE_CICD_BOT_ORG_RW_TOKEN_PRIVATE_KEY }}
+          permission-contents: read
+
       - name: Configure Git access to private org repos
         env:
-          # WARNING: This token is temporary, valid until 2026-05-01
-          GITHUB_TOKEN: ${{ secrets.AAP_ORG_FG_ANSIBLE_CICD_BOT_ACTIONS_REPO_READ }}
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
           git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
 
@@ -94,9 +102,18 @@ jobs:
           python-version: "3.11"
           cache: "poetry"
 
+      - name: Generate ephemeral read-only token
+        id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.ANSIBLE_CICD_BOT_ORG_RW_TOKEN_APP_ID }}
+          owner: ${{ github.repository_owner }}
+          private-key: ${{ secrets.ANSIBLE_CICD_BOT_ORG_RW_TOKEN_PRIVATE_KEY }}
+          permission-contents: read
+
       - name: Configure Git access to private org repos
         env:
-          GITHUB_TOKEN: ${{ secrets.AAP_ORG_FG_ANSIBLE_CICD_BOT_ACTIONS_REPO_READ }}
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
           git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
 
