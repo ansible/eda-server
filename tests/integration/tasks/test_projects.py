@@ -1063,6 +1063,164 @@ def test_auto_restart_mixed_source_mappings_activations(
 
 
 @pytest.mark.django_db
+def test_sync_rulebook_preserves_sha256_for_source_mapped_activations(
+    default_organization,
+):
+    """_sync_rulebook preserves SHA256 for source-mapped activations."""
+    from aap_eda.services.project.imports import (
+        ProjectImportService,
+        RulebookInfo,
+    )
+
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="old-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="old-content",
+    )
+    old_sha256 = get_rulebook_hash("old-content")
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="source-mapped-activation",
+        restart_on_project_update=False,
+        rulebook_rulesets="old-content",
+        source_mappings="[{source: src1, event_stream: es1}]",
+    )
+
+    service = ProjectImportService()
+    rulebook_info = RulebookInfo(
+        relpath="test-rulebook",
+        raw_content="new-content",
+        content=None,
+    )
+    service._sync_rulebook(rulebook, rulebook_info, "new-hash")
+
+    activation.refresh_from_db()
+    assert activation.rulebook_rulesets == "new-content"
+    assert activation.rulebook_rulesets_sha256 == old_sha256
+    assert activation.git_hash == "new-hash"
+
+
+@pytest.mark.django_db
+def test_sync_rulebook_updates_sha256_for_non_source_mapped_activations(
+    default_organization,
+):
+    """_sync_rulebook updates SHA256 normally."""
+    from aap_eda.services.project.imports import (
+        ProjectImportService,
+        RulebookInfo,
+    )
+
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="old-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="old-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="normal-activation",
+        restart_on_project_update=False,
+        rulebook_rulesets="old-content",
+    )
+
+    service = ProjectImportService()
+    rulebook_info = RulebookInfo(
+        relpath="test-rulebook",
+        raw_content="new-content",
+        content=None,
+    )
+    new_sha256 = get_rulebook_hash("new-content")
+    service._sync_rulebook(rulebook, rulebook_info, "new-hash")
+
+    activation.refresh_from_db()
+    assert activation.rulebook_rulesets == "new-content"
+    assert activation.rulebook_rulesets_sha256 == new_sha256
+    assert activation.git_hash == "new-hash"
+
+
+@pytest.mark.django_db
+def test_update_activation_content_preserves_sha256_for_source_mapped(
+    default_organization,
+):
+    """_update_activation_content preserves SHA256 for source-mapped."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="new-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="new-content",
+    )
+    old_sha256 = get_rulebook_hash("old-content")
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="source-mapped-activation",
+        rulebook_rulesets="old-content",
+        git_hash="old-hash",
+        source_mappings="[{source: src1, event_stream: es1}]",
+    )
+
+    _update_activation_content(activation, project)
+
+    assert activation.rulebook_rulesets == "new-content"
+    assert activation.rulebook_rulesets_sha256 == old_sha256
+    assert activation.git_hash == "new-hash"
+
+
+@pytest.mark.django_db
+def test_update_activation_content_updates_sha256_for_non_source_mapped(
+    default_organization,
+):
+    """_update_activation_content updates SHA256 without source mappings."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="new-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="new-content",
+    )
+    new_sha256 = get_rulebook_hash("new-content")
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="normal-activation",
+        rulebook_rulesets="old-content",
+        git_hash="old-hash",
+    )
+
+    _update_activation_content(activation, project)
+
+    assert activation.rulebook_rulesets == "new-content"
+    assert activation.rulebook_rulesets_sha256 == new_sha256
+    assert activation.git_hash == "new-hash"
+
+
+@pytest.mark.django_db
 @patch("aap_eda.tasks.project.restart_rulebook_process")
 def test_auto_restart_skips_unchanged_content(
     mock_restart,
