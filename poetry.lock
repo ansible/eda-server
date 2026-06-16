@@ -876,14 +876,14 @@ dev = ["PyTest", "PyTest-Cov", "bump2version (<1)", "setuptools ; python_version
 
 [[package]]
 name = "dispatcherd"
-version = "2026.3.25"
+version = "2026.5.27"
 description = "An asyncio-based dispatcher for tasks in a worker pool."
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "dispatcherd-2026.3.25-py3-none-any.whl", hash = "sha256:69e0eea911de26859d2dd65d8ff0d514a72a79a9137816cedc0b5dac3940d446"},
-    {file = "dispatcherd-2026.3.25.tar.gz", hash = "sha256:417bb6d030b7617d0137db30b6d90f01521b229baa5fcca37a34fe1afe62f3ee"},
+    {file = "dispatcherd-2026.5.27-py3-none-any.whl", hash = "sha256:fc6612893dc029a632c4ab77681b1fab1f5bbd2f805e567a0c262d1a3e382c8e"},
+    {file = "dispatcherd-2026.5.27.tar.gz", hash = "sha256:46e22f4d3da8b430b14009de2b588bbe055b3bdbd682d3b60ff084194daf584a"},
 ]
 
 [package.dependencies]
@@ -931,7 +931,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "26.6.1.0.dev2+gb237051a2"
+version = "26.6.15.0.dev6+gf36ec5ebe"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.11"
@@ -970,7 +970,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "ssh://git@github.com/ansible-automation-platform/django-ansible-base.git"
 reference = "stable-2.7"
-resolved_reference = "b237051a21f0ac2a0b7b25d4da57d4801f79324b"
+resolved_reference = "f36ec5ebe4f28b208738073ac5aa8e94d259bc24"
 
 [[package]]
 name = "django-crum"
@@ -3453,4 +3453,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "d4c3047c94af5b83d8ef36cbd64c01ceed9595c05e2b6ea1820e9849eea19352"
+content-hash = "2896a683f4c939913eda9fab7e0f788ca6289e11365c5c6f825014b5e3eb2a5d"
