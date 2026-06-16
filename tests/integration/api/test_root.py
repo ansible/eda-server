@@ -46,6 +46,10 @@ from tests.integration.constants import api_url_v1
                 "/teams/",
                 "/event-streams/",
                 "/credential-input-sources/",
+                "/role_definitions/",
+                "/role_user_assignments/",
+                "/role_team_assignments/",
+                "/role_metadata/",
             ],
             True,
             id="with_shared_resource",
@@ -115,7 +119,7 @@ def test_v1_root(admin_client, request, expected_slugs, use_shared_resource):
     for slug in expected_slugs:
         assert any(
             slug in url for url in response.data.values()
-        ), f"Expected slug {slug} not found in response"
+        ), f"Expected slug {slug} not found in response"  # noqa: E713
 
 
 @pytest.mark.django_db

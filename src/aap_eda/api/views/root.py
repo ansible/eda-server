@@ -24,6 +24,15 @@ from rest_framework.views import APIView
 
 LOGGER = logging.getLogger(__name__)
 
+# Exposed regardless of ALLOW_LOCAL_RESOURCE_MANAGEMENT
+# for API parity with Controller (AAP-58905).
+ALWAYS_VISIBLE_ENDPOINTS = {
+    "roledefinition-list",
+    "roleuserassignment-list",
+    "roleteamassignment-list",
+    "role-metadata",
+}
+
 
 @extend_schema(exclude=True)
 class ApiRootView(APIView):
@@ -65,8 +74,11 @@ def get_api_v1_urls(request=None):
         return url_list
 
     if settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT:
-        urls = urls.v1_urls
-    else:
-        urls = urls.eda_v1_urls
+        return list_urls(urls.v1_urls)
 
-    return list_urls(urls)
+    url_list = list_urls(urls.eda_v1_urls)
+    all_urls = list_urls(urls.dab_urls)
+    for name, url in all_urls.items():
+        if name in ALWAYS_VISIBLE_ENDPOINTS:
+            url_list[name] = url
+    return url_list
