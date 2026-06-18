@@ -30,7 +30,12 @@ class RefreshTokenSerializer(serializers.Serializer):
 
     def validate(self, data):
         try:
-            self.user = validate_jwt_token(data["refresh"], "refresh")
+            self.user, token_payload = validate_jwt_token(
+                data["refresh"], "refresh"
+            )
+            self.activation_instance_id = token_payload.get(
+                "activation_instance_id"
+            )
         except InvalidTokenError as e:
             raise serializers.ValidationError("Invalid token") from e
         return data

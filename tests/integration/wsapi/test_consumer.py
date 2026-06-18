@@ -18,6 +18,7 @@ from pydantic.error_wrappers import ValidationError
 from aap_eda.core import enums, models
 from aap_eda.core.models.activation import ActivationStatus
 from aap_eda.services.activation.activation_manager import ActivationManager
+from aap_eda.services.auth import create_jwt_token
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer, logger
 
 # TODO(doston): this test module needs a whole refactor to use already
@@ -79,6 +80,7 @@ async def test_handle_workers_without_credentials(
     payload = {
         "type": "Worker",
         "activation_id": rulebook_process_with_extra_var,
+        "activation_instance_id": rulebook_process_with_extra_var,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -96,6 +98,7 @@ async def test_handle_workers_without_credentials(
     payload = {
         "type": "Worker",
         "activation_id": rulebook_process_without_extra_var,
+        "activation_instance_id": rulebook_process_without_extra_var,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -112,6 +115,7 @@ async def test_handle_workers_without_credentials(
     payload = {
         "type": "Worker",
         "activation_id": rulebook_process_no_token,
+        "activation_instance_id": rulebook_process_no_token,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -125,7 +129,6 @@ async def test_handle_workers_without_credentials(
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_eda_system_vault_credential(
-    ws_communicator: WebsocketCommunicator,
     preseed_credential_types,
     default_organization: models.Organization,
 ):
@@ -137,9 +140,17 @@ async def test_handle_workers_with_eda_system_vault_credential(
         [credential],
     )
 
+    # Create communicator with scoped token
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     payload = {
         "type": "Worker",
         "activation_id": rulebook_process_id,
+        "activation_instance_id": rulebook_process_id,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -157,10 +168,11 @@ async def test_handle_workers_with_eda_system_vault_credential(
             assert data[0]["password"] == "secret"
             assert data[0]["label"] == "adam"
 
+    await ws_communicator.disconnect()
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_controller_info(
-    ws_communicator: WebsocketCommunicator,
     preseed_credential_types,
     default_organization: models.Organization,
 ):
@@ -168,9 +180,16 @@ async def test_handle_workers_with_controller_info(
         default_organization,
     )
 
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     payload = {
         "type": "Worker",
         "activation_id": rulebook_process_id,
+        "activation_instance_id": rulebook_process_id,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -194,14 +213,14 @@ async def test_handle_workers_with_controller_info(
         elif type == "EnvVars":
             assert response["data"].startswith("QUFQX0hPU1ROQU1FOiBodHRwczovL")
 
+    await ws_communicator.disconnect()
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_validation_errors(
     default_organization: models.Organization,
 ):
-    communicator = WebsocketCommunicator(
-        AnsibleRulebookConsumer.as_asgi(), "ws/"
-    )
+    communicator = await create_ws_communicator_with_token()
     connected, _ = await communicator.connect(timeout=3)
     assert connected
 
@@ -246,8 +265,16 @@ async def test_handle_jobs(
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_events(ws_communicator: WebsocketCommunicator):
+async def test_handle_events(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+):
+    # Prepare activation instance to associate with job
+    activation_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
+
+    # Create association between activation and job for security validation
+    await _create_activation_job_association(activation_id, job_instance.id)
 
     assert (await get_job_instance_event_count()) == 0
     payload = {
@@ -267,11 +294,16 @@ async def test_handle_events(ws_communicator: WebsocketCommunicator):
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions_multiple_firing(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
+
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
 
     assert (await get_audit_rule_count()) == 0
     payload1 = create_action_payload(
@@ -298,13 +330,24 @@ async def test_handle_actions_multiple_firing(
     assert (await get_audit_action_count()) == 2
     assert (await get_audit_event_count()) == 4
 
+    try:
+        await ws_communicator.disconnect()
+    except asyncio.CancelledError:
+        pass
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions_with_empty_job_uuid(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data(default_organization)
+
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     assert (await get_audit_rule_count()) == 0
 
     # job uuid is empty string
@@ -323,14 +366,24 @@ async def test_handle_actions_with_empty_job_uuid(
     assert (await get_audit_action_count()) == 1
     assert (await get_audit_event_count()) == 2
 
+    try:
+        await ws_communicator.disconnect()
+    except asyncio.CancelledError:
+        pass
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
+
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
 
     assert (await get_audit_rule_count()) == 0
     payload = create_action_payload(
@@ -366,14 +419,24 @@ async def test_handle_actions(
         assert event.source_name == meta["source"]["name"]
         assert event.source_type == meta["source"]["type"]
 
+    try:
+        await ws_communicator.disconnect()
+    except asyncio.CancelledError:
+        pass
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_rule_status_with_multiple_failed_actions(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
+
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
 
     action1 = create_action_payload(
         DUMMY_UUID,
@@ -402,14 +465,25 @@ async def test_rule_status_with_multiple_failed_actions(
     rule = await get_first_audit_rule()
     assert rule.status == "failed"
 
+    try:
+        await ws_communicator.disconnect()
+    except asyncio.CancelledError:
+        pass
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_heartbeat(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data(default_organization)
     rulebook_process = await get_rulebook_process(rulebook_process_id)
+
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     activation = await get_activation_by_rulebook_process(rulebook_process_id)
     assert activation.ruleset_stats == {}
 
@@ -450,6 +524,7 @@ async def test_handle_heartbeat(
         {
             "type": "SessionStats",
             "activation_id": rulebook_process_id,
+            "activation_instance_id": rulebook_process_id,
             "stats": stat,
             "reported_at": timezone.now().strftime(DATETIME_FORMAT),
         }
@@ -472,10 +547,14 @@ async def test_handle_heartbeat(
         stat["ruleSetName"] for stat in stats
     ]
 
+    try:
+        await ws_communicator.disconnect()
+    except asyncio.CancelledError:
+        pass
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_heartbeat_running_status(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data(
@@ -483,6 +562,13 @@ async def test_handle_heartbeat_running_status(
         ActivationStatus.STARTING,
     )
     rulebook_process = await get_rulebook_process(rulebook_process_id)
+
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     activation = await get_activation_by_rulebook_process(rulebook_process_id)
     assert activation.ruleset_stats == {}
 
@@ -508,6 +594,7 @@ async def test_handle_heartbeat_running_status(
         {
             "type": "SessionStats",
             "activation_id": rulebook_process_id,
+            "activation_instance_id": rulebook_process_id,
             "stats": stat,
             "reported_at": timezone.now().strftime(DATETIME_FORMAT),
         }
@@ -522,6 +609,11 @@ async def test_handle_heartbeat_running_status(
     activation = await monitor_activation(activation)
     assert activation.status == ActivationStatus.RUNNING
 
+    try:
+        await ws_communicator.disconnect()
+    except asyncio.CancelledError:
+        pass
+
 
 @database_sync_to_async
 def monitor_activation(activation: models.Activation):
@@ -534,11 +626,16 @@ def monitor_activation(activation: models.Activation):
 
 @pytest.mark.django_db(transaction=True)
 async def test_multiple_rules_for_one_event(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
+
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
 
     matching_events = _matching_events()
 
@@ -569,6 +666,11 @@ async def test_multiple_rules_for_one_event(
 
     for event in await get_audit_events():
         assert await get_audit_event_action_count(event) == 2
+
+    try:
+        await ws_communicator.disconnect()
+    except asyncio.CancelledError:
+        pass
 
 
 job_url_test_data = [
@@ -644,7 +746,6 @@ job_url_test_data = [
 )
 @pytest.mark.django_db(transaction=True)
 async def test_controller_job_url(
-    ws_communicator: WebsocketCommunicator,
     preseed_credential_types,
     action_type,
     controller_job_id,
@@ -665,6 +766,12 @@ async def test_controller_job_url(
     )
     job_instance = await _prepare_job_instance()
 
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     assert (await get_audit_rule_count()) == 0
     payload = create_action_payload(
         DUMMY_UUID,
@@ -684,6 +791,11 @@ async def test_controller_job_url(
     assert (await get_audit_action_count()) == 1
     action = await get_audit_action_first()
     assert action.url == new_url
+
+    try:
+        await ws_communicator.disconnect()
+    except asyncio.CancelledError:
+        pass
 
 
 @database_sync_to_async
@@ -1079,11 +1191,51 @@ def _prepare_job_instance():
     return job_instance
 
 
+@database_sync_to_async
+def _create_activation_job_association(
+    activation_instance_id: int, job_instance_id: int
+):
+    """Create association between activation instance and job instance.
+
+    Required for ANSIBLE_EVENT security validation which resolves
+    activation from job_id.
+    """
+    models.ActivationInstanceJobInstance.objects.get_or_create(
+        activation_instance_id=activation_instance_id,
+        job_instance_id=job_instance_id,
+    )
+
+
+@database_sync_to_async
+def _create_jwt_token_sync(activation_id=None):
+    """Sync wrapper for creating JWT tokens."""
+    return create_jwt_token(activation_instance_id=activation_id)
+
+
+async def create_ws_communicator_with_token(activation_id=None):
+    """Helper to create a WebSocket communicator with proper JWT
+    authentication.
+
+    Args:
+        activation_id: Optional activation instance ID to scope the token
+        to. If None, creates a token without scope.
+    """
+    # Create a JWT token scoped to the activation instance
+    access_token, _ = await _create_jwt_token_sync(activation_id)
+
+    return WebsocketCommunicator(
+        AnsibleRulebookConsumer.as_asgi(),
+        "ws/",
+        headers=[(b"authorization", f"Bearer {access_token}".encode())],
+    )
+
+
 @pytest_asyncio.fixture(scope="function")
 async def ws_communicator() -> Generator[WebsocketCommunicator, None, None]:
-    communicator = WebsocketCommunicator(
-        AnsibleRulebookConsumer.as_asgi(), "ws/"
-    )
+    # Create a communicator without token for backwards compatibility
+    # Individual tests should use create_ws_communicator_with_token()
+    # if they need tokens
+    communicator = await create_ws_communicator_with_token()
     connected, _ = await communicator.connect()
     assert connected
 
@@ -1116,6 +1268,7 @@ def create_action_payload(
         "action": action_name,
         "action_uuid": action_uuid,
         "activation_id": activation_instance_id,
+        "activation_instance_id": activation_instance_id,
         "job_id": job_instance_uuid,
         "ruleset": "ruleset",
         "rule": "rule",
@@ -1256,7 +1409,6 @@ def _create_event(data, uuid):
 )
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_file_contents(
-    ws_communicator: WebsocketCommunicator,
     preseed_credential_types,
     default_organization: models.Organization,
     credential_type_inputs: dict[str, any],
@@ -1276,9 +1428,16 @@ async def test_handle_workers_with_file_contents(
         [eda_credential],
     )
 
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     payload = {
         "type": "Worker",
         "activation_id": rulebook_process_id,
+        "activation_instance_id": rulebook_process_id,
     }
     await ws_communicator.send_json_to(payload)
     check_data = [("Rulebook", None)]
@@ -1293,10 +1452,11 @@ async def test_handle_workers_with_file_contents(
             for key, value in data.items():
                 assert response[key] == value
 
+    await ws_communicator.disconnect()
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_env_vars(
-    ws_communicator: WebsocketCommunicator,
     preseed_credential_types,
     default_organization: models.Organization,
 ):
@@ -1310,9 +1470,16 @@ async def test_handle_workers_with_env_vars(
         system_credential,
     )
 
+    ws_communicator = await create_ws_communicator_with_token(
+        rulebook_process_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     payload = {
         "type": "Worker",
         "activation_id": rulebook_process_id,
+        "activation_instance_id": rulebook_process_id,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -1327,6 +1494,8 @@ async def test_handle_workers_with_env_vars(
         assert response["type"] == type
         if type == "EnvVars":
             assert response["data"].startswith("QUFQX0hPU1ROQU1FOiBodHRwczovL")
+
+    await ws_communicator.disconnect()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -1351,7 +1520,6 @@ async def test_receive_object_not_exist(
 
 @pytest.mark.django_db(transaction=True)
 async def test_insert_audit_rule_invalid_activation(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
     eda_caplog,
 ):
@@ -1360,6 +1528,15 @@ async def test_insert_audit_rule_invalid_activation(
     # Test with invalid activation ID
     invalid_activation_id = 100000000
     job_uuid = "940730a1-8b6f-45f3-84c9-bde8f04390e0"
+
+    # Create communicator with token scoped to invalid activation ID
+    # This allows token validation to pass and reach the code that checks
+    # if the RulebookProcess exists
+    ws_communicator = await create_ws_communicator_with_token(
+        invalid_activation_id
+    )
+    connected, _ = await ws_communicator.connect()
+    assert connected
 
     payload = create_action_payload(
         str(uuid.uuid4()),
@@ -1381,6 +1558,11 @@ async def test_insert_audit_rule_invalid_activation(
         # Verify no audit records created and error is logged
         assert await get_audit_rule_count() == initial_audit_count
         assert "RulebookProcess 100000000 not found" in eda_caplog.text
+
+    try:
+        await ws_communicator.disconnect()
+    except asyncio.CancelledError:
+        pass
 
 
 @pytest.mark.django_db(transaction=True)
@@ -1596,7 +1778,6 @@ def _prepare_activation_with_rule_engine_credential(
 
 @pytest.mark.django_db(transaction=True)
 async def test_get_rule_engine_credential_with_user_provided(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
     preseed_credential_types,
 ):
@@ -1611,10 +1792,15 @@ async def test_get_rule_engine_credential_with_user_provided(
         default_organization, rule_engine_cred
     )
 
+    ws_communicator = await create_ws_communicator_with_token(process_id)
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     # Send Worker payload - should work without errors
     payload = {
         "type": "Worker",
         "activation_id": process_id,
+        "activation_instance_id": process_id,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -1631,10 +1817,11 @@ async def test_get_rule_engine_credential_with_user_provided(
 
     assert received_end, "Should receive EndOfResponse"
 
+    await ws_communicator.disconnect()
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_get_rule_engine_credential_persistence_disabled(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
     preseed_credential_types,
 ):
@@ -1642,10 +1829,15 @@ async def test_get_rule_engine_credential_persistence_disabled(
     # Create activation WITHOUT persistence
     process_id = await _prepare_db_data(default_organization)
 
+    ws_communicator = await create_ws_communicator_with_token(process_id)
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     # Send Worker payload
     payload = {
         "type": "Worker",
         "activation_id": process_id,
+        "activation_instance_id": process_id,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -1658,6 +1850,8 @@ async def test_get_rule_engine_credential_persistence_disabled(
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == message_type
+
+    await ws_communicator.disconnect()
 
 
 @database_sync_to_async
@@ -1768,7 +1962,6 @@ def _prepare_activation_with_default_rule_engine_credential(
 
 @pytest.mark.django_db(transaction=True)
 async def test_get_rule_engine_credential_uses_default(
-    ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
     preseed_credential_types,
 ):
@@ -1783,10 +1976,15 @@ async def test_get_rule_engine_credential_uses_default(
         default_organization
     )
 
+    ws_communicator = await create_ws_communicator_with_token(process_id)
+    connected, _ = await ws_communicator.connect()
+    assert connected
+
     # Send Worker payload - should use default credential
     payload = {
         "type": "Worker",
         "activation_id": process_id,
+        "activation_instance_id": process_id,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -1802,3 +2000,5 @@ async def test_get_rule_engine_credential_uses_default(
             break
 
     assert received_end, "Should receive EndOfResponse with default credential"
+
+    await ws_communicator.disconnect()

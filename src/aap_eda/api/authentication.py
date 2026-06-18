@@ -49,6 +49,7 @@ class WebsocketJWTAuthentication(BaseAuthentication):
             raise AuthenticationFailed("Invalid Bearer token format")
 
         try:
-            return validate_jwt_token(parts[1], "access"), None
+            user, _ = validate_jwt_token(parts[1], "access")
+            return user, None
         except InvalidTokenError as e:
             raise AuthenticationFailed("Invalid token") from e
