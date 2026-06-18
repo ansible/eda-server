@@ -97,12 +97,6 @@ class ActivationManager(StatusManager):
         self.db_instance.save(update_fields=["failure_count", "modified_at"])
 
     @run_with_lock
-    def _reset_failure_count(self):
-        """Reset the failure count of the activation."""
-        self.db_instance.failure_count = 0
-        self.db_instance.save(update_fields=["failure_count", "modified_at"])
-
-    @run_with_lock
     def _increase_restart_count(self):
         """Increase the restart count of the activation."""
         self.db_instance.restart_count += 1
@@ -1008,7 +1002,6 @@ class ActivationManager(StatusManager):
             with transaction.atomic():
                 self.set_status(ActivationStatus.RUNNING)
                 self.set_latest_instance_status(ActivationStatus.RUNNING)
-                self._reset_failure_count()
 
     def update_logs(self):
         """Update the logs of the latest instance of the activation."""
