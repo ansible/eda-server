@@ -1002,6 +1002,7 @@ class ActivationManager(StatusManager):
             with transaction.atomic():
                 self.set_status(ActivationStatus.RUNNING)
                 self.set_latest_instance_status(ActivationStatus.RUNNING)
+                self.db_instance.refresh_from_db()
 
     def update_logs(self):
         """Update the logs of the latest instance of the activation."""
