@@ -315,6 +315,7 @@ def test_engine_start_applies_k8s_pod_metadata(
 
     spec = created_body.spec.template.spec
     assert spec.service_account_name == "eda-workload"
+    assert spec.automount_service_account_token is False
     labels = created_body.spec.template.metadata.labels
     assert labels["app"] == "eda"
     assert labels["job-name"] == engine.job_name
@@ -904,3 +905,4 @@ def test_engine_start_no_tolerations_by_default(
             )
             pod_spec = job_body.spec.template.spec
             assert pod_spec.tolerations is None
+            assert pod_spec.automount_service_account_token is False
