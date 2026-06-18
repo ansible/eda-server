@@ -42,10 +42,18 @@ def display_permissions(role_data: dict) -> dict:
 JWT_ALGORITHM = "HS256"
 
 
-def create_jwt_token() -> tuple[str, str]:
+def create_jwt_token(
+    activation_instance_id: str | int | None = None,
+) -> tuple[str, str]:
     """Create JWT access and refresh token pair.
 
     They can be sent to rulebook clients through command line arguments.
+
+    Args:
+        activation_instance_id: Optional activation instance ID to
+            scope the token. Can be string or int (will be converted
+            to string). If provided, the token can only be used for
+            this activation instance.
     """
     with no_reverse_sync():
         user, new = User.objects.get_or_create(
@@ -56,31 +64,54 @@ def create_jwt_token() -> tuple[str, str]:
         user.set_unusable_password()
         user.save(update_fields=["password"])
 
-    access_token = jwt_access_token(user.id)
-    refresh_token = jwt_refresh_token(user.id)
+    # Convert to string for consistent comparison
+    activation_id_str = (
+        str(activation_instance_id)
+        if activation_instance_id is not None
+        else None
+    )
+    access_token = jwt_access_token(user.id, activation_id_str)
+    refresh_token = jwt_refresh_token(user.id, activation_id_str)
     return (access_token, refresh_token)
 
 
-def jwt_access_token(user_id: int) -> str:
+def jwt_access_token(
+    user_id: int, activation_instance_id: str | None = None
+) -> str:
     expiration = timedelta(
         minutes=float(settings.JWT_ACCESS_TOKEN_LIFETIME_MINUTES)
     )
-    return get_jwt_token(user_id, expiration, token_type="access")
+    return get_jwt_token(
+        user_id,
+        expiration,
+        token_type="access",
+        activation_instance_id=activation_instance_id,
+    )
 
 
-def jwt_refresh_token(user_id: int) -> str:
+def jwt_refresh_token(
+    user_id: int, activation_instance_id: str | None = None
+) -> str:
     expiration = timedelta(
         days=float(settings.JWT_REFRESH_TOKEN_LIFETIME_DAYS)
     )
-    return get_jwt_token(user_id, expiration, token_type="refresh")
+    return get_jwt_token(
+        user_id,
+        expiration,
+        token_type="refresh",
+        activation_instance_id=activation_instance_id,
+    )
 
 
 def get_jwt_token(user_id, expiration, **kwargs):
+    activation_instance_id = kwargs.pop("activation_instance_id", None)
     payload = {
         "user_id": user_id,
         "exp": datetime.now() + expiration,
         **kwargs,
     }
+    if activation_instance_id is not None:
+        payload["activation_instance_id"] = activation_instance_id
 
     return jwt.encode(payload, settings.SECRET_KEY, JWT_ALGORITHM)
 
@@ -94,7 +125,26 @@ def parse_jwt_token(token: str) -> dict:
         raise InvalidTokenError("Expired token") from e
 
 
-def validate_jwt_token(token: str, token_type: str) -> User:
+def validate_jwt_token(
+    token: str,
+    token_type: str,
+    activation_instance_id: str | int | None = None,
+) -> User:
+    """Validate JWT token and optionally verify activation instance scope.
+
+    Args:
+        token: The JWT token to validate
+        token_type: Expected token type ('access' or 'refresh')
+        activation_instance_id: If provided, verify that the token
+            is scoped to this activation instance. Can be string or
+            int.
+
+    Returns:
+        User: The user associated with the token
+
+    Raises:
+        InvalidTokenError: If token is invalid or scope doesn't match
+    """
     token_dict = parse_jwt_token(token)
 
     for key in ["user_id", "exp", "token_type"]:
@@ -103,6 +153,21 @@ def validate_jwt_token(token: str, token_type: str) -> User:
 
     if token_dict["token_type"] != token_type:
         raise InvalidTokenError("Invalid token type")
+
+    # Validate activation_instance_id scope if required
+    if activation_instance_id is not None:
+        token_activation_id = token_dict.get("activation_instance_id")
+        if token_activation_id is None:
+            raise InvalidTokenError(
+                "Token is not scoped to an activation instance"
+            )
+        # Compare as strings to handle both int and UUID types
+        if str(token_activation_id) != str(activation_instance_id):
+            raise InvalidTokenError(
+                f"Token is scoped to activation instance "
+                f"{token_activation_id}, but request is for activation "
+                f"instance {activation_instance_id}"
+            )
 
     try:
         return User.objects.get(id=token_dict["user_id"])

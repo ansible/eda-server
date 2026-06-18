@@ -14,7 +14,7 @@
 
 from rest_framework import serializers
 
-from aap_eda.services.auth import validate_jwt_token
+from aap_eda.services.auth import parse_jwt_token, validate_jwt_token
 from aap_eda.services.exceptions import InvalidTokenError
 
 
@@ -30,7 +30,16 @@ class RefreshTokenSerializer(serializers.Serializer):
 
     def validate(self, data):
         try:
+            # Validate the refresh token
             self.user = validate_jwt_token(data["refresh"], "refresh")
+
+            # Extract activation_instance_id from refresh token if present
+            # This is the trusted value from the token payload
+            token_payload = parse_jwt_token(data["refresh"])
+            self.activation_instance_id = token_payload.get(
+                "activation_instance_id"
+            )
+
         except InvalidTokenError as e:
             raise serializers.ValidationError("Invalid token") from e
         return data

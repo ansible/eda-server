@@ -207,7 +207,10 @@ class ContainerableMixin:
             raise ContainerableInvalidError from e
 
     def _build_cmdline(self) -> AnsibleRulebookCmdLine:
-        access_token, refresh_token = create_jwt_token()
+        # Create tokens scoped to this specific activation instance
+        access_token, refresh_token = create_jwt_token(
+            activation_instance_id=self.latest_instance.id
+        )
         return AnsibleRulebookCmdLine(
             ws_url=self._get_ws_url(),
             log_level=self._get_log_level(),
