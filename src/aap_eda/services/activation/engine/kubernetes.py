@@ -346,6 +346,7 @@ class Engine(ContainerEngine):
         spec_kwargs: dict = {
             "restart_policy": "Never",
             "containers": [container],
+            "automount_service_account_token": False,
         }
         if request.credential:
             self._create_secret(request, log_handler)
