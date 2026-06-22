@@ -104,7 +104,7 @@ class AuditRuleSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "organization_id", "created_at"]
 
 
-class AuditRuleDetailSerializer(serializers.Serializer):
+class AuditRuleSerializerBase(serializers.Serializer):
     id = serializers.IntegerField(
         required=True,
         help_text="ID of the fired rule",
@@ -124,6 +124,49 @@ class AuditRuleDetailSerializer(serializers.Serializer):
 
     organization = serializers.SerializerMethodField()
 
+    fired_at = serializers.DateTimeField(
+        required=True,
+        help_text="The fired timestamp of the rule",
+    )
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "nullable": True},
+                "name": {"type": "string"},
+            },
+            "example": {"id": 0, "name": "string"},
+        }
+    )
+    def get_activation_instance(self, rule):
+        instance = rule.activation_instance
+        if instance:
+            return {"id": instance.id, "name": instance.name}
+        else:
+            return {"id": None, "name": "DELETED"}
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "nullable": False},
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+            },
+            "example": {"id": 0, "name": "string", "description": "string"},
+        }
+    )
+    def get_organization(self, rule):
+        organization = rule.organization
+        return {
+            "id": organization.id,
+            "name": organization.name,
+            "description": organization.description,
+        }
+
+
+class AuditRuleDetailSerializer(AuditRuleSerializerBase):
     ruleset_name = serializers.CharField(
         required=False,
         help_text="Name of the related ruleset",
@@ -134,108 +177,9 @@ class AuditRuleDetailSerializer(serializers.Serializer):
         help_text="The created timestamp of the action",
     )
 
-    fired_at = serializers.DateTimeField(
-        required=True,
-        help_text="The fired timestamp of the rule",
-    )
 
-    @extend_schema_field(
-        {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "nullable": True},
-                "name": {"type": "string"},
-            },
-            "example": {"id": 0, "name": "string"},
-        }
-    )
-    def get_activation_instance(self, rule):
-        instance = rule.activation_instance
-        if instance:
-            return {"id": instance.id, "name": instance.name}
-        else:
-            return {"id": None, "name": "DELETED"}
-
-    @extend_schema_field(
-        {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "nullable": False},
-                "name": {"type": "string"},
-                "description": {"type": "string"},
-            },
-            "example": {"id": 0, "name": "string", "description": "string"},
-        }
-    )
-    def get_organization(self, rule):
-        organization = rule.organization
-        return {
-            "id": organization.id,
-            "name": organization.name,
-            "description": organization.description,
-        }
-
-
-class AuditRuleListSerializer(serializers.Serializer):
-    id = serializers.IntegerField(
-        required=True,
-        help_text="ID of the fired rule",
-    )
-
-    name = serializers.CharField(
-        required=True,
-        help_text="Name of the fired rule",
-    )
-
-    status = serializers.CharField(
-        required=False,
-        help_text="Status of the fired rule",
-    )
-
-    activation_instance = serializers.SerializerMethodField()
-
-    organization = serializers.SerializerMethodField()
-
-    fired_at = serializers.DateTimeField(
-        required=True,
-        help_text="The fired timestamp of the rule",
-    )
-
-    @extend_schema_field(
-        {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "nullable": True},
-                "name": {"type": "string"},
-            },
-            "example": {"id": 0, "name": "string"},
-        }
-    )
-    def get_activation_instance(self, rule):
-        instance = rule.activation_instance
-        if instance:
-            return {"id": instance.id, "name": instance.name}
-        else:
-            return {"id": None, "name": "DELETED"}
-
-    @extend_schema_field(
-        {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "nullable": False},
-                "name": {"type": "string"},
-                "description": {"type": "string"},
-            },
-            "example": {"id": 0, "name": "string", "description": "string"},
-        }
-    )
-    def get_organization(self, rule):
-        organization = rule.organization
-        return {
-            "id": organization.id,
-            "name": organization.name,
-            "description": organization.description,
-        }
+class AuditRuleListSerializer(AuditRuleSerializerBase):
+    pass
 
 
 class AuditActionSerializer(serializers.ModelSerializer):
