@@ -81,8 +81,8 @@ def test_mtls_authentication_invalid_subject_mismatch():
     with pytest.raises(AuthenticationFailed) as exc_info:
         auth.authenticate()
 
-    assert "does not match" in str(exc_info.value)
-    assert "CN=different.example.com,O=Test Org" in str(exc_info.value)
+    # Generic message that doesn't leak Subject details
+    assert str(exc_info.value) == "Authentication failed"
 
 
 def test_mtls_authentication_invalid_missing_attribute():
@@ -95,7 +95,8 @@ def test_mtls_authentication_invalid_missing_attribute():
     with pytest.raises(AuthenticationFailed) as exc_info:
         auth.authenticate()
 
-    assert "does not match" in str(exc_info.value)
+    # Generic message that doesn't leak Subject details
+    assert str(exc_info.value) == "Authentication failed"
 
 
 def test_mtls_authentication_invalid_wildcard_no_match():
@@ -107,7 +108,8 @@ def test_mtls_authentication_invalid_wildcard_no_match():
     with pytest.raises(AuthenticationFailed) as exc_info:
         auth.authenticate()
 
-    assert "does not match" in str(exc_info.value)
+    # Generic message that doesn't leak Subject details
+    assert str(exc_info.value) == "Authentication failed"
 
 
 def test_mtls_authentication_invalid_dn_format():
@@ -119,7 +121,8 @@ def test_mtls_authentication_invalid_dn_format():
     with pytest.raises(AuthenticationFailed) as exc_info:
         auth.authenticate()
 
-    assert "does not match" in str(exc_info.value)
+    # Generic message that doesn't leak Subject details
+    assert str(exc_info.value) == "Authentication failed"
 
 
 def test_mtls_authentication_empty_subject_allowed():

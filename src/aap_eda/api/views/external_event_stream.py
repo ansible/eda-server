@@ -19,6 +19,9 @@ import urllib.parse
 from typing import Any
 
 import yaml
+from ansible_base.jwt_consumer.common.util import (
+    validate_x_trusted_proxy_header,
+)
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -90,6 +93,47 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                 "test_error_message",
             ]
         )
+
+    def _validate_trusted_proxy_header(self, request):
+        """Validate the X-Trusted-Proxy header.
+
+        Ensures that the request came from the Gateway/Envoy Proxy by
+        validating the X-Trusted-Proxy header signature and timestamp.
+
+        This validation can be disabled for local development by setting:
+        EVENT_STREAM_REQUIRE_TRUSTED_PROXY=False
+
+        Args:
+            request: The HTTP request object
+
+        Raises:
+            ParseError: If the header is missing or validation fails
+                       (only when EVENT_STREAM_REQUIRE_TRUSTED_PROXY=True)
+        """
+        # Skip validation if not required (for local development)
+        if not settings.EVENT_STREAM_REQUIRE_TRUSTED_PROXY:
+            logger.debug(
+                "X-Trusted-Proxy header validation is disabled "
+                "(EVENT_STREAM_REQUIRE_TRUSTED_PROXY=False)"
+            )
+            return
+
+        x_trusted_proxy = request.META.get("HTTP_X_TRUSTED_PROXY")
+
+        if not x_trusted_proxy:
+            message = "X-Trusted-Proxy header is missing"
+            logger.error(message)
+            raise ParseError("Invalid request")
+
+        if not validate_x_trusted_proxy_header(x_trusted_proxy):
+            message = (
+                "X-Trusted-Proxy header validation failed. "
+                "Request must come from a trusted Gateway/Envoy Proxy."
+            )
+            logger.error(message)
+            raise ParseError("Invalid request")
+
+        logger.debug("X-Trusted-Proxy header validated successfully")
 
     def _parse_body(self, content_type: str, body: bytes) -> dict:
         if content_type == "application/x-www-form-urlencoded":
@@ -246,6 +290,9 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
             self.event_stream = EventStream.objects.get(uuid=kwargs["pk"])
         except (EventStream.DoesNotExist, ValidationError) as exc:
             raise ParseError("bad uuid specified") from exc
+
+        # Validate X-Trusted-Proxy header from Gateway/Envoy
+        self._validate_trusted_proxy_header(request)
 
         try:
             inputs = get_resolved_secrets(self.event_stream.eda_credential)

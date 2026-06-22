@@ -114,9 +114,12 @@ class MTLSAuthentication(EventStreamAuthentication):
         if self.subject and not self.validate_subject(
             self.subject, self.value
         ):
-            message = f"Subject: {self.value} does not match {self.subject}"
-            logger.warning(message)
-            raise AuthenticationFailed(message)
+            # Log details internally but don't leak in response
+            logger.warning(
+                f"Subject validation failed: {self.value} "
+                f"does not match {self.subject}"
+            )
+            raise AuthenticationFailed("Authentication failed")
 
     def validate_subject(self, expected: str, actual: str) -> bool:
         """Validate that actual subject matches expected subject pattern.

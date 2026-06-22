@@ -35,6 +35,7 @@ x-environment: &common-env
   EDA_PG_NOTIFY_DSN_SERVER: "host=postgres port=5432 dbname=eda user=postgres password=secret"
   EDA_EVENT_STREAM_BASE_URL: ${EDA_EVENT_STREAM_BASE_URL:-https://localhost:8443/edgecafe-beef-feed-fade-decadeedgecafe/}
   EDA_EVENT_STREAM_MTLS_BASE_URL: ${EDA_EVENT_STREAM_MTLS_BASE_URL:-https://localhost:8443/mtls/edgecafe-beef-feed-fade-decadeedgecafe/}
+  EDA_EVENT_STREAM_REQUIRE_TRUSTED_PROXY: ${EDA_EVENT_STREAM_REQUIRE_TRUSTED_PROXY:-True}
   EDA_WEBHOOK_HOST: ${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
   EDA_WEBHOOK_SERVER: http://${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
   EDA_STATIC_URL: ${EDA_STATIC_URL:-api/eda/static/}
