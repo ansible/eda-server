@@ -20,6 +20,8 @@ import re
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+PRIVATE_KEY_TYPE = "PRIVATE KEY"
+
 
 # Code copied from AWX repo hoping it lands in django-anssible-base at
 # some point
@@ -80,12 +82,12 @@ def validate_pem(data, min_keys=0, max_keys=None, min_certs=0, max_certs=None):
         pem_obj_info = {}
         pem_obj_info["all"] = match.group(0)
         pem_obj_info["type"] = pem_obj_type = match.group("type")
-        if pem_obj_type.endswith("PRIVATE KEY"):
+        if pem_obj_type.endswith(PRIVATE_KEY_TYPE):
             key_count += 1
-            pem_obj_info["type"] = "PRIVATE KEY"
+            pem_obj_info["type"] = PRIVATE_KEY_TYPE
             key_type = (
-                pem_obj_type.replace("ENCRYPTED PRIVATE KEY", "")
-                .replace("PRIVATE KEY", "")
+                pem_obj_type.replace(f"ENCRYPTED {PRIVATE_KEY_TYPE}", "")
+                .replace(PRIVATE_KEY_TYPE, "")
                 .strip()
             )
             try:

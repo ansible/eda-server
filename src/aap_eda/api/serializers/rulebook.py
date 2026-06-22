@@ -18,6 +18,11 @@ from rest_framework import serializers
 from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
 from aap_eda.core import models
 
+FIRED_RULE_ID_HELP = "ID of the fired rule"
+FIRED_RULE_NAME_HELP = "Name of the fired rule"
+FIRED_RULE_STATUS_HELP = "Status of the fired rule"
+FIRED_RULE_TIMESTAMP_HELP = "The fired timestamp of the rule"
+
 
 class RulebookSerializer(serializers.ModelSerializer):
     project_id = serializers.PrimaryKeyRelatedField(
@@ -63,17 +68,17 @@ class RulebookRefSerializer(serializers.ModelSerializer):
 class AuditRuleSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(
         required=True,
-        help_text="ID of the fired rule",
+        help_text=FIRED_RULE_ID_HELP,
     )
 
     name = serializers.CharField(
         required=True,
-        help_text="Name of the fired rule",
+        help_text=FIRED_RULE_NAME_HELP,
     )
 
     status = serializers.CharField(
         required=False,
-        help_text="Status of the fired rule",
+        help_text=FIRED_RULE_STATUS_HELP,
     )
 
     ruleset_name = serializers.CharField(
@@ -83,7 +88,7 @@ class AuditRuleSerializer(serializers.ModelSerializer):
 
     fired_at = serializers.DateTimeField(
         required=True,
-        help_text="The fired timestamp of the rule",
+        help_text=FIRED_RULE_TIMESTAMP_HELP,
     )
 
     class Meta:
@@ -107,17 +112,17 @@ class AuditRuleSerializer(serializers.ModelSerializer):
 class AuditRuleSerializerBase(serializers.Serializer):
     id = serializers.IntegerField(
         required=True,
-        help_text="ID of the fired rule",
+        help_text=FIRED_RULE_ID_HELP,
     )
 
     name = serializers.CharField(
         required=True,
-        help_text="Name of the fired rule",
+        help_text=FIRED_RULE_NAME_HELP,
     )
 
     status = serializers.CharField(
         required=False,
-        help_text="Status of the fired rule",
+        help_text=FIRED_RULE_STATUS_HELP,
     )
 
     activation_instance = serializers.SerializerMethodField()
@@ -126,7 +131,7 @@ class AuditRuleSerializerBase(serializers.Serializer):
 
     fired_at = serializers.DateTimeField(
         required=True,
-        help_text="The fired timestamp of the rule",
+        help_text=FIRED_RULE_TIMESTAMP_HELP,
     )
 
     @extend_schema_field(
