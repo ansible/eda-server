@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import datetime
+import uuid
 from typing import Any, Dict
 from unittest import mock
 
@@ -795,6 +796,108 @@ def test_partial_update_project_scm_refspec(
     new_project.refresh_from_db()
     assert new_project.scm_refspec == new_scm_refspec
     assert new_project.scm_refspec != original_scm_refspec
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
+@mock.patch("aap_eda.tasks.sync_project")
+def test_partial_update_does_not_overwrite_worker_state(
+    sync_project_task: mock.Mock,
+    mock_health_check: mock.Mock,
+    new_project: models.Project,
+    admin_client: APIClient,
+):
+    """Regression test for AAP-79566: partial_update race condition.
+
+    Simulates a worker completing the sync before the API handler
+    records the job_id. The worker's import_state update must be
+    preserved — import_state should NOT be overwritten to PENDING.
+    """
+    mock_health_check.return_value = True
+    job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
+
+    def sync_side_effect(project_id):
+        models.Project.objects.filter(pk=project_id).update(
+            import_state=models.Project.ImportState.COMPLETED,
+            git_hash="worker-updated-hash",
+        )
+        return job_id
+
+    sync_project_task.side_effect = sync_side_effect
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{new_project.id}/",
+        data={"scm_branch": "new-branch"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    new_project.refresh_from_db()
+    assert new_project.scm_branch == "new-branch"
+    assert new_project.import_task_id == uuid.UUID(job_id)
+    assert new_project.import_state == models.Project.ImportState.COMPLETED
+    assert new_project.git_hash == "worker-updated-hash"
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
+@mock.patch("aap_eda.tasks.sync_project")
+def test_partial_update_does_not_overwrite_unrelated_fields(
+    sync_project_task: mock.Mock,
+    mock_health_check: mock.Mock,
+    new_project: models.Project,
+    admin_client: APIClient,
+):
+    """Regression test for AAP-79566: update_fields prevents stale writes.
+
+    Verifies that partial_update only saves import_state and
+    import_task_id, not other fields that may have been updated
+    concurrently by a worker.
+    """
+    mock_health_check.return_value = True
+    job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
+
+    models.Project.objects.filter(pk=new_project.id).update(
+        import_error="concurrent-error-update",
+    )
+
+    sync_project_task.return_value = job_id
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{new_project.id}/",
+        data={"scm_branch": "new-branch"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    new_project.refresh_from_db()
+    assert new_project.import_error == "concurrent-error-update"
+    assert new_project.import_state == models.Project.ImportState.PENDING
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
+@mock.patch("aap_eda.tasks.sync_project")
+def test_partial_update_skips_sync_when_already_pending(
+    sync_project_task: mock.Mock,
+    mock_health_check: mock.Mock,
+    new_project: models.Project,
+    admin_client: APIClient,
+):
+    """Verify partial_update skips sync dispatch when already PENDING."""
+    mock_health_check.return_value = True
+
+    models.Project.objects.filter(pk=new_project.id).update(
+        import_state=models.Project.ImportState.PENDING,
+    )
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{new_project.id}/",
+        data={"scm_branch": "new-branch"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    sync_project_task.assert_not_called()
 
 
 @pytest.mark.django_db

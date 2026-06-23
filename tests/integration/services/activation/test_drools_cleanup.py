@@ -180,6 +180,7 @@ class TestDeleteRowsByHaUuid:
             "drools_ansible_ha_stats": 10,
             "drools_ansible_matching_event": 10,
             "drools_ansible_session_state": 10,
+            "drools_ansible_event_record": 10,
         }
 
         # Verify DELETE queries were executed
@@ -188,7 +189,7 @@ class TestDeleteRowsByHaUuid:
             for call in mock_cursor.execute.call_args_list
             if "DELETE FROM" in str(call)
         ]
-        assert len(delete_calls) == 4
+        assert len(delete_calls) == 5
 
     @patch("aap_eda.services.activation.drools_cleanup.psycopg.connect")
     @patch("aap_eda.services.activation.drools_cleanup._temp_cert_files")
@@ -250,7 +251,7 @@ class TestDeleteRowsByHaUuid:
         assert call_kwargs["sslmode"] == "verify-full"
 
         # Verify results
-        assert len(result) == 4
+        assert len(result) == 5
         assert all(count == 5 for count in result.values())
 
     @patch("aap_eda.services.activation.drools_cleanup.psycopg.connect")
@@ -262,8 +263,14 @@ class TestDeleteRowsByHaUuid:
         mock_connect.return_value.__enter__.return_value = mock_conn
         mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
 
-        # Mock table existence checks: first two exist, last two don't
-        mock_cursor.fetchone.side_effect = [[True], [True], [False], [False]]
+        # Mock table existence checks: first two exist, last three don't
+        mock_cursor.fetchone.side_effect = [
+            [True],
+            [True],
+            [False],
+            [False],
+            [False],
+        ]
         mock_cursor.rowcount = 3
 
         with patch(
@@ -280,6 +287,7 @@ class TestDeleteRowsByHaUuid:
             "drools_ansible_ha_stats": 3,
             "drools_ansible_matching_event": 0,
             "drools_ansible_session_state": 0,
+            "drools_ansible_event_record": 0,
         }
 
         # Verify warnings were logged for nonexistent tables
@@ -288,7 +296,7 @@ class TestDeleteRowsByHaUuid:
             for call in mock_logger.warning.call_args_list
             if "does not exist" in str(call)
         ]
-        assert len(warning_calls) == 2
+        assert len(warning_calls) == 3
 
     @patch("aap_eda.services.activation.drools_cleanup.psycopg.connect")
     def test_connection_error(self, mock_connect):
@@ -471,6 +479,7 @@ class TestDroolsCleanup:
             "drools_ansible_ha_stats": 3,
             "drools_ansible_matching_event": 10,
             "drools_ansible_session_state": 2,
+            "drools_ansible_event_record": 7,
         }
 
         activation = activation_with_rule_engine_cred

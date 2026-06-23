@@ -213,6 +213,33 @@ class ProjectViewSet(
             ),
         },
     )
+    @staticmethod
+    def _needs_project_sync(update_fields):
+        return bool({"scm_branch", "scm_refspec", "url"} & set(update_fields))
+
+    @staticmethod
+    def _mark_pending_if_idle(project, update_fields):
+        """Read fresh import_state under row lock; set PENDING if idle.
+
+        Appends 'import_state' to update_fields when the state is
+        changed so the caller's single save persists it.
+        Returns True when a sync task should be dispatched.
+        """
+        current_state = (
+            models.Project.objects.select_for_update()
+            .values_list("import_state", flat=True)
+            .get(pk=project.id)
+        )
+        if current_state in [
+            models.Project.ImportState.PENDING,
+            models.Project.ImportState.RUNNING,
+        ]:
+            return False
+
+        project.import_state = models.Project.ImportState.PENDING
+        update_fields.append("import_state")
+        return True
+
     def partial_update(self, request, pk):
         project = self.get_object()
         serializer = serializers.ProjectUpdateRequestSerializer(
@@ -227,7 +254,17 @@ class ProjectViewSet(
             setattr(project, key, value)
             update_fields.append(key)
 
+        needs_sync = self._needs_project_sync(update_fields)
+
+        if needs_sync and not check_default_worker_health():
+            raise api_exc.WorkerUnavailable(worker_type="default")
+
+        sync_needed = False
         with transaction.atomic():
+            if needs_sync:
+                sync_needed = self._mark_pending_if_idle(
+                    project, update_fields
+                )
             project.save(update_fields=update_fields)
             check_related_permissions(
                 request.user,
@@ -246,33 +283,19 @@ class ProjectViewSet(
             )
         )
 
-        if {"scm_branch", "scm_refspec", "url"}.intersection(
-            update_fields
-        ) and (
-            project.import_state
-            not in [
-                models.Project.ImportState.PENDING,
-                models.Project.ImportState.RUNNING,
-            ]
-        ):
-            # Check if project workers are available before syncing
-            if not check_default_worker_health():
-                raise api_exc.WorkerUnavailable(worker_type="default")
-
-            # With dispatcherd migration, Redis is no longer required
-
+        if sync_needed:
             job_id = tasks.sync_project(project.id)
 
-            project.import_state = models.Project.ImportState.PENDING
             if job_id:
+                models.Project.objects.filter(pk=project.id).update(
+                    import_task_id=job_id
+                )
                 project.import_task_id = job_id
 
             logger.info(
                 f"Triggered import/sync task {job_id}"
                 f" for project {project.id}"
             )
-
-            project.save()
 
         return Response(serializers.ProjectSerializer(project).data)
 
