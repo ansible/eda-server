@@ -250,6 +250,7 @@ def _delete_rows_by_ha_uuid(
         "drools_ansible_ha_stats",
         "drools_ansible_matching_event",
         "drools_ansible_session_state",
+        "drools_ansible_event_record",
     ]
 
     results = {}
