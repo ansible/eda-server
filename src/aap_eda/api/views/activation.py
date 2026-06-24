@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
+from typing import Optional
 
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
@@ -249,7 +250,10 @@ class ActivationViewSet(
         # Check if activation workers are available before deleting
         # (unless force is true)
         if not force_delete:
-            check_dispatcherd_workers_health(raise_exceptions=True)
+            queue_name = self._get_activation_queue_name(activation)
+            check_dispatcherd_workers_health(
+                raise_exceptions=True, queue_name=queue_name
+            )
 
         with transaction.atomic():
             activation.status = ActivationStatus.DELETING
@@ -394,6 +398,15 @@ class ActivationViewSet(
         activation = self.get_object()
         return self._start(request, activation)
 
+    def _get_activation_queue_name(
+        self, activation: models.Activation
+    ) -> Optional[str]:
+        """Resolve the queue name for an activation's latest instance."""
+        latest = activation.latest_instance
+        if latest and hasattr(latest, "rulebookprocessqueue"):
+            return latest.rulebookprocessqueue.queue_name
+        return None
+
     def _start(self, request, activation: models.Activation) -> Response:
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -422,7 +435,10 @@ class ActivationViewSet(
             )
 
         # Check if activation workers are available before enabling
-        check_dispatcherd_workers_health(raise_exceptions=True)
+        queue_name = self._get_activation_queue_name(activation)
+        check_dispatcherd_workers_health(
+            raise_exceptions=True, queue_name=queue_name
+        )
 
         sync_response = self._sync_project_if_needed(activation)
         if sync_response:
@@ -509,7 +525,10 @@ class ActivationViewSet(
             # Check if activation workers are available before disabling
             # (unless force=true to allow operation with unhealthy workers)
             if not force_disable:
-                check_dispatcherd_workers_health(raise_exceptions=True)
+                queue_name = self._get_activation_queue_name(activation)
+                check_dispatcherd_workers_health(
+                    raise_exceptions=True, queue_name=queue_name
+                )
             if activation.status in [
                 ActivationStatus.STARTING,
                 ActivationStatus.RUNNING,
@@ -582,7 +601,10 @@ class ActivationViewSet(
         # Check if activation workers are available before restarting
         # (unless force is true)
         if not force_restart:
-            check_dispatcherd_workers_health(raise_exceptions=True)
+            queue_name = self._get_activation_queue_name(activation)
+            check_dispatcherd_workers_health(
+                raise_exceptions=True, queue_name=queue_name
+            )
 
         valid, error = is_activation_valid(activation)
         if not valid:
