@@ -786,7 +786,7 @@ class ActivationManager(StatusManager):
         """User requested delete."""
         LOGGER.info(
             f"Delete operation requested for activation id: "
-            f"{self.db_instance.id},",
+            f"{self.db_instance.id}",
         )
         try:
             self._cleanup()
@@ -896,25 +896,8 @@ class ActivationManager(StatusManager):
 
         self._detect_running_status()
 
-        # get the status of the container
-        container_status = None
-        try:
-            container_status = self.container_engine.get_status(
-                container_id=self.latest_instance.activation_pod_id,
-            )
-        except engine_exceptions.ContainerNotFoundError:
-            pass
-        except engine_exceptions.ContainerEngineError as exc:
-            msg = (
-                f"Monitor operation: activation id: {self.db_instance.id} "
-                f"Failed to get status of the container. Reason: {exc}"
-            )
-            LOGGER.warning(msg)
-            self.set_status(ActivationStatus.WORKERS_OFFLINE, msg)
-            self.set_latest_instance_status(
-                ActivationStatus.WORKERS_OFFLINE,
-                msg,
-            )
+        container_status, engine_error = self._get_container_status()
+        if engine_error:
             return
 
         # Activations in running status must have a container
@@ -997,6 +980,35 @@ class ActivationManager(StatusManager):
                 f"Container {self.latest_instance.activation_pod_id} "
                 "is in an stopped state.",
             )
+
+    def _get_container_status(self):
+        """Get the container status for the latest instance.
+
+        Returns a (status, engine_error) tuple. When the container
+        engine reports a transient error the activation is moved to
+        WORKERS_OFFLINE and engine_error is True so the caller can
+        exit early.
+        """
+        try:
+            return self.container_engine.get_status(
+                container_id=self.latest_instance.activation_pod_id,
+            ), False
+        except engine_exceptions.ContainerNotFoundError:
+            return None, False
+        except engine_exceptions.ContainerEngineError as exc:
+            msg = (
+                f"Monitor operation: activation id: "
+                f"{self.db_instance.id} "
+                f"Failed to get status of the container. "
+                f"Reason: {exc}"
+            )
+            LOGGER.warning(msg)
+            self.set_status(ActivationStatus.WORKERS_OFFLINE, msg)
+            self.set_latest_instance_status(
+                ActivationStatus.WORKERS_OFFLINE,
+                msg,
+            )
+            return None, True
 
     def _detect_running_status(self):
         if (

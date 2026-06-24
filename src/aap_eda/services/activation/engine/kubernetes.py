@@ -661,6 +661,7 @@ class Engine(ContainerEngine):
         return False
 
     def _wait_for_pod_to_start(self, log_handler: LogHandler) -> None:
+        """Wait for the pod to reach a running state."""
         LOGGER.info("Waiting for pod to start")
         desc = f"watch pod start {self.job_name}"
         last_exc = None

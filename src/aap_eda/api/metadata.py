@@ -83,7 +83,7 @@ class EDAMetadata(metadata.SimpleMetadata):
                     action.pop(field)
 
             # For PUT/PATCH/POST methods, remove read-only fields.
-            if method in ("PUT", "PATCH", "POST"):
+            elif method in ("PUT", "PATCH", "POST"):
                 # file-based read-only settings can't be updated
                 meta.pop("defined_in_file", False)
 

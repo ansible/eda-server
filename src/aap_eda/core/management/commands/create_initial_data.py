@@ -2655,150 +2655,160 @@ class Command(BaseCommand):
         for cls in permission_registry.all_registered_models:
             ct = self.content_type_model.objects.get_for_model(cls)
             parent_model = permission_registry.get_parent_model(cls)
-            # ignore if the model is organization, covered by org roles
-            # or child model, inherits permissions from parent model
+            # ignore if the model is organization, covered by org
+            # roles or child model, inherits permissions from
+            # parent model
             if cls._meta.model_name == "organization" or (
                 parent_model
                 and parent_model._meta.model_name != "organization"
             ):
                 continue
-            permissions = self._create_permissions_for_content_type(ct)
-            desc = f"Has all permissions to a single {cls._meta.verbose_name}"
-            # parent model should add permissions related to its child models
-            child_models = permission_registry.get_child_models(cls)
-            child_names = []
-            for _, child_model in child_models:
-                child_ct = self.content_type_model.objects.get_for_model(
-                    child_model
-                )
-                permissions.extend(
-                    self._create_permissions_for_content_type(child_ct)
-                )
-                child_names.append(child_model._meta.verbose_name)
-            if child_names:
-                desc += f" and its child resources - {', '.join(child_names)}"  # noqa: E501
 
-            # create resource admin role
-            admin_role_name = f"{cls._meta.verbose_name.title()} Admin"
-            if cls._meta.model_name == "project":
-                admin_role_name = f"EDA {admin_role_name}"
-            elif cls._meta.model_name == "edacredential":
-                admin_role_name = admin_role_name.replace("Eda ", "EDA ")
+            permissions = self._collect_permissions(cls, ct)
+            desc = self._build_admin_description(cls)
+            self._create_admin_role(cls, ct, permissions, desc)
 
-            role, created = RoleDefinition.objects.update_or_create(
-                name=admin_role_name,
-                defaults={
-                    "description": desc,
-                    "content_type": ct,
-                    "managed": True,
-                },
-            )
-            role.permissions.set(permissions)
-            if created:
-                self.stdout.write(
-                    f"Added role {role.name} with {len(permissions)} "
-                    "permissions to itself"
-                )
-
-            # create resource use role
-            # ignore team model as it makes no sense to have Use role for it
-            # and should be managed by Admin users only
+            # ignore team model as it makes no sense to have Use
+            # role for it and should be managed by Admin users only
             if cls._meta.model_name != "team":
-                use_role_name = f"{cls._meta.verbose_name.title()} Use"
-                if cls._meta.model_name == "project":
-                    use_role_name = f"EDA {use_role_name}"
-                elif cls._meta.model_name == "edacredential":
-                    use_role_name = use_role_name.replace("Eda ", "EDA ")
-
-                (
-                    use_role,
-                    use_role_created,
-                ) = RoleDefinition.objects.update_or_create(
-                    name=use_role_name,
-                    defaults={
-                        "description": f"Has use permissions to a single {cls._meta.verbose_name}",  # noqa: E501
-                        "content_type": ct,
-                        "managed": True,
-                    },
-                )
-                use_permissions = [
-                    perm
-                    for perm in permissions
-                    if perm.codename.startswith("view_")
-                ]
-                use_role.permissions.set(use_permissions)
-                if use_role_created:
-                    self.stdout.write(
-                        f"Added role {use_role.name} with "
-                        f"{len(use_permissions)} permissions to itself"
-                    )
-
-                # create org-level admin roles for each resource type
-                org_role_name = (
-                    f"Organization {cls._meta.verbose_name.title()} Admin"
-                )
-                if cls._meta.model_name == "project":
-                    org_role_name = f"EDA {org_role_name}"
-                elif cls._meta.model_name == "edacredential":
-                    org_role_name = org_role_name.replace("Eda ", "EDA ")
-
-                (
-                    org_role,
-                    org_role_created,
-                ) = RoleDefinition.objects.update_or_create(
-                    name=org_role_name,
-                    defaults={
-                        "description": f"Has all permissions to {cls._meta.verbose_name}s within an organization",  # noqa: E501
-                        "content_type": self.content_type_model.objects.get(
-                            model="organization"
-                        ),
-                        "managed": True,
-                    },
-                )
-                permissions.extend(
-                    DABPermission.objects.filter(
-                        content_type=ct, codename__startswith="add_"
-                    )
-                )
-                # Add organization view permission for organization-level admin roles,  # noqa: E501
-                org_ct = self.content_type_model.objects.get(
-                    model="organization"
-                )
-                org_view_permission = DABPermission.objects.filter(
-                    content_type=org_ct, codename="view_organization"
-                ).first()
-                if (
-                    org_view_permission
-                    and org_view_permission not in permissions
-                ):
-                    permissions.append(org_view_permission)
-
-                org_role.permissions.set(permissions)
-                if org_role_created:
-                    self.stdout.write(
-                        f"Added role {org_role.name} with {len(permissions)} "
-                        "permissions to itself"
-                    )
+                self._create_use_role(cls, ct, permissions)
+                self._create_org_admin_role(cls, ct, permissions)
 
             # Special case to create team member role
             if cls._meta.model_name == "team":
-                member_permissions = [
-                    p
-                    for p in permissions
-                    if p.codename in ("view_team", "member_team")
-                ]
-                desc = "Inherits permissions assigned to this team"
-                role, created = RoleDefinition.objects.update_or_create(
-                    name="Team Member",
-                    defaults={
-                        "description": desc,
-                        "content_type": ct,
-                        "managed": True,
-                    },
-                )
-                role.permissions.set(member_permissions)
-                if created:
-                    self.stdout.write(
-                        f"Added role {role.name} with "
-                        f"{len(member_permissions)} permissions to itself"
-                    )
+                self._create_team_member_role(ct, permissions)
+
+    def _collect_permissions(self, cls, ct):
+        """Gather permissions for a model including child models."""
+        permissions = self._create_permissions_for_content_type(ct)
+        # parent model should add permissions related to its
+        # child models
+        for _, child_model in permission_registry.get_child_models(cls):
+            child_ct = self.content_type_model.objects.get_for_model(
+                child_model
+            )
+            permissions.extend(
+                self._create_permissions_for_content_type(child_ct)
+            )
+        return permissions
+
+    def _build_admin_description(self, cls):
+        """Build the admin role description with child resources."""
+        desc = "Has all permissions to a single " f"{cls._meta.verbose_name}"
+        child_names = [
+            cm._meta.verbose_name
+            for _, cm in permission_registry.get_child_models(cls)
+        ]
+        if child_names:
+            desc += " and its child resources" f" - {', '.join(child_names)}"
+        return desc
+
+    def _format_role_name(self, cls, template):
+        """Format a role name with EDA prefix for special models."""
+        name = template.format(verbose=cls._meta.verbose_name.title())
+        if cls._meta.model_name == "project":
+            name = f"EDA {name}"
+        elif cls._meta.model_name == "edacredential":
+            name = name.replace("Eda ", "EDA ")
+        return name
+
+    def _create_admin_role(self, cls, ct, permissions, desc):
+        """Create resource admin role."""
+        name = self._format_role_name(cls, "{verbose} Admin")
+        role, created = RoleDefinition.objects.update_or_create(
+            name=name,
+            defaults={
+                "description": desc,
+                "content_type": ct,
+                "managed": True,
+            },
+        )
+        role.permissions.set(permissions)
+        if created:
+            self.stdout.write(
+                f"Added role {role.name} with "
+                f"{len(permissions)} permissions to itself"
+            )
+
+    def _create_use_role(self, cls, ct, permissions):
+        """Create resource use role (view-only permissions)."""
+        name = self._format_role_name(cls, "{verbose} Use")
+        use_role, created = RoleDefinition.objects.update_or_create(
+            name=name,
+            defaults={
+                "description": (
+                    "Has use permissions to a single "
+                    f"{cls._meta.verbose_name}"
+                ),
+                "content_type": ct,
+                "managed": True,
+            },
+        )
+        use_permissions = [
+            p for p in permissions if p.codename.startswith("view_")
+        ]
+        use_role.permissions.set(use_permissions)
+        if created:
+            self.stdout.write(
+                f"Added role {use_role.name} with "
+                f"{len(use_permissions)} permissions to itself"
+            )
+
+    def _create_org_admin_role(self, cls, ct, permissions):
+        """Create org-level admin role for a resource type."""
+        name = self._format_role_name(cls, "Organization {verbose} Admin")
+        org_ct = self.content_type_model.objects.get(model="organization")
+        org_role, created = RoleDefinition.objects.update_or_create(
+            name=name,
+            defaults={
+                "description": (
+                    "Has all permissions to "
+                    f"{cls._meta.verbose_name}s "
+                    "within an organization"
+                ),
+                "content_type": org_ct,
+                "managed": True,
+            },
+        )
+        permissions.extend(
+            DABPermission.objects.filter(
+                content_type=ct, codename__startswith="add_"
+            )
+        )
+        # Add organization view permission for
+        # organization-level admin roles
+        org_view_permission = DABPermission.objects.filter(
+            content_type=org_ct, codename="view_organization"
+        ).first()
+        if org_view_permission and org_view_permission not in permissions:
+            permissions.append(org_view_permission)
+
+        org_role.permissions.set(permissions)
+        if created:
+            self.stdout.write(
+                f"Added role {org_role.name} with "
+                f"{len(permissions)} permissions to itself"
+            )
+
+    def _create_team_member_role(self, ct, permissions):
+        """Create team member role."""
+        member_permissions = [
+            p
+            for p in permissions
+            if p.codename in ("view_team", "member_team")
+        ]
+        role, created = RoleDefinition.objects.update_or_create(
+            name="Team Member",
+            defaults={
+                "description": ("Inherits permissions assigned to this team"),
+                "content_type": ct,
+                "managed": True,
+            },
+        )
+        role.permissions.set(member_permissions)
+        if created:
+            self.stdout.write(
+                f"Added role {role.name} with "
+                f"{len(member_permissions)} "
+                "permissions to itself"
+            )
