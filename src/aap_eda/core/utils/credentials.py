@@ -435,8 +435,8 @@ def _validate_single_schema_field(field, errors, formats_found):
         ("format", str),
     ]:
         value = field.get(option)
+        type_name = "a boolean" if expected_type is bool else "a string"
         if value is not None and not isinstance(value, expected_type):
-            type_name = "a boolean" if expected_type is bool else "a string"
             errors.append(f"{option} must be {type_name}")
 
     _validate_field_default(field, errors)
