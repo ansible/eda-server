@@ -22,6 +22,8 @@ from aap_eda.core import models
 from .fields.ansible_resource import AnsibleResourceFieldSerializer
 from .mixins import SharedResourceSerializerMixin
 
+USERNAME_HELP = "The user's log in name."
+
 
 class UserSerializer(serializers.ModelSerializer):
     resource = AnsibleResourceFieldSerializer(read_only=True)
@@ -40,7 +42,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserDetailSerializer(serializers.ModelSerializer):
     username = serializers.CharField(
-        help_text="The user's log in name.",
+        help_text=USERNAME_HELP,
     )
     created_at = serializers.DateTimeField(source="date_joined")
     resource = AnsibleResourceFieldSerializer(read_only=True)
@@ -78,7 +80,7 @@ class UserListSerializer(serializers.Serializer):
 
     username = serializers.CharField(
         required=True,
-        help_text="The user's log in name.",
+        help_text=USERNAME_HELP,
     )
 
     first_name = serializers.CharField(
@@ -104,7 +106,7 @@ class UserUpdateSerializerBase(
     SharedResourceSerializerMixin,
 ):
     username = serializers.CharField(
-        help_text="The user's log in name.",
+        help_text=USERNAME_HELP,
     )
     password = serializers.CharField(write_only=True)
 
