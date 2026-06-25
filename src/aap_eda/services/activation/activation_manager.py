@@ -990,9 +990,12 @@ class ActivationManager(StatusManager):
         exit early.
         """
         try:
-            return self.container_engine.get_status(
-                container_id=self.latest_instance.activation_pod_id,
-            ), False
+            return (
+                self.container_engine.get_status(
+                    container_id=self.latest_instance.activation_pod_id,
+                ),
+                False,
+            )
         except engine_exceptions.ContainerNotFoundError:
             return None, False
         except engine_exceptions.ContainerEngineError as exc:
