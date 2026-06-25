@@ -17,6 +17,7 @@ import logging
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
+from django.db.models import Q
 from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
@@ -33,7 +34,7 @@ from aap_eda.analytics.utils import get_analytics_interval_if_exist
 from aap_eda.api import exceptions, exceptions as api_exc, filters, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
-from aap_eda.core.enums import Action
+from aap_eda.core.enums import Action, DefaultCredentialType
 from aap_eda.core.utils.credential_plugins import run_plugin
 from aap_eda.core.utils.credentials import (
     build_copy_post_data,
@@ -156,7 +157,10 @@ class EdaCredentialViewSet(
         },
     )
     def list(self, request):
-        credentials = self.get_queryset().exclude(managed=True)
+        credentials = self.get_queryset().exclude(
+            Q(managed=True)
+            & ~Q(credential_type__name=DefaultCredentialType.EDA_RULE_ENGINE)
+        )
         credentials = self.filter_queryset(credentials)
 
         serializer = serializers.EdaCredentialSerializer(
@@ -180,6 +184,11 @@ class EdaCredentialViewSet(
     )
     def partial_update(self, request, pk):
         eda_credential = self.get_object()
+        if eda_credential.managed:
+            error = "Managed EDA credential cannot be updated"
+            return Response(
+                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+            )
         data = request.data
         data["inputs"] = inputs_to_store_dict(
             data.get("inputs", {}), eda_credential.inputs

@@ -464,6 +464,48 @@ def test_list_eda_credentials(
 
 
 @pytest.mark.django_db
+def test_list_eda_credentials_includes_managed_rule_engine(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Managed rule engine credentials should be visible in the list."""
+    rule_engine_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    managed_rule_engine = models.EdaCredential.objects.create(
+        name="_DEFAULT_EDA_RULE_ENGINE_CREDS",
+        description="Default Rule Engine Credential",
+        credential_type=rule_engine_type,
+        inputs=inputs_to_store(
+            {"postgres_db_host": "localhost", "postgres_db_port": "5432"}
+        ),
+        organization=default_organization,
+        managed=True,
+    )
+    # Also create a non-rule-engine managed credential that should be hidden
+    registry_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    models.EdaCredential.objects.create(
+        name="_MANAGED_REGISTRY_CRED",
+        description="Managed Registry Credential",
+        credential_type=registry_type,
+        inputs=inputs_to_store({"username": "user", "password": "pass"}),
+        organization=default_organization,
+        managed=True,
+    )
+
+    response = admin_client.get(f"{api_url_v1}/eda-credentials/")
+    assert response.status_code == status.HTTP_200_OK
+    result_names = [r["name"] for r in response.data["results"]]
+    # Managed rule engine credential should be visible
+    assert managed_rule_engine.name in result_names
+    # Other managed credentials should remain hidden
+    assert "_MANAGED_REGISTRY_CRED" not in result_names
+
+
+@pytest.mark.django_db
 def test_list_eda_credentials_with_kind_filter(
     admin_client: APIClient,
     default_registry_credential: models.EdaCredential,
@@ -604,6 +646,27 @@ def test_delete_managed_eda_credential(
 
 
 @pytest.mark.django_db
+def test_update_managed_eda_credential(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+):
+    obj = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={"username": "adam", "password": "secret"},
+        managed=True,
+        organization=default_organization,
+    )
+    data = {"name": "updated-name"}
+    response = admin_client.patch(
+        f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        response.data["errors"] == "Managed EDA credential cannot be updated"
+    )
+
+
+@pytest.mark.django_db
 def test_partial_update_eda_credential_without_inputs(
     admin_client: APIClient,
     credential_type: models.CredentialType,
@@ -613,7 +676,7 @@ def test_partial_update_eda_credential_without_inputs(
         name="eda-credential",
         inputs={"username": "adam", "password": "secret"},
         credential_type_id=credential_type.id,
-        managed=True,
+        managed=False,
         organization=default_organization,
     )
     data = {"inputs": {"username": "bearny", "password": "demo"}}
@@ -638,7 +701,7 @@ def test_partial_update_eda_credential_with_invalid_inputs(
         name="eda-credential",
         inputs={"username": "adam", "password": "secret"},
         credential_type_id=credential_type.id,
-        managed=True,
+        managed=False,
         organization=default_organization,
     )
     data = {
@@ -893,7 +956,7 @@ def test_partial_update_eda_credential_with_encrypted_output(
         name="eda-credential",
         inputs={"username": "adam", "password": "secret"},
         credential_type_id=credential_type.id,
-        managed=True,
+        managed=False,
         organization=default_organization,
     )
     data = {"name": "demo2"}
@@ -1399,7 +1462,7 @@ def test_update_eda_credential_for_analytics(
         name="eda-credential",
         inputs={"username": "adam", "password": fake_secret},
         credential_type_id=credential_type.id,
-        managed=True,
+        managed=False,
         organization=default_organization,
     )
     # first try, interval 100 -> 200
@@ -2668,7 +2731,7 @@ def test_list_eda_credentials_filter_namespace(
     # so we test with drools only
     response = admin_client.get(
         f"{api_url_v1}/eda-credentials/"
-        f"?credential_type__namespace__in=drools,other_namespace"
+        f"?credential_type__namespace__in=drools,other_namespace"  # noqa: E231
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
