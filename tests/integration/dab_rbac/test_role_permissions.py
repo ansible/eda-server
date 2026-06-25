@@ -41,7 +41,7 @@ def test_view_assignments_non_admin(
     url = reverse("roleuserassignment-list")
     r = user_client.get(url)
     assert r.status_code == 200
-    assert r.data["count"] == 1
+    assert len(r.data["results"]) == 1
     response_obj = r.data["results"][0]
     assert response_obj["id"] == assignment.id
     assert response_obj["summary_fields"]["content_object"] == {
