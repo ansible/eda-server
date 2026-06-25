@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 """Module for Activation Manager."""
+
 import contextlib
 import logging
 import typing as tp
@@ -893,10 +894,13 @@ class ActivationManager(StatusManager):
                 f"Monitor operation: activation id: {self.db_instance.id} "
                 f"Failed to get status of the container. Reason: {exc}"
             )
-            LOGGER.error(msg)
-            self._error_instance(msg)
-            self._error_activation(msg)
-            raise exceptions.ActivationMonitorError(msg) from exc
+            LOGGER.warning(msg)
+            self.set_status(ActivationStatus.WORKERS_OFFLINE, msg)
+            self.set_latest_instance_status(
+                ActivationStatus.WORKERS_OFFLINE,
+                msg,
+            )
+            return
 
         # Activations in running status must have a container
         # This case prevents cases when the container is externally deleted
