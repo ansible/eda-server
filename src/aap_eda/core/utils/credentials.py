@@ -428,15 +428,16 @@ def _validate_single_schema_field(field, errors, formats_found):
     ):
         errors.append("choices must be a list of strings")
 
-    for option in ["secret", "multiline"]:
+    for option, expected_type in [
+        ("secret", bool),
+        ("multiline", bool),
+        ("help_text", str),
+        ("format", str),
+    ]:
         value = field.get(option)
-        if value is not None and not isinstance(value, bool):
-            errors.append(f"{option} must be a boolean")
-
-    for option in ["help_text", "format"]:
-        value = field.get(option)
-        if value is not None and not isinstance(value, str):
-            errors.append(f"{option} must be a string")
+        if value is not None and not isinstance(value, expected_type):
+            type_name = "a boolean" if expected_type is bool else "a string"
+            errors.append(f"{option} must be {type_name}")
 
     _validate_field_default(field, errors)
     _validate_field_format_definition(field, errors, formats_found)
