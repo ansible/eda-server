@@ -62,6 +62,7 @@ from aap_eda.core.utils.rulebook import (
 from aap_eda.core.utils.strings import substitute_variables
 
 logger = logging.getLogger(__name__)
+DE_NEEDED_MSG = "Decision Environment is needed"
 REQUIRED_KEYS = [
     "event_stream_id",
     "event_stream_name",
@@ -648,7 +649,7 @@ class ActivationCreateSerializer(
     decision_environment_id = serializers.IntegerField(
         validators=[validators.check_if_de_exists],
         error_messages={
-            "null": "Decision Environment is needed",
+            "null": DE_NEEDED_MSG,
             "required": "Decision Environment is required",
         },
     )
@@ -850,7 +851,7 @@ class ActivationUpdateSerializer(
     )
     decision_environment_id = serializers.IntegerField(
         validators=[validators.check_if_de_exists],
-        error_messages={"null": "Decision Environment is needed"},
+        error_messages={"null": DE_NEEDED_MSG},
     )
     awx_token_id = serializers.IntegerField(
         allow_null=True,
@@ -1333,7 +1334,7 @@ class PostActivationSerializer(
     name = serializers.CharField(required=True)
     decision_environment_id = serializers.IntegerField(
         validators=[validators.check_if_de_exists],
-        error_messages={"null": "Decision Environment is needed"},
+        error_messages={"null": DE_NEEDED_MSG},
     )
     # TODO: is_activation_valid needs to tell event stream/activation
     awx_token_id = serializers.IntegerField(
