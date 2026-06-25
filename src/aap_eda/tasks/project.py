@@ -53,7 +53,7 @@ def check_default_worker_health() -> bool:
 def import_project(project_id: int) -> str:
     """Import project async task using dispatcherd."""
     queue_name = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)
-    job_data, queue = submit_task(
+    job_data, _ = submit_task(
         _import_project,
         queue=queue_name,
         args=(project_id,),
@@ -122,7 +122,7 @@ def _import_project_no_lock(project_id: int):
 def sync_project(project_id: int) -> str:
     """Sync project async task using dispatcherd."""
     queue_name = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)
-    job_data, queue = submit_task(
+    job_data, _ = submit_task(
         _sync_project,
         queue=queue_name,
         args=(project_id,),
