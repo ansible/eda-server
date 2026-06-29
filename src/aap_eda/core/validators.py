@@ -70,16 +70,27 @@ def check_if_de_valid(
     image_url: str,
     eda_credential_id: tp.Optional[int] = None,
 ):
-    # The OCI standard format for the image url is a combination of a host
-    # (with optional port) separated from the image path (with optional tag) by
-    # a slash: <host>[:port]/<path>[:tag].
-    #
-    # https://github.com/opencontainers/distribution-spec/blob/8376368dd8aadc33bf6c88a8b765df90287bb5c8/spec.md?plain=1#L155 # noqa: E501
-    #
-    # We split the image url on the first slash into the host and path.  The
-    # path is further split into a name and tag on the rightmost colon.
-    #
-    # The path and tag are validated using the OCI regexes for each.
+    host, name, tag, digest = _parse_image_url(image_url)
+    _validate_oci_name(image_url, name)
+    _validate_oci_tag(image_url, tag, digest)
+    if eda_credential_id:
+        _validate_credential_host(image_url, host, eda_credential_id)
+
+
+def _parse_image_url(image_url):
+    """Parse an OCI image URL into host, name, tag, and digest flag.
+
+    The OCI standard format for the image url is a combination of a
+    host (with optional port) separated from the image path (with
+    optional tag) by a slash: <host>[:port]/<path>[:tag].
+
+    https://github.com/opencontainers/distribution-spec/blob/8376368dd8aadc33bf6c88a8b765df90287bb5c8/spec.md?plain=1#L155
+
+    We split the image url on the first slash into the host and path.
+    The path is further split into a name and tag on the rightmost
+    colon. The path and tag are validated using the OCI regexes for
+    each.
+    """
     split = image_url.split("/", 1)
     host = split[0]
     path = split[1] if len(split) > 1 else None
@@ -93,15 +104,15 @@ def check_if_de_valid(
     try:
         validate_registry_host_name(host)
     except serializers.ValidationError:
-        # We raise our own instance of this exception in order to assert
-        # control over the format of the message.
+        # We raise our own instance of this exception in order to
+        # assert control over the format of the message.
         message = _(
             "Image url %(image_url)s is malformed; "
             "invalid host name: '%(host)s'"
         ) % {"image_url": image_url, "host": host}
         raise serializers.ValidationError({"image_url": message})
 
-    if (path is None) or (path == ""):
+    if not path:
         message = _(
             "Image url %(image_url)s is malformed; no image path found"
         ) % {"image_url": image_url}
@@ -110,18 +121,23 @@ def check_if_de_valid(
     digest = False
     if "@sha256" in path or "@sha512" in path:
         split = path.split("@", 1)
-        name = split[0]
         digest = True
     else:
         split = path.split(":", 1)
-        name = split[0]
+    name = split[0]
     # Get the tag sans any additional content.  Any additional content
     # is passed without validation.
-    tag = split[1] if (len(split) > 1) else None
-    tag = tag if tag is None else tag.split("@", 1)[0]
+    tag = split[1] if len(split) > 1 else None
+    if tag is not None:
+        tag = tag.split("@", 1)[0]
 
+    return host, name, tag, digest
+
+
+def _validate_oci_name(image_url, name):
     if not re.fullmatch(
-        r"[[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*",  # noqa: E501
+        r"[[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)"
+        r"*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*",
         name,
     ):
         message = _(
@@ -130,48 +146,50 @@ def check_if_de_valid(
         ) % {"image_url": image_url, "name": name}
         raise serializers.ValidationError({"image_url": message})
 
-    if (not digest and tag is not None) and (
-        not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}", tag)
-    ):
+
+def _validate_oci_tag(image_url, tag, digest):
+    if digest or tag is None:
+        return
+    if not re.fullmatch(r"\w[\w.-]{0,127}", tag):
         message = _(
             "Image url %(image_url)s is malformed; "
             "'%(tag)s' does not match OCI tag standard"
         ) % {"image_url": image_url, "tag": tag}
         raise serializers.ValidationError({"image_url": message})
 
-    if eda_credential_id:
-        credential = get_credential_if_exists(eda_credential_id)
-        inputs = yaml.safe_load(credential.inputs.get_secret_value())
-        credential_host = inputs.get("host")
 
-        if not credential_host:
-            message = _(
-                "Credential %(name)s needs to have host information"
-            ) % {"name": credential.name}
-            raise serializers.ValidationError({"image_url": message})
+def _validate_credential_host(image_url, host, eda_credential_id):
+    """Validate that the image host matches the credential host."""
+    credential = get_credential_if_exists(eda_credential_id)
+    inputs = yaml.safe_load(credential.inputs.get_secret_value())
+    credential_host = inputs.get("host")
 
-        # Check that the host matches the credential host.
-        # For backward compatibility when creating a new DE with
-        # an old credential we need to separate any
-        # scheme from the host before doing the compare.
-        parsed_credential_host = urllib.parse.urlparse(credential_host)
-        # If there's a netloc that's the host to use; if not, it's the path if
-        # there is no scheme else it's the scheme and path joined by a colon.
-        if parsed_credential_host.netloc:
-            parsed_host = parsed_credential_host.netloc
-        else:
-            parsed_host = parsed_credential_host.path
-            if parsed_credential_host.scheme:
-                parsed_host = ":".join(
-                    [parsed_credential_host.scheme, parsed_host]
-                )
+    if not credential_host:
+        message = _("Credential %(name)s needs to have host information") % {
+            "name": credential.name
+        }
+        raise serializers.ValidationError({"image_url": message})
 
-        if host != parsed_host:
-            message = _(
-                "DecisionEnvironment image url: %(image_url)s does "
-                "not match with the credential host: %(host)s"
-            ) % {"image_url": image_url, "host": credential_host}
-            raise serializers.ValidationError({"image_url": message})
+    # For backward compatibility when creating a new DE with
+    # an old credential we need to separate any
+    # scheme from the host before doing the compare.
+    parsed = urllib.parse.urlparse(credential_host)
+    # If there's a netloc that's the host to use; if not, it's the
+    # path if there is no scheme else it's the scheme and path
+    # joined by a colon.
+    if parsed.netloc:
+        parsed_host = parsed.netloc
+    elif parsed.scheme:
+        parsed_host = ":".join([parsed.scheme, parsed.path])
+    else:
+        parsed_host = parsed.path
+
+    if host != parsed_host:
+        message = _(
+            "DecisionEnvironment image url: %(image_url)s does "
+            "not match with the credential host: %(host)s"
+        ) % {"image_url": image_url, "host": credential_host}
+        raise serializers.ValidationError({"image_url": message})
 
 
 def get_credential_if_exists(eda_credential_id: int) -> models.EdaCredential:

@@ -273,16 +273,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def insert_audit_rule_data(self, message: ActionMessage) -> None:
-        job_instance_id = None
-        if message.job_id:
-            job_instance = models.JobInstance.objects.filter(
-                uuid=message.job_id
-            ).first()
-            job_instance_id = job_instance.id if job_instance else None
-
-        audit_rule = models.AuditRule.objects.filter(
-            rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
-        ).first()
+        job_instance_id = self._resolve_job_instance_id(message)
 
         try:
             activation_instance = models.RulebookProcess.objects.get(
@@ -291,6 +282,30 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         except ObjectDoesNotExist:
             logger.error(f"RulebookProcess {message.activation_id} not found")
             raise
+
+        audit_rule = self._get_or_create_audit_rule(
+            message, activation_instance, job_instance_id
+        )
+        audit_action = self._get_or_create_audit_action(
+            message, activation_instance, audit_rule
+        )
+        self._process_matching_events(message, audit_action)
+
+    def _resolve_job_instance_id(self, message):
+        if not message.job_id:
+            return None
+        job_instance = models.JobInstance.objects.filter(
+            uuid=message.job_id
+        ).first()
+        return job_instance.id if job_instance else None
+
+    def _get_or_create_audit_rule(
+        self, message, activation_instance, job_instance_id
+    ):
+        audit_rule = models.AuditRule.objects.filter(
+            rule_uuid=message.rule_uuid,
+            fired_at=message.rule_run_at,
+        ).first()
 
         if audit_rule is None:
             activation_org = models.Organization.objects.filter(
@@ -307,71 +322,76 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 status=message.status,
                 organization=activation_org,
             )
-
             logger.info(f"Audit rule [{audit_rule.name}] is created.")
-        else:
-            # if rule has multiple actions and one of its action's status is
-            # 'failed', keep rule's status as 'failed'
-            if (
-                audit_rule.status != message.status
-                and audit_rule.status != "failed"
-            ):
-                audit_rule.status = message.status
-                audit_rule.save()
+        # if rule has multiple actions and one of its action's
+        # status is 'failed', keep rule's status as 'failed'
+        elif (
+            audit_rule.status != message.status
+            and audit_rule.status != "failed"
+        ):
+            audit_rule.status = message.status
+            audit_rule.save()
 
+        return audit_rule
+
+    def _get_or_create_audit_action(
+        self, message, activation_instance, audit_rule
+    ):
         audit_action = models.AuditAction.objects.filter(
             id=message.action_uuid
         ).first()
 
-        if audit_action is None:
-            inputs = {}
-            aap_credential_type = models.CredentialType.objects.filter(
-                name=DefaultCredentialType.AAP
-            )
-            if aap_credential_type:
-                credentials = (
-                    activation_instance.get_parent().eda_credentials.filter(
-                        credential_type_id=aap_credential_type[0].id
-                    )
-                )
-                if credentials:
-                    inputs = get_resolved_secrets(credentials[0])
+        if audit_action is not None:
+            return audit_action
 
-            url = self._get_url(message, inputs)
-            audit_action = models.AuditAction.objects.create(
-                id=message.action_uuid,
-                fired_at=message.run_at,
-                name=message.action,
-                url=url,
-                status=message.status,
-                rule_fired_at=message.rule_run_at,
-                audit_rule_id=audit_rule.id,
-                status_message=message.message,
-            )
+        inputs = self._resolve_aap_inputs(activation_instance)
+        url = self._get_url(message, inputs)
+        audit_action = models.AuditAction.objects.create(
+            id=message.action_uuid,
+            fired_at=message.run_at,
+            name=message.action,
+            url=url,
+            status=message.status,
+            rule_fired_at=message.rule_run_at,
+            audit_rule_id=audit_rule.id,
+            status_message=message.message,
+        )
+        logger.info(f"Audit action [{audit_action.name}] is created.")
+        return audit_action
 
-            logger.info(f"Audit action [{audit_action.name}] is created.")
+    def _resolve_aap_inputs(self, activation_instance):
+        aap_credential_type = models.CredentialType.objects.filter(
+            name=DefaultCredentialType.AAP
+        )
+        if not aap_credential_type:
+            return {}
+        credentials = activation_instance.get_parent().eda_credentials.filter(
+            credential_type_id=aap_credential_type[0].id
+        )
+        if credentials:
+            return get_resolved_secrets(credentials[0])
+        return {}
 
-        matching_events = message.matching_events
-        for event_meta in matching_events.values():
+    def _process_matching_events(self, message, audit_action):
+        for event_meta in message.matching_events.values():
             meta = event_meta.pop("meta")
-            if meta:
-                audit_event = models.AuditEvent.objects.filter(
-                    id=meta.get("uuid")
-                ).first()
-
-                if audit_event is None:
-                    audit_event = models.AuditEvent.objects.create(
-                        id=meta.get("uuid"),
-                        source_name=meta.get("source", {}).get("name"),
-                        source_type=meta.get("source", {}).get("type"),
-                        payload=event_meta,
-                        received_at=meta.get("received_at"),
-                        rule_fired_at=message.rule_run_at,
-                    )
-                    logger.info(f"Audit event [{audit_event.id}] is created.")
-
-                audit_event.audit_actions.add(audit_action)
-                audit_event.save()
+            if not meta:
+                continue
+            audit_event = models.AuditEvent.objects.filter(
+                id=meta.get("uuid")
+            ).first()
+            if audit_event is None:
+                audit_event = models.AuditEvent.objects.create(
+                    id=meta.get("uuid"),
+                    source_name=meta.get("source", {}).get("name"),
+                    source_type=meta.get("source", {}).get("type"),
+                    payload=event_meta,
+                    received_at=meta.get("received_at"),
+                    rule_fired_at=message.rule_run_at,
+                )
+                logger.info(f"Audit event [{audit_event.id}] is created.")
+            audit_event.audit_actions.add(audit_action)
+            audit_event.save()
 
     @database_sync_to_async
     def insert_job_related_data(

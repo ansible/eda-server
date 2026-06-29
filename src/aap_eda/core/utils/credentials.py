@@ -191,105 +191,167 @@ def validate_inputs(
             aes_salt = secrets.token_hex(32)
 
     for data in section_fields:
-        field = data["id"]
-        required = field in required_fields
-        default = data.get("default")
-        user_input = inputs.get(field)
-        display_field = f"inputs.{field}"
-
-        if user_input is None:
-            if default:
-                inputs[field] = default
-            if required and not default:
-                errors[display_field] = ["Cannot be blank"]
-                continue
-        else:
-            if not isinstance(user_input, str) and not isinstance(
-                user_input, bool
-            ):
-                msg = (
-                    f"Input fields must have a boolean or string value. "
-                    f"The value provided in the '{field}' field is of "
-                    f"type {type(user_input).__name__}."
-                )
-
-                errors[display_field] = [msg]
-                continue
-            else:
-                if required and len(user_input.strip()) == 0:
-                    errors[display_field] = ["Cannot be blank"]
-                    continue
-        if data.get("format") and user_input:
-            result = _validate_format(
-                schema=schema,
-                data_type=data.get("format"),
-                data=user_input,
-                inputs=inputs,
-            )
-            if bool(result):
-                if PROTECTED_PASSPHRASE_ERROR in result:
-                    errors["inputs.ssh_key_unlock"] = result
-                else:
-                    errors[display_field] = result
-
-        # We apply particular requirements on "host" when it is
-        # associated with a container registry.
-        if (
-            (credential_type.name == enums.DefaultCredentialType.REGISTRY)
-            and (field == "host")
-            and user_input
-        ):
-            result = _validate_registry_host_name(user_input)
-            if bool(result):
-                errors[display_field] = result
-
-        if field == "gpg_public_key":
-            result = _validate_gpg_public_key(user_input)
-            if bool(result):
-                errors[display_field] = result
-
-        # Special validation for mTLS certificate and subject
-        if credential_type.name == enums.EventStreamCredentialType.MTLS:
-            # Also validate subject format if provided
-            if field == "subject" and user_input:
-                subject_errors = _validate_certificate_subject_format(
-                    user_input
-                )
-                if bool(subject_errors):
-                    errors["inputs.subject"] = subject_errors
-
-        if data.get("type") == "boolean":
-            if user_input and not isinstance(user_input, bool):
-                errors[display_field] = ["Must be a boolean"]
-            continue
-
-        choices = data.get("choices")
-        if choices and user_input and user_input not in choices:
-            errors[display_field] = [f"Must be one of the choices: {choices}"]
-            continue
-
-        if data.get("format") == "aes_salt" and aes_salt is not None:
-            inputs[field] = aes_salt
-
-        if data.get("format") == "aes_key" and inputs.get(field):
-            if aes_salt is None:
-                errors[display_field] = [AES_SALT_ERROR]
-            else:
-                # If this is update preserve the old values
-                if old_inputs.get(field) != inputs.get(field):
-                    inputs[field] = _get_aes_key(inputs[field], aes_salt)
+        _validate_field(
+            data,
+            inputs,
+            required_fields,
+            errors,
+            credential_type,
+            schema,
+            old_inputs,
+            aes_salt,
+        )
 
     return errors
 
 
+def _validate_field(
+    data,
+    inputs,
+    required_fields,
+    errors,
+    credential_type,
+    schema,
+    old_inputs,
+    aes_salt,
+):
+    """Validate a single field against the schema."""
+    field = data["id"]
+    required = field in required_fields
+    default = data.get("default")
+    user_input = inputs.get(field)
+    display_field = f"inputs.{field}"
+
+    if user_input is None:
+        if default:
+            inputs[field] = default
+        if required and not default:
+            errors[display_field] = ["Cannot be blank"]
+            return
+    elif not isinstance(user_input, (str, bool)):
+        msg = (
+            "Input fields must have a boolean or string "
+            f"value. The value provided in the '{field}' "
+            f"field is of type "
+            f"{type(user_input).__name__}."
+        )
+        errors[display_field] = [msg]
+        return
+    elif required and len(user_input.strip()) == 0:
+        errors[display_field] = ["Cannot be blank"]
+        return
+
+    _validate_field_format(
+        data,
+        field,
+        user_input,
+        inputs,
+        errors,
+        display_field,
+        credential_type,
+        schema,
+    )
+
+    if data.get("type") == "boolean":
+        if user_input and not isinstance(user_input, bool):
+            errors[display_field] = ["Must be a boolean"]
+        return
+
+    choices = data.get("choices")
+    if choices and user_input and user_input not in choices:
+        errors[display_field] = [f"Must be one of the choices: {choices}"]
+        return
+
+    _apply_aes_fields(
+        data,
+        field,
+        inputs,
+        errors,
+        display_field,
+        old_inputs,
+        aes_salt,
+    )
+
+
+def _apply_aes_fields(
+    data, field, inputs, errors, display_field, old_inputs, aes_salt
+):
+    """Apply AES salt and key field processing."""
+    if data.get("format") == "aes_salt" and aes_salt is not None:
+        inputs[field] = aes_salt
+
+    if data.get("format") == "aes_key" and inputs.get(field):
+        if aes_salt is None:
+            errors[display_field] = [AES_SALT_ERROR]
+        # If this is update preserve the old values
+        elif old_inputs.get(field) != inputs.get(field):
+            inputs[field] = _get_aes_key(inputs[field], aes_salt)
+
+
+def _validate_field_format(
+    data,
+    field,
+    user_input,
+    inputs,
+    errors,
+    display_field,
+    credential_type,
+    schema,
+):
+    """Run format and type-specific validations."""
+    _check_format_errors(
+        data, user_input, inputs, errors, display_field, schema
+    )
+
+    # We apply particular requirements on "host" when it
+    # is associated with a container registry.
+    if (
+        credential_type.name == enums.DefaultCredentialType.REGISTRY
+        and field == "host"
+        and user_input
+    ):
+        result = _validate_registry_host_name(user_input)
+        if bool(result):
+            errors[display_field] = result
+
+    if field == "gpg_public_key":
+        result = _validate_gpg_public_key(user_input)
+        if bool(result):
+            errors[display_field] = result
+
+    # Special validation for mTLS certificate and subject
+    if (
+        credential_type.name == enums.EventStreamCredentialType.MTLS
+        and field == "subject"
+        and user_input
+    ):
+        subject_errors = _validate_certificate_subject_format(user_input)
+        if bool(subject_errors):
+            errors["inputs.subject"] = subject_errors
+
+
+def _check_format_errors(
+    data, user_input, inputs, errors, display_field, schema
+):
+    """Check format-specific validation errors."""
+    if not (data.get("format") and user_input):
+        return
+    result = _validate_format(
+        schema=schema,
+        data_type=data.get("format"),
+        data=user_input,
+        inputs=inputs,
+    )
+    if not bool(result):
+        return
+    if PROTECTED_PASSPHRASE_ERROR in result:
+        errors["inputs.ssh_key_unlock"] = result
+    else:
+        errors[display_field] = result
+
+
 def validate_schema(schema: dict) -> list[str]:
     """Validate a credential schema.
-
-    Sample output:
-    [
-        "label must exist and be a string",
-        "type must be either string or boolean"
-    ]
 
     Return an empty list if no errors.
     """
@@ -304,96 +366,121 @@ def validate_schema(schema: dict) -> list[str]:
 
     if not isinstance(fields, list):
         errors.append("'fields' must be a list")
-    else:
-        id_fields = _get_id_fields(schema)
-        metadata_fields = _get_id_fields(schema, "metadata")
-        duplicates = []
-        uniqs = []
-        for id in id_fields:
-            if id in uniqs:
-                duplicates.append(id)
-            else:
-                uniqs.append(id)
+        return errors
 
-        if len(duplicates) > 0:
-            errors.append(f"Duplicate fields: {set(duplicates)} found")
+    id_fields = _get_id_fields(schema)
+    metadata_fields = _get_id_fields(schema, "metadata")
+    _validate_field_ids(id_fields, errors)
+    formats_found = _validate_schema_fields(fields, errors)
 
-        for id in id_fields:
-            if id.upper().startswith(EDA_PREFIX):
-                errors.append(f"{id} should not start with {EDA_PREFIX}")
+    if "aes_key" in formats_found and "aes_salt" not in formats_found:
+        errors.append(AES_SALT_ERROR)
 
-            if not bool(re.match(r"^\w+$", id)):
-                errors.append(
-                    f"{id} can only contain alphanumeric and "
-                    "underscore characters"
-                )
-
-        formats_found = []
-        for field in fields:
-            for option in ["id", "label"]:
-                value = field.get(option)
-                if not value or not isinstance(value, str):
-                    errors.append(f"{option} must exist and be a string")
-
-            field_type = field.get("type")
-            if field_type and field_type not in ["string", "boolean"]:
-                errors.append("type must be either string or boolean")
-
-            choices = field.get("choices")
-            if choices:
-                if not isinstance(choices, list) or any(
-                    not isinstance(choice, str) for choice in choices
-                ):
-                    errors.append("choices must be a list of strings")
-
-            for option in ["secret", "multiline"]:
-                value = field.get(option)
-                if value is not None and not isinstance(value, bool):
-                    errors.append(f"{option} must be a boolean")
-
-            for option in ["help_text", "format"]:
-                value = field.get(option)
-                if value is not None and not isinstance(value, str):
-                    errors.append(f"{option} must be a string")
-
-            default_value = field.get("default")
-            if default_value is not None:
-                if not isinstance(default_value, (str, bool)):
-                    errors.append(
-                        f"default for field '{field.get('id')}' "
-                        "must be a string or boolean"
-                    )
-
-            field_format = field.get("format")
-            if field_format:
-                # Only validate format if it's a string (non-string types
-                # are caught by the validation above)
-                if isinstance(field_format, str):
-                    formats_found.append(field_format)
-                    if field_format not in VALID_FIELD_FORMATS:
-                        errors.append(
-                            f"invalid format: {field_format} for field "
-                            f"{field.get('id')} "
-                            "must be one of "
-                            f"{' '.join(sorted(VALID_FIELD_FORMATS))}"
-                        )
-
-        if "aes_key" in formats_found and "aes_salt" not in formats_found:
-            errors.append(AES_SALT_ERROR)
-
-    required_fields = schema.get("required")
-    if required_fields:
-        if not isinstance(required_fields, list):
-            errors.append("required must be a list of strings")
-        else:
-            for field_id in required_fields:
-                if (
-                    field_id not in id_fields
-                    and field_id not in metadata_fields
-                ):
-                    errors.append(f"required field {field_id} does not exist")
-
+    _validate_required_fields(schema, id_fields, metadata_fields, errors)
     return errors
+
+
+def _validate_field_ids(id_fields, errors):
+    """Check for duplicate and invalid field IDs."""
+    seen = set()
+    duplicates = set()
+    for field_id in id_fields:
+        if field_id in seen:
+            duplicates.add(field_id)
+        seen.add(field_id)
+
+    if duplicates:
+        errors.append(f"Duplicate fields: {duplicates} found")
+
+    for field_id in id_fields:
+        if field_id.upper().startswith(EDA_PREFIX):
+            errors.append(f"{field_id} should not start with {EDA_PREFIX}")
+        if not bool(re.match(r"^\w+$", field_id)):
+            errors.append(
+                f"{field_id} can only contain alphanumeric "
+                "and underscore characters"
+            )
+
+
+def _validate_schema_fields(fields, errors):
+    """Validate individual field definitions in a schema."""
+    formats_found = []
+    for field in fields:
+        _validate_single_schema_field(field, errors, formats_found)
+    return formats_found
+
+
+def _validate_single_schema_field(field, errors, formats_found):
+    """Validate a single field definition."""
+    for option in ["id", "label"]:
+        value = field.get(option)
+        if not value or not isinstance(value, str):
+            errors.append(f"{option} must exist and be a string")
+
+    field_type = field.get("type")
+    if field_type and field_type not in ["string", "boolean"]:
+        errors.append("type must be either string or boolean")
+
+    choices = field.get("choices")
+    if choices and (
+        not isinstance(choices, list)
+        or any(not isinstance(choice, str) for choice in choices)
+    ):
+        errors.append("choices must be a list of strings")
+
+    for option, expected_type in [
+        ("secret", bool),
+        ("multiline", bool),
+        ("help_text", str),
+        ("format", str),
+    ]:
+        value = field.get(option)
+        type_name = "a boolean" if expected_type is bool else "a string"
+        if value is not None and not isinstance(value, expected_type):
+            errors.append(f"{option} must be {type_name}")
+
+    _validate_field_default(field, errors)
+    _validate_field_format_definition(field, errors, formats_found)
+
+
+def _validate_field_default(field, errors):
+    default_value = field.get("default")
+    if default_value is not None and not isinstance(
+        default_value, (str, bool)
+    ):
+        errors.append(
+            f"default for field '{field.get('id')}' "
+            "must be a string or boolean"
+        )
+
+
+def _validate_field_format_definition(field, errors, formats_found):
+    field_format = field.get("format")
+    # Only validate format if it's a string
+    # (non-string types are caught by the validation above)
+    if not field_format or not isinstance(field_format, str):
+        return
+    formats_found.append(field_format)
+    if field_format not in VALID_FIELD_FORMATS:
+        errors.append(
+            f"invalid format: {field_format} "
+            f"for field {field.get('id')} "
+            "must be one of "
+            f"{' '.join(sorted(VALID_FIELD_FORMATS))}"
+        )
+
+
+def _validate_required_fields(schema, id_fields, metadata_fields, errors):
+    """Validate the required fields list."""
+    required_fields = schema.get("required")
+    if not required_fields:
+        return
+    if not isinstance(required_fields, list):
+        errors.append("required must be a list of strings")
+        return
+    for field_id in required_fields:
+        if field_id not in id_fields and field_id not in metadata_fields:
+            errors.append(f"required field {field_id} does not exist")
 
 
 def validate_injectors(schema: dict, injectors: dict) -> dict:
@@ -412,42 +499,49 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
     context = _default_context(schema, injectors)
     key_names = []
     for field in SUPPORTED_KEYS_IN_INJECTORS:
-        input_data = injectors.get(field)
-        if not input_data:
-            continue
-
-        if not isinstance(input_data, dict):
-            errors.append(f"{field} must be a dict type")
-            continue
-
-        try:
-            if field in ["extra_vars", "env"]:
-                check_reserved_keys_in_extra_vars(input_data)
-        except ValidationError as e:
-            errors.append(e.message)
-            continue
-
-        for k, v in input_data.items():
-            try:
-                if k in key_names:
-                    raise InjectorDuplicateKey(
-                        f"Injector {field} key: {k} already exists"
-                    )
-
-                if field == "file":
-                    _validate_file_template_key(k, key_names)
-                if isinstance(v, str):
-                    _check_jinja_string(v, context)
-                key_names.append(k)
-            except InjectorMissingKeyException as e:
-                errors.append(
-                    f"Injector key: {k} has a value which refers to an"
-                    f" undefined key error: {e}"
-                )
-            except (InjectorInvalidTemplateKey, InjectorDuplicateKey) as e:
-                errors.append(f"{e}")
+        _validate_injector_field(field, injectors, context, key_names, errors)
 
     return {"injectors": errors} if bool(errors) else {}
+
+
+def _validate_injector_field(field, injectors, context, key_names, errors):
+    """Validate a single injector field."""
+    input_data = injectors.get(field)
+    if not input_data:
+        return
+
+    if not isinstance(input_data, dict):
+        errors.append(f"{field} must be a dict type")
+        return
+
+    try:
+        if field in ["extra_vars", "env"]:
+            check_reserved_keys_in_extra_vars(input_data)
+    except ValidationError as e:
+        errors.append(e.message)
+        return
+
+    for k, v in input_data.items():
+        try:
+            if k in key_names:
+                raise InjectorDuplicateKey(
+                    f"Injector {field} key: {k} already exists"
+                )
+            if field == "file":
+                _validate_file_template_key(k, key_names)
+            if isinstance(v, str):
+                _check_jinja_string(v, context)
+            key_names.append(k)
+        except InjectorMissingKeyException as e:
+            errors.append(
+                f"Injector key: {k} has a value which "
+                f"refers to an undefined key error: {e}"
+            )
+        except (
+            InjectorInvalidTemplateKey,
+            InjectorDuplicateKey,
+        ) as e:
+            errors.append(f"{e}")
 
 
 def validate_registry_host_name(host: str) -> None:

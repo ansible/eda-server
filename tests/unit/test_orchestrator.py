@@ -20,12 +20,19 @@ from unittest import mock
 import pytest
 from django.conf import settings
 
-from aap_eda.core.enums import ActivationStatus, ProcessParentType
+from aap_eda.core.enums import (
+    ActivationRequest,
+    ActivationStatus,
+    ProcessParentType,
+)
 from aap_eda.core.models import Activation, RulebookProcess
 from aap_eda.tasks import orchestrator
 from aap_eda.tasks.exceptions import UnknownProcessParentType
 from aap_eda.tasks.orchestrator import (
+    HealthyQueueNotFoundError,
+    _handle_unhealthy_queue,
     _manage,
+    _resolve_existing_queue,
     get_least_busy_queue_name,
     get_process_parent,
 )
@@ -737,3 +744,247 @@ def test_manage_monitor_runs_when_queue_returns_none(
         )
 
     manager_mock.monitor.assert_called_once()
+
+
+#################################################################
+# Tests for _resolve_existing_queue and _handle_unhealthy_queue
+#################################################################
+
+
+@pytest.mark.django_db
+def test_resolve_existing_queue_no_queue_assigned():
+    """When no queue is assigned, fall back to least busy."""
+    status_manager = mock.Mock()
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+        return_value=None,
+    ), mock.patch(
+        "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
+        return_value="healthy-queue",
+    ):
+        result = _resolve_existing_queue(
+            ProcessParentType.ACTIVATION,
+            1,
+            "Monitor",
+            mock.Mock(),
+            status_manager,
+        )
+
+    assert result == "healthy-queue"
+
+
+@pytest.mark.django_db
+def test_resolve_existing_queue_stale_queue():
+    """When queue is not in configured queues, fall back to least busy."""
+    status_manager = mock.Mock()
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+        return_value="old-queue",
+    ), mock.patch(
+        "aap_eda.tasks.orchestrator.settings"
+    ) as mock_settings, mock.patch(
+        "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
+        return_value="healthy-queue",
+    ):
+        mock_settings.RULEBOOK_WORKER_QUEUES = ["activation"]
+        result = _resolve_existing_queue(
+            ProcessParentType.ACTIVATION,
+            1,
+            "Monitor",
+            mock.Mock(),
+            status_manager,
+        )
+
+    assert result == "healthy-queue"
+
+
+@pytest.mark.django_db
+def test_resolve_existing_queue_no_healthy_queues():
+    """When no healthy queues exist, set PENDING and return None."""
+    status_manager = mock.Mock()
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+        return_value=None,
+    ), mock.patch(
+        "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
+        side_effect=HealthyQueueNotFoundError,
+    ):
+        result = _resolve_existing_queue(
+            ProcessParentType.ACTIVATION,
+            1,
+            "Monitor",
+            mock.Mock(),
+            status_manager,
+        )
+
+    assert result is None
+    status_manager.set_status.assert_called_once_with(
+        ActivationStatus.PENDING, mock.ANY
+    )
+
+
+@pytest.mark.django_db
+def test_resolve_existing_queue_healthy():
+    """When assigned queue is healthy, return it."""
+    status_manager = mock.Mock()
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+        return_value="activation",
+    ), mock.patch(
+        "aap_eda.tasks.orchestrator.settings"
+    ) as mock_settings, mock.patch(
+        "aap_eda.tasks.orchestrator.check_rulebook_queue_health",
+        return_value=True,
+    ):
+        mock_settings.RULEBOOK_WORKER_QUEUES = ["activation"]
+        result = _resolve_existing_queue(
+            ProcessParentType.ACTIVATION,
+            1,
+            "Monitor",
+            mock.Mock(),
+            status_manager,
+        )
+
+    assert result == "activation"
+
+
+@pytest.mark.django_db
+def test_resolve_existing_queue_unhealthy_delegates():
+    """When queue is unhealthy, delegate to _handle_unhealthy_queue."""
+    status_manager = mock.Mock()
+    process_parent = mock.Mock()
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+        return_value="activation",
+    ), mock.patch(
+        "aap_eda.tasks.orchestrator.settings"
+    ) as mock_settings, mock.patch(
+        "aap_eda.tasks.orchestrator.check_rulebook_queue_health",
+        return_value=False,
+    ), mock.patch(
+        "aap_eda.tasks.orchestrator._handle_unhealthy_queue",
+        return_value="fallback-queue",
+    ) as mock_handle:
+        mock_settings.RULEBOOK_WORKER_QUEUES = ["activation"]
+        result = _resolve_existing_queue(
+            ProcessParentType.ACTIVATION,
+            1,
+            "Monitor",
+            process_parent,
+            status_manager,
+        )
+
+    assert result == "fallback-queue"
+    mock_handle.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_handle_unhealthy_queue_non_restart_pending():
+    """Non-restart with PENDING parent returns None without update."""
+    process_parent = mock.Mock()
+    process_parent.status = ActivationStatus.PENDING
+    status_manager = mock.Mock()
+
+    result = _handle_unhealthy_queue(
+        "activation",
+        ProcessParentType.ACTIVATION,
+        1,
+        "Monitor",
+        process_parent,
+        status_manager,
+    )
+
+    assert result is None
+    status_manager.set_status.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_handle_unhealthy_queue_non_restart_workers_offline():
+    """Non-restart with WORKERS_OFFLINE parent returns None."""
+    process_parent = mock.Mock()
+    process_parent.status = ActivationStatus.WORKERS_OFFLINE
+    status_manager = mock.Mock()
+
+    result = _handle_unhealthy_queue(
+        "activation",
+        ProcessParentType.ACTIVATION,
+        1,
+        "Monitor",
+        process_parent,
+        status_manager,
+    )
+
+    assert result is None
+    status_manager.set_status.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_handle_unhealthy_queue_non_restart_running():
+    """Non-restart with RUNNING parent sets WORKERS_OFFLINE."""
+    process_parent = mock.Mock()
+    process_parent.status = ActivationStatus.RUNNING
+    status_manager = mock.Mock()
+
+    result = _handle_unhealthy_queue(
+        "activation",
+        ProcessParentType.ACTIVATION,
+        1,
+        "Monitor",
+        process_parent,
+        status_manager,
+    )
+
+    assert result is None
+    status_manager.set_status.assert_called_once_with(
+        ActivationStatus.WORKERS_OFFLINE, mock.ANY
+    )
+    status_manager.set_latest_instance_status.assert_called_once_with(
+        ActivationStatus.WORKERS_OFFLINE, mock.ANY
+    )
+
+
+@pytest.mark.django_db
+def test_handle_unhealthy_queue_restart_fallback():
+    """Restart request falls back to least busy queue."""
+    process_parent = mock.Mock()
+    status_manager = mock.Mock()
+
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
+        return_value="healthy-queue",
+    ):
+        result = _handle_unhealthy_queue(
+            "activation",
+            ProcessParentType.ACTIVATION,
+            1,
+            ActivationRequest.RESTART,
+            process_parent,
+            status_manager,
+        )
+
+    assert result == "healthy-queue"
+
+
+@pytest.mark.django_db
+def test_handle_unhealthy_queue_restart_no_healthy():
+    """Restart with no healthy queues sets PENDING."""
+    process_parent = mock.Mock()
+    status_manager = mock.Mock()
+
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
+        side_effect=HealthyQueueNotFoundError,
+    ):
+        result = _handle_unhealthy_queue(
+            "activation",
+            ProcessParentType.ACTIVATION,
+            1,
+            ActivationRequest.RESTART,
+            process_parent,
+            status_manager,
+        )
+
+    assert result is None
+    status_manager.set_status.assert_called_once_with(
+        ActivationStatus.PENDING, mock.ANY
+    )

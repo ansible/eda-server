@@ -19,54 +19,44 @@ def render_string(value: str, context: dict) -> str:
 
 
 def find_ports(rulebook_text: str, context: dict = None) -> list[tuple]:
-    """
-    Return (host, port) pairs for all sources in a rulebook.
-
-    Walk the rulebook and find ports in source parameters
-    Assume the rulebook is valid if it imported
-    """
+    """Return (host, port) pairs for all sources in a rulebook."""
     rulebook = yaml.safe_load(rulebook_text)
-
-    # Make a list of host, port pairs found in all sources in
-    # rulesets in a rulebook
     found_ports = []
-
-    # Walk all rulesets in a rulebook
     for ruleset in rulebook:
-        # Walk through all sources in a ruleset
         for source in ruleset.get("sources", []):
-            # Remove name from source
-            if "name" in source:
-                del source["name"]
-            # The first remaining key is the type and the arguments
-            source_plugin = list(source.keys())[0]
-
-            if source_plugin not in settings.SAFE_PLUGINS_FOR_PORT_FORWARD:
-                continue
-
-            source_args = source[source_plugin]
-            if source_args is None:
-                continue
-            # Get host if it exists
-            # Maybe check for "0.0.0.0" in the future
-            host = source_args.get("host")
-            # Get port if it exists
-            maybe_port = source_args.get("port")
-            # port may be a string or an integer
-            if maybe_port is None:
-                continue
-
-            try:
-                maybe_port = render_string(str(maybe_port), context or {})
-
-                with contextlib.suppress(ValueError):
-                    found_ports.append((host, int(maybe_port)))
-            except ValueError as e:
-                LOGGER.error(f"find_ports error: {e}")
-                raise exceptions.ActivationStartError(str(e))
-            except UndefinedError as e:
-                raise exceptions.ActivationStartError(str(e))
-            except SecurityError as e:
-                raise exceptions.ActivationStartError(str(e))
-
+            result = _extract_port(source, context or {})
+            if result is not None:
+                found_ports.append(result)
     return found_ports
+
+
+def _extract_port(source, context):
+    """Extract a (host, port) pair from a single source."""
+    if "name" in source:
+        del source["name"]
+    # The first remaining key is the type and the arguments
+    source_plugin = next(iter(source))
+
+    if source_plugin not in settings.SAFE_PLUGINS_FOR_PORT_FORWARD:
+        return None
+
+    source_args = source[source_plugin]
+    if source_args is None:
+        return None
+
+    host = source_args.get("host")
+    # port may be a string or an integer
+    maybe_port = source_args.get("port")
+    if maybe_port is None:
+        return None
+
+    try:
+        maybe_port = render_string(str(maybe_port), context)
+        with contextlib.suppress(ValueError):
+            return (host, int(maybe_port))
+        return None
+    except ValueError as e:
+        LOGGER.exception(f"find_ports error: {e}")
+        raise exceptions.ActivationStartError(str(e))
+    except (UndefinedError, SecurityError) as e:
+        raise exceptions.ActivationStartError(str(e))
