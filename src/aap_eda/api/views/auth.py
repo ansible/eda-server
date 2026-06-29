@@ -116,7 +116,17 @@ class TokenRefreshView(APIView):
         serializer = RefreshTokenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        access_token = {"access": jwt_access_token(serializer.user.id)}
+        # Preserve activation_instance_id from refresh token (if present)
+        # This ensures scoped tokens remain scoped after refresh
+        activation_instance_id = getattr(
+            serializer, "activation_instance_id", None
+        )
+
+        access_token = {
+            "access": jwt_access_token(
+                serializer.user.id, activation_instance_id
+            )
+        }
         return Response(
             access_token,
             status=status.HTTP_200_OK,
