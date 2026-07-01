@@ -15,7 +15,6 @@
 import base64
 import json
 import logging
-import os
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
