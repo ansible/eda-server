@@ -82,6 +82,29 @@ tasks:
       - "{{.PYTEST_CMD}} {{.CLI_ARGS}}"
       - "{{.PYTEST_CMD}} -m multithreaded {{.CLI_ARGS}}"
 
+  test:rotate-db-encryption-key:
+    desc: "Run DB encryption key rotation lifecycle tests (manual, requires Postgres)."
+    summary: |
+      Run integration lifecycle tests for rotate_db_encryption_key.
+      Skipped by default — requires RUN_ROTATION_TESTS=1.
+
+      Run when changing: rotate_db_encryption_key.py, EncryptedTextField,
+      or aap_eda/core/utils/crypto/.
+
+      Prerequisites:
+        Command-level tests: task docker:up:minimal
+        Service-level tests: EDA_SECRET_KEY=insecure task docker:up
+
+      See docs/development.md "DB encryption key rotation tests" for
+      full prerequisites, env var reference, examples and recovery steps.
+
+    env:
+      RUN_ROTATION_TESTS: "1"
+      EDA_SECRET_KEY: '{{.EDA_SECRET_KEY | default "insecure"}}'
+      EDA_DB_PASSWORD: '{{.EDA_DB_PASSWORD | default "secret"}}'
+    cmds:
+      - "{{.PYTEST_CMD}} tests/integration/commands/test_rotate_db_encryption_key_lifecycle.py {{.CLI_ARGS}}"
+
   lint:
     desc: "Run all linters."
     cmds:

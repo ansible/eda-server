@@ -23,6 +23,17 @@ Usage::
     aap-eda-manage rotate_db_encryption_key
     EDA_DB_ROTATION_KEY='...' \
       aap-eda-manage rotate_db_encryption_key --use-custom-key
+
+Manual validation::
+
+    When changing this command or EncryptedTextField/crypto code, start
+    the stack with an explicit key and run the lifecycle tests:
+
+        EDA_SECRET_KEY=insecure task docker:up
+        task test:rotate-db-encryption-key
+
+    See docs/development.md "DB encryption key rotation tests" for
+    prerequisites, recovery steps, and env var reference.
 """
 
 from __future__ import annotations

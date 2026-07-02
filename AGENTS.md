@@ -216,6 +216,25 @@ API Views → Serializers → Services → Models → ORM → PostgreSQL
   **Note:** This PR was developed with assistance from Claude AI assistant.
   ```
 
+### Manual Validation: DB Encryption Key Rotation
+
+**When to run:** Any time code changes touch `rotate_db_encryption_key.py`,
+`EncryptedTextField`, or `aap_eda/core/utils/crypto/`.
+
+**Prerequisite:** Start the stack with an explicit key before running:
+```bash
+EDA_SECRET_KEY=insecure task docker:up
+```
+
+**Run tests:**
+```bash
+task test:rotate-db-encryption-key
+```
+
+Full prerequisites, test coverage details, env var reference, and recovery
+steps are documented in [docs/development.md](docs/development.md) § "DB
+encryption key rotation tests".
+
 ### Common Gotchas
 - Tests require PostgreSQL running (`task docker:up:minimal`)
 - The `task test` command runs tests twice: once normal, once with `-m multithreaded`
