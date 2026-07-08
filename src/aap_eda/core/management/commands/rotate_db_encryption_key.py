@@ -21,8 +21,19 @@ deployment secret with the new key, then restart services.
 Usage::
 
     aap-eda-manage rotate_db_encryption_key
-    EDA_SECRET_KEY='...' \
+    EDA_DB_ROTATION_KEY='...' \
       aap-eda-manage rotate_db_encryption_key --use-custom-key
+
+Manual validation::
+
+    When changing this command or EncryptedTextField/crypto code, start
+    the stack with an explicit key and run the lifecycle tests:
+
+        EDA_SECRET_KEY=insecure task docker:up
+        task test:rotate-db-encryption-key
+
+    See docs/development.md "DB encryption key rotation tests" for
+    prerequisites, recovery steps, and env var reference.
 """
 
 from __future__ import annotations
@@ -88,7 +99,7 @@ class Command(BaseCommand):
             action="store_true",
             default=False,
             help=(
-                "Use the key from the EDA_SECRET_KEY environment "
+                "Use the key from the EDA_DB_ROTATION_KEY environment "
                 "variable instead of generating a new one."
             ),
         )
@@ -108,11 +119,11 @@ class Command(BaseCommand):
         self.old_key = settings.SECRET_KEY
 
         if use_custom_key:
-            self.new_key = os.environ.get("EDA_SECRET_KEY")
+            self.new_key = os.environ.get("EDA_DB_ROTATION_KEY")
             if not self.new_key:
                 raise CommandError(
                     "--use-custom-key was specified but "
-                    "EDA_SECRET_KEY is not set in the environment."
+                    "EDA_DB_ROTATION_KEY is not set in the environment."
                 )
         else:
             self.new_key = base64.encodebytes(os.urandom(33)).decode().rstrip()
