@@ -384,6 +384,83 @@ With docker compose:
 task docker -- run --rm eda-api python3.11 -m pytest
 ```
 
+### DB encryption key rotation tests
+
+Integration tests for the `rotate_db_encryption_key` management command live in
+`tests/integration/commands/test_rotate_db_encryption_key_lifecycle.py`.
+They are **skipped by default** and must be run manually.
+
+**When to run:** Any time code changes touch `rotate_db_encryption_key.py`,
+`EncryptedTextField`, or `aap_eda/core/utils/crypto/`.
+
+#### Prerequisites
+
+- **Command-level tests** require Postgres: `task docker:up:minimal`
+- **Service-level tests** require the full Docker stack started with an explicit key:
+
+```shell
+EDA_SECRET_KEY=insecure task docker:up
+```
+
+> **Important:** Do not use bare `task docker:up` — the `docker-compose-dev.yaml`
+> default `${EDA_SECRET_KEY:-'insecure'}` includes literal quotes around the
+> value, causing a key mismatch when the test restarts services during rotation.
+
+- Service-level tests require `docker compose up -d` to work — the test
+  restarts containers mid-rotation. If the restart fails, the DB is left
+  encrypted with a rotated key that no running service knows — see
+  recovery steps below.
+
+#### Running the tests
+
+Run all rotation tests (command-level + service-level):
+
+```shell
+task test:rotate-db-encryption-key
+```
+
+Run command-level only (Postgres only):
+
+```shell
+task test:rotate-db-encryption-key -- -k "TestRotateDbEncryptionKeyLifecycle"
+```
+
+Run service-level only (full Docker stack):
+
+```shell
+task test:rotate-db-encryption-key -- -k "TestRotateDbEncryptionKeyService"
+```
+
+#### What the tests cover
+
+- **Command-level** (`TestRotateDbEncryptionKeyLifecycle`): auto-generated key
+  rotation, custom key rotation via `EDA_DB_ROTATION_KEY`, dry-run mode, and
+  restore-to-original. Runs via subprocess so dynaconf loads env vars the same
+  way production does.
+- **Service-level** (`TestRotateDbEncryptionKeyService`): full customer workflow —
+  create credential via API, rotate key, verify API returns 500 (old key in
+  memory), restart services with new key, verify API returns 200, restore
+  original key.
+
+#### Recovery from a failed service-level test
+
+If the service-level test fails mid-rotation the DB is left encrypted with a
+key that doesn't match the running services. The only recovery is a full reset:
+
+```shell
+task docker:purge && EDA_SECRET_KEY=insecure task docker:up
+```
+
+#### Environment variable reference
+
+| Variable | Purpose |
+|----------|---------|
+| `EDA_SECRET_KEY` | Sets `settings.SECRET_KEY` via dynaconf. Used by Django for encryption at rest. |
+| `EDA_DB_ROTATION_KEY` | Provides the new key for `rotate_db_encryption_key --use-custom-key`. Operator-set, ad-hoc only. |
+
+Do **not** confuse the two — see the command docstring in
+`src/aap_eda/core/management/commands/rotate_db_encryption_key.py`.
+
 ### Running linters
 
 The project uses `flake8` with a set of plugins, `black`, `isort` and `ruff` (experimental),
