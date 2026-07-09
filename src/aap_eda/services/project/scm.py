@@ -132,7 +132,7 @@ class ScmRepository:
         self._executor = _executor
         self.git_hash = None
 
-    def rev_parse(self, rev: str) -> str:
+    def rev_parse(self, _rev: str) -> str:
         """
         Return object identifier for the given revision specifier.
 
@@ -359,10 +359,10 @@ class GitAnsibleRunnerExecutor:
                 )
                 if match:
                     return match.group(1)
-            match = re.search(
-                r'fatal: \[localhost\]: FAILED! => \{.+"msg": (.+)\}',
-                outputs.getvalue(),
-            )
+            output = outputs.getvalue()
+            match = None
+            if "fatal: [localhost]: FAILED!" in output and '"msg":' in output:
+                match = re.search(r'"msg": ([^}]+)\}', output)
             if match:
                 err_msg = match.group(1)
                 if "Authentication failed" in err_msg:
