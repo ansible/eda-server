@@ -761,6 +761,8 @@ class ActivationCopySerializer(serializers.ModelSerializer):
         validators.validate_k8s_pod_tolerations(
             activation.k8s_pod_tolerations or []
         )
+        validators.check_if_rulebook_exists(activation.rulebook_id)
+
         copied_data = {
             "name": self.validated_data["name"],
             "description": activation.description,
