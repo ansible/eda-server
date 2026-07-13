@@ -52,32 +52,34 @@ class ApiV1RootView(APIView):
         return Response(urls)
 
 
+def _list_urls(url_patterns, request=None):
+    """Collect named URL patterns into a dict of name to URL."""
+    url_list = {}
+    for url in url_patterns:
+        if isinstance(url, URLResolver):
+            url_list.update(_list_urls(url.url_patterns, request))
+        elif isinstance(url, URLPattern):
+            name = url.name
+            if not name:
+                LOGGER.warning(
+                    "URL %s has no name, DRF browsable API will omit it",
+                    url.pattern,
+                )
+                continue
+            if url.pattern.regex.groups:
+                continue
+            url_list[name] = reverse(name, request=request)
+    return url_list
+
+
 def get_api_v1_urls(request=None):
     from aap_eda.api import urls
 
-    def list_urls(urls):
-        url_list = {}
-        for url in urls:
-            if isinstance(url, URLResolver):
-                url_list.update(list_urls(url.url_patterns))
-            elif isinstance(url, URLPattern):
-                name = url.name
-                if not name:
-                    LOGGER.warning(
-                        "URL %s has no name, DRF browsable API will omit it",
-                        url.pattern,
-                    )
-                    continue
-                if url.pattern.regex.groups:
-                    continue
-                url_list[name] = reverse(name, request=request)
-        return url_list
-
     if settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT:
-        return list_urls(urls.v1_urls)
+        return _list_urls(urls.v1_urls, request)
 
-    url_list = list_urls(urls.eda_v1_urls)
-    all_urls = list_urls(urls.dab_urls)
+    url_list = _list_urls(urls.eda_v1_urls, request)
+    all_urls = _list_urls(urls.dab_urls, request)
     for name, url in all_urls.items():
         if name in ALWAYS_VISIBLE_ENDPOINTS:
             url_list[name] = url

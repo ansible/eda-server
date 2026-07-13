@@ -266,105 +266,15 @@ def queue_dispatch(
             return
 
     else:
-        queue_name = get_queue_name_by_parent_id(
+        queue_name = _resolve_existing_queue(
             process_parent_type,
             process_parent_id,
+            request_type,
+            process_parent,
+            status_manager,
         )
-
-        # If there is not an associated queue or the queue does not exist
-        # within the configured queues (i.e., it is from a previous deployment
-        # with different queues) we get a queue to use.
-        if (not queue_name) or (
-            queue_name not in settings.RULEBOOK_WORKER_QUEUES
-        ):
-            if not queue_name:
-                LOGGER.info(
-                    "Scheduling request "
-                    f"{request_type} for {process_parent_type} "
-                    f"{process_parent_id} to the least busy queue; "
-                    "it is not currently associated with a queue.",
-                )
-            else:
-                LOGGER.info(
-                    "Scheduling request"
-                    f"{request_type} for {process_parent_type} "
-                    f"{process_parent_id} to the least busy queue; "
-                    f"its associated queue '{queue_name}' is from "
-                    "previous configuation settings.",
-                )
-            try:
-                queue_name = get_least_busy_queue_name()
-            except HealthyQueueNotFoundError:
-                msg = (
-                    f"There are no healthy queues to process operation "
-                    f"{request_type} for {process_parent_type} "
-                    f"{process_parent_id}. Waiting for a worker. "
-                    "There may be an issue with the system; please "
-                    "contact the administrator."
-                )
-                LOGGER.error(msg)
-                status_manager.set_status(
-                    ActivationStatus.PENDING,
-                    msg,
-                )
-                return
-        elif not check_rulebook_queue_health(queue_name):
-            # The queue is unhealthy.  If we're not restarting it there's
-            # nothing we can do except update its status to WORKERS_OFFLINE.
-            if request_type != ActivationRequest.RESTART:
-                # A process in PENDING status don't need to update its status.
-                # A monitor can be scheduled for an activation in PENDING
-                # status if its latest process is in workers-offline status
-                # and it is scheduled for restart.
-                if process_parent.status == ActivationStatus.PENDING:
-                    return
-
-                # If the process is in WORKERS_OFFLINE status, it is already
-                # in a bad state.  We don't need to update its status.
-                if process_parent.status == ActivationStatus.WORKERS_OFFLINE:
-                    return
-
-                msg = (
-                    f"{process_parent_type} {process_parent_id} is in an "
-                    "unknown state. The workers of its associated queue "
-                    f"'{queue_name}' are failing liveness checks. "
-                    "There may be an issue with the worker node; "
-                    "please contact the administrator."
-                )
-                status_manager.set_status(
-                    ActivationStatus.WORKERS_OFFLINE,
-                    msg,
-                )
-                status_manager.set_latest_instance_status(
-                    ActivationStatus.WORKERS_OFFLINE,
-                    msg,
-                )
-                LOGGER.error(msg)
-                return
-
-            # The queue is unhealthy, but this is a restart.
-            # The priority is to adhere to the restart policy and
-            # execute the task.
-            LOGGER.warning(
-                f"Forcing user restart of {process_parent_type} "
-                f"{process_parent_id} on the least busy queue; "
-                "after failing liveness checks of current associated queue"
-            )
-            try:
-                queue_name = get_least_busy_queue_name()
-            except HealthyQueueNotFoundError:
-                msg = (
-                    f"There are no healthy queues to process the "
-                    f"restart request for {process_parent_type} "
-                    f"{process_parent_id}. There may be an issue "
-                    "with the system; please contact the administrator."
-                )
-                LOGGER.error(msg)
-                status_manager.set_status(
-                    ActivationStatus.PENDING,
-                    msg,
-                )
-                return
+        if queue_name is None:
+            return
     LOGGER.info(
         f"Trying to enqueue {process_parent_type} {process_parent_id} "
         f"request {request_type} to queue {queue_name}"
@@ -383,6 +293,151 @@ def queue_dispatch(
         f"_manage({job_id}) submitted to queue {queue_name} "
         f"request={request_type}",
     )
+
+
+def _resolve_existing_queue(
+    process_parent_type,
+    process_parent_id,
+    request_type,
+    process_parent,
+    status_manager,
+):
+    """Resolve the queue for an existing process.
+
+    Returns the queue name, or None if the request cannot
+    be dispatched.
+    """
+    queue_name = get_queue_name_by_parent_id(
+        process_parent_type,
+        process_parent_id,
+    )
+
+    # If there is not an associated queue or the queue does not
+    # exist within the configured queues (i.e., it is from a
+    # previous deployment with different queues) we get a queue
+    # to use.
+    if not queue_name or (queue_name not in settings.RULEBOOK_WORKER_QUEUES):
+        if not queue_name:
+            LOGGER.info(
+                "Scheduling request "
+                f"{request_type} for {process_parent_type} "
+                f"{process_parent_id} to the least busy queue; "
+                "it is not currently associated with a queue.",
+            )
+        else:
+            LOGGER.info(
+                "Scheduling request"
+                f"{request_type} for {process_parent_type} "
+                f"{process_parent_id} to the least busy queue; "
+                f"its associated queue '{queue_name}' is from "
+                "previous configuation settings.",
+            )
+        try:
+            return get_least_busy_queue_name()
+        except HealthyQueueNotFoundError:
+            msg = (
+                f"There are no healthy queues to process "
+                f"operation {request_type} for "
+                f"{process_parent_type} "
+                f"{process_parent_id}. Waiting for a worker. "
+                "There may be an issue with the system; "
+                "please contact the administrator."
+            )
+            LOGGER.error(msg)
+            status_manager.set_status(
+                ActivationStatus.PENDING,
+                msg,
+            )
+            return None
+
+    if not check_rulebook_queue_health(queue_name):
+        return _handle_unhealthy_queue(
+            queue_name,
+            process_parent_type,
+            process_parent_id,
+            request_type,
+            process_parent,
+            status_manager,
+        )
+
+    return queue_name
+
+
+def _handle_unhealthy_queue(
+    queue_name,
+    process_parent_type,
+    process_parent_id,
+    request_type,
+    process_parent,
+    status_manager,
+):
+    """Handle dispatch when the associated queue is unhealthy.
+
+    Returns a fallback queue name, or None if the request
+    cannot be dispatched.
+    """
+    # The queue is unhealthy.  If we're not restarting it there's
+    # nothing we can do except update its status to
+    # WORKERS_OFFLINE.
+    if request_type != ActivationRequest.RESTART:
+        # A process in PENDING status don't need to update its
+        # status. A monitor can be scheduled for an activation
+        # in PENDING status if its latest process is in
+        # workers-offline status and it is scheduled for restart.
+        #
+        # If the process is in WORKERS_OFFLINE status, it is
+        # already in a bad state.  We don't need to update its
+        # status.
+        if process_parent.status in (
+            ActivationStatus.PENDING,
+            ActivationStatus.WORKERS_OFFLINE,
+        ):
+            return None
+
+        msg = (
+            f"{process_parent_type} {process_parent_id} is "
+            "in an unknown state. The workers of its "
+            f"associated queue '{queue_name}' are failing "
+            "liveness checks. There may be an issue with "
+            "the worker node; please contact the "
+            "administrator."
+        )
+        status_manager.set_status(
+            ActivationStatus.WORKERS_OFFLINE,
+            msg,
+        )
+        status_manager.set_latest_instance_status(
+            ActivationStatus.WORKERS_OFFLINE,
+            msg,
+        )
+        LOGGER.error(msg)
+        return None
+
+    # The queue is unhealthy, but this is a restart.
+    # The priority is to adhere to the restart policy and
+    # execute the task.
+    LOGGER.warning(
+        f"Forcing user restart of {process_parent_type} "
+        f"{process_parent_id} on the least busy queue; "
+        "after failing liveness checks of current "
+        "associated queue"
+    )
+    try:
+        return get_least_busy_queue_name()
+    except HealthyQueueNotFoundError:
+        msg = (
+            f"There are no healthy queues to process the "
+            f"restart request for {process_parent_type} "
+            f"{process_parent_id}. There may be an issue "
+            "with the system; please contact the "
+            "administrator."
+        )
+        LOGGER.error(msg)
+        status_manager.set_status(
+            ActivationStatus.PENDING,
+            msg,
+        )
+        return None
 
 
 def get_least_busy_queue_name() -> str:
