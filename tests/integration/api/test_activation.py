@@ -1375,6 +1375,30 @@ def test_copy_activation_invalid_body(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
+@pytest.mark.django_db
+def test_copy_activation_with_deleted_rulebook(
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    activation_payload["is_enabled"] = False
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    a_id = response.data["id"]
+
+    activation = models.Activation.objects.get(id=a_id)
+    activation.rulebook = None
+    activation.save(update_fields=["rulebook"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/{a_id}/copy/",
+        data={"name": "copied-activation"},
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
 # ------------------------------------------------------------------
 # Project sync dependency tests
 # ------------------------------------------------------------------

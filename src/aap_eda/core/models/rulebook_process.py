@@ -80,9 +80,8 @@ class RulebookProcess(BaseOrgModel):
         return f"Rulebook Process id {self.id}"
 
     def save(self, *args, **kwargs):
-        # when creating
+        """Save the rulebook process."""
         if self._state.adding:
-            # ensure type is set
             self._set_parent_type()
             parent = self.get_parent()
             parent.latest_instance = self
@@ -90,36 +89,36 @@ class RulebookProcess(BaseOrgModel):
             if self.status_message is None:
                 self.status_message = self._get_default_status_message()
         else:
-            if not bool(kwargs) or "update_fields" not in kwargs:
-                raise UpdateFieldsRequiredError(
-                    "update_fields is required to use when saving "
-                    "due to race conditions"
-                )
-            else:
-                if "status" in kwargs["update_fields"]:
-                    self._is_valid_status()
-
-            if (
-                "status_message" in kwargs["update_fields"]
-                and "status" not in kwargs["update_fields"]
-            ):
-                raise StatusRequiredError(
-                    "status_message cannot be set by itself, "
-                    "it requires status and status_message together"
-                )
-            # when updating without status_message
-            elif (
-                "status" in kwargs["update_fields"]
-                and "status_message" not in kwargs["update_fields"]
-            ):
-                self.status_message = self._get_default_status_message()
-                kwargs["update_fields"].append("status_message")
+            self._validate_update_fields(kwargs)
 
         super().save(*args, **kwargs)
 
-        # update parent's latest_instance
         parent = self.get_parent()
         parent.save(update_fields=["latest_instance"])
+
+    def _validate_update_fields(self, kwargs):
+        """Validate kwargs for update operations."""
+        if not bool(kwargs) or "update_fields" not in kwargs:
+            raise UpdateFieldsRequiredError(
+                "update_fields is required to use when saving "
+                "due to race conditions"
+            )
+
+        update_fields = kwargs["update_fields"]
+        if "status" in update_fields:
+            self._is_valid_status()
+
+        has_status_message = "status_message" in update_fields
+        has_status = "status" in update_fields
+
+        if has_status_message and not has_status:
+            raise StatusRequiredError(
+                "status_message cannot be set by itself, "
+                "it requires status and status_message together"
+            )
+        if has_status and not has_status_message:
+            self.status_message = self._get_default_status_message()
+            update_fields.append("status_message")
 
     def _check_parent(self):
         """Clean method for RulebookProcess model."""

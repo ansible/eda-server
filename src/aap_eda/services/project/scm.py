@@ -179,43 +179,13 @@ class ScmRepository:
             os.makedirs(path)
         extra_vars = {"project_path": path}
         env_vars = {}
-        final_url = url
-        secret = ""
-        key_file = None
-        key_password = None
-        gpg_key_file = None
-        gpg_home_dir = None
         with set_proxy_environ(proxy):
-            if credential:
-                inputs = credentials.get_resolved_secrets(credential)
-                secret = inputs.get("password", "")
-                key_data = inputs.get("ssh_key_data", "")
-
-                final_url = cls.build_url(
-                    url,
-                    inputs.get("username", ""),
-                    secret,
-                    key_data,
-                )
-
-                if key_data:  # ssh
-                    key_file = tempfile.NamedTemporaryFile("w+t")
-                    key_file.write(key_data)
-                    key_file.write("\n")
-                    key_file.flush()
-                    extra_vars["key_file"] = key_file.name
-                    key_password = inputs.get("ssh_key_unlock")
-
-            if gpg_credential:
-                gpg_inputs = credentials.get_resolved_secrets(gpg_credential)
-                gpg_key = gpg_inputs.get("gpg_public_key")
-                gpg_key_file = tempfile.NamedTemporaryFile("w+t")
-                gpg_key_file.write(gpg_key)
-                gpg_key_file.write("\n")
-                gpg_key_file.flush()
-                extra_vars["verify_commit"] = "true"
-                gpg_home_dir = tempfile.TemporaryDirectory()
-                env_vars["GNUPGHOME"] = gpg_home_dir.name
+            final_url, secret, key_file, key_password = cls._setup_credential(
+                url, credential, extra_vars
+            )
+            gpg_key_file, gpg_home_dir = cls._setup_gpg_credential(
+                gpg_credential, extra_vars, env_vars
+            )
 
         if not verify_ssl:
             extra_vars["ssl_no_verify"] = "true"
@@ -242,18 +212,7 @@ class ScmRepository:
             with contextlib.chdir(path):
                 git_hash = _executor(extra_vars=extra_vars, env_vars=env_vars)
         except ScmError as e:
-            msg = str(e)
-            # Replace credential-embedded URL with clean URL instead
-            # of redacting the password substring (which would create
-            # an oracle attack vector — see AAP-72813).
-            if final_url != url:
-                msg = msg.replace(final_url, url)
-            # Handle URL-decoded form for passwords with special chars
-            # (e.g., "p@ss" is encoded as "p%40ss" in final_url, but
-            # git may print the decoded form in error messages).
-            if secret and secret != quote(secret, safe=""):
-                raw_url = final_url.replace(quote(secret, safe=""), secret)
-                msg = msg.replace(raw_url, url)
+            msg = cls._sanitize_clone_error(str(e), url, final_url, secret)
             logger.warning("SCM clone failed: %s", msg)
             raise e.__class__(msg) from None
         finally:
@@ -265,6 +224,66 @@ class ScmRepository:
         instance = cls(path, _executor=_executor)
         instance.git_hash = git_hash
         return instance
+
+    @classmethod
+    def _setup_credential(cls, url, credential, extra_vars):
+        """Set up SCM credential, returning URL and key info."""
+        final_url = url
+        secret = ""
+        key_file = None
+        key_password = None
+        if credential:
+            inputs = credentials.get_resolved_secrets(credential)
+            secret = inputs.get("password", "")
+            key_data = inputs.get("ssh_key_data", "")
+
+            final_url = cls.build_url(
+                url,
+                inputs.get("username", ""),
+                secret,
+                key_data,
+            )
+
+            if key_data:  # ssh
+                key_file = tempfile.NamedTemporaryFile("w+t")
+                key_file.write(key_data)
+                key_file.write("\n")
+                key_file.flush()
+                extra_vars["key_file"] = key_file.name
+                key_password = inputs.get("ssh_key_unlock")
+        return final_url, secret, key_file, key_password
+
+    @classmethod
+    def _setup_gpg_credential(cls, gpg_credential, extra_vars, env_vars):
+        """Set up GPG credential for commit verification."""
+        gpg_key_file = None
+        gpg_home_dir = None
+        if gpg_credential:
+            gpg_inputs = credentials.get_resolved_secrets(gpg_credential)
+            gpg_key = gpg_inputs.get("gpg_public_key")
+            gpg_key_file = tempfile.NamedTemporaryFile("w+t")
+            gpg_key_file.write(gpg_key)
+            gpg_key_file.write("\n")
+            gpg_key_file.flush()
+            extra_vars["verify_commit"] = "true"
+            gpg_home_dir = tempfile.TemporaryDirectory()
+            env_vars["GNUPGHOME"] = gpg_home_dir.name
+        return gpg_key_file, gpg_home_dir
+
+    @classmethod
+    def _sanitize_clone_error(cls, msg, url, final_url, secret):
+        """Redact credentials from clone error messages.
+
+        Replaces credential-embedded URL with clean URL instead
+        of redacting the password substring (which would create
+        an oracle attack vector — see AAP-72813).
+        """
+        if final_url != url:
+            msg = msg.replace(final_url, url)
+        if secret and secret != quote(secret, safe=""):
+            raw_url = final_url.replace(quote(secret, safe=""), secret)
+            msg = msg.replace(raw_url, url)
+        return msg
 
     @classmethod
     def build_url(
@@ -284,7 +303,9 @@ class ScmRepository:
         if user and password:
             encoded_user = quote(user, safe="")
             encoded_password = quote(password, safe="")
-            domain = f"{encoded_user}:{encoded_password}@{domain}"
+            domain = (
+                f"{encoded_user}:{encoded_password}@{domain}"  # noqa: E231
+            )
         elif password:
             encoded_token = quote(password, safe="")
             domain = f"{encoded_token}@{domain}"

@@ -227,38 +227,44 @@ class ProjectImportService:
         )
 
     def _find_rulebooks(self, repo: StrPath) -> Iterator[RulebookInfo]:
-        rulebooks_dir = None
-        for name in ["extensions/eda/rulebooks", "rulebooks"]:
-            if os.path.exists(os.path.join(repo, name)):
-                rulebooks_dir = os.path.join(repo, name)
-                break
-
-        if not rulebooks_dir:
-            raise ProjectImportWarning(
-                "The 'extensions/eda/rulebooks' or 'rulebooks' directory"
-                " doesn't exist within the project root."
-            )
+        rulebooks_dir = self._locate_rulebooks_dir(repo)
 
         for root, _dirs, files in os.walk(rulebooks_dir):
             for filename in files:
-                path = os.path.join(root, filename)
                 _base, ext = os.path.splitext(filename)
                 if ext not in YAML_EXTENSIONS:
                     continue
-                try:
-                    info = self._try_load_rulebook(rulebooks_dir, path)
-                except Exception:
-                    logger.error(
-                        "Unexpected exception when scanning file %s."
-                        " Skipping.",
-                        path,
-                        exc_info=settings.DEBUG,
-                    )
-                    continue
-                if not info:
-                    logger.warning("Not a rulebook file: %s", path)
-                    continue
-                yield info
+                path = os.path.join(root, filename)
+                info = self._safe_load_rulebook(rulebooks_dir, path)
+                if info:
+                    yield info
+
+    def _locate_rulebooks_dir(self, repo: StrPath) -> str:
+        for name in ["extensions/eda/rulebooks", "rulebooks"]:
+            candidate = os.path.join(repo, name)
+            if os.path.exists(candidate):
+                return candidate
+        raise ProjectImportWarning(
+            "The 'extensions/eda/rulebooks' or 'rulebooks' directory"
+            " doesn't exist within the project root."
+        )
+
+    def _safe_load_rulebook(
+        self, rulebooks_dir: StrPath, path: str
+    ) -> Optional[RulebookInfo]:
+        try:
+            info = self._try_load_rulebook(rulebooks_dir, path)
+        except Exception:
+            logger.error(
+                "Unexpected exception when scanning file %s. Skipping.",
+                path,
+                exc_info=settings.DEBUG,
+            )
+            return None
+        if not info:
+            logger.warning("Not a rulebook file: %s", path)
+            return None
+        return info
 
     def _try_load_rulebook(
         self, rulebooks_dir: StrPath, rulebook_path: StrPath

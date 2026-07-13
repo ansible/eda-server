@@ -86,41 +86,45 @@ def _arbitrate(
             ref_request = request
             continue
 
-        # nothing can be done after delete
-        # or dedup
-        # or skip auto_start
-        if (
-            ref_request.request == ActivationRequest.DELETE
-            or request.request == ref_request.request
-            or request.request == ActivationRequest.AUTO_START
-        ):
-            request.delete()
-            continue
-
-        if ref_request.request == ActivationRequest.AUTO_START:
-            ref_request.delete()
-            ref_request = request
-            continue
-
-        if (
-            request.request == ActivationRequest.STOP
-            or request.request == ActivationRequest.DELETE
-        ):
-            while qualified_requests:
-                qualified = qualified_requests.pop()
-                qualified.delete()
-            ref_request.delete()
-            ref_request = request
-            continue
-
-        if request.request in starts and ref_request.request in starts:
-            request.delete()
-            continue
-
-        qualified_requests.append(ref_request)
-        ref_request = request
+        ref_request = _resolve_request_pair(
+            ref_request, request, qualified_requests, starts
+        )
 
     if ref_request:
         qualified_requests.append(ref_request)
 
     return qualified_requests
+
+
+def _resolve_request_pair(ref_request, request, qualified_requests, starts):
+    """Resolve a pair of activation requests, returning the new reference."""
+    # nothing can be done after delete
+    # or dedup
+    # or skip auto_start
+    if (
+        ref_request.request == ActivationRequest.DELETE
+        or request.request == ref_request.request
+        or request.request == ActivationRequest.AUTO_START
+    ):
+        request.delete()
+        return ref_request
+
+    if ref_request.request == ActivationRequest.AUTO_START:
+        ref_request.delete()
+        return request
+
+    if request.request in (
+        ActivationRequest.STOP,
+        ActivationRequest.DELETE,
+    ):
+        while qualified_requests:
+            qualified_requests.pop().delete()
+        ref_request.delete()
+        return request
+
+    if request.request in starts and ref_request.request in starts:
+        request.delete()
+        return ref_request
+
+    qualified_requests.append(ref_request)
+    return request
