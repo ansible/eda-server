@@ -411,3 +411,89 @@ def test_git_clone_ssh_key(ssh_credential: models.EdaCredential, url: str):
         # SSH key file must be provided
         assert "key_file" in extra_vars
         assert extra_vars["key_file"]  # non-empty path
+
+
+#################################################################
+# Tests for GitAnsibleRunnerExecutor._extract_error_msg
+#################################################################
+
+_extract = scm.GitAnsibleRunnerExecutor._extract_error_msg
+
+
+def test_extract_error_msg_standard():
+    output = (
+        "fatal: [localhost]: FAILED! => "
+        '{"changed": false, "msg": "Authentication failed"}'
+    )
+    assert _extract(output) == '"Authentication failed"'
+
+
+def test_extract_error_msg_multiple_keys():
+    output = (
+        "fatal: [localhost]: FAILED! => "
+        '{"changed": false, "rc": 1, '
+        '"msg": "Could not clone repo"}'
+    )
+    assert _extract(output) == '"Could not clone repo"'
+
+
+def test_extract_error_msg_only_key():
+    output = (
+        "fatal: [localhost]: FAILED! => " '{"msg": "could not read Username"}'
+    )
+    assert _extract(output) == '"could not read Username"'
+
+
+def test_extract_error_msg_brace_in_value():
+    output = (
+        "fatal: [localhost]: FAILED! => "
+        '{"changed": false, '
+        '"msg": "failed with {error: bad}"}'
+    )
+    assert _extract(output) == '"failed with {error: bad}"'
+
+
+def test_extract_error_msg_success_returns_none():
+    output = 'ok: [localhost]: SUCCESS => {"changed": true}'
+    assert _extract(output) is None
+
+
+def test_extract_error_msg_no_msg_key_returns_none():
+    output = (
+        "fatal: [localhost]: FAILED! => "
+        '{"changed": false, "error": "something"}'
+    )
+    assert _extract(output) is None
+
+
+def test_extract_error_msg_empty():
+    output = "fatal: [localhost]: FAILED! => " '{"changed": false, "msg": ""}'
+    assert _extract(output) == '""'
+
+
+def test_extract_error_msg_multiline():
+    output = (
+        "some log output\n"
+        "fatal: [localhost]: FAILED! => "
+        '{"msg": "real error"}'
+    )
+    assert _extract(output) == '"real error"'
+
+
+def test_extract_error_msg_auth_failed():
+    output = (
+        "fatal: [localhost]: FAILED! => "
+        '{"msg": "Authentication failed for user@host"}'
+    )
+    assert _extract(output) == '"Authentication failed for user@host"'
+
+
+def test_extract_error_msg_username_prompt():
+    output = (
+        "fatal: [localhost]: FAILED! => "
+        '{"msg": "could not read Username for '
+        "'https://git.example.com'\"}"
+    )
+    assert _extract(output) == (
+        '"could not read Username for ' "'https://git.example.com'\""
+    )

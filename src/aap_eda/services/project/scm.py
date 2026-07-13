@@ -380,12 +380,8 @@ class GitAnsibleRunnerExecutor:
                 )
                 if match:
                     return match.group(1)
-            match = re.search(
-                r'fatal: \[localhost\]: FAILED! => \{.+"msg": (.+)\}',
-                outputs.getvalue(),
-            )
-            if match:
-                err_msg = match.group(1)
+            err_msg = self._extract_error_msg(outputs.getvalue())
+            if err_msg:
                 if "Authentication failed" in err_msg:
                     raise ScmAuthenticationError("Authentication failed")
                 if (
@@ -396,6 +392,29 @@ class GitAnsibleRunnerExecutor:
                     raise ScmAuthenticationError(err_msg)
                 raise ScmError(f"{self.ERROR_PREFIX} {err_msg}")
             raise ScmError(f"{self.ERROR_PREFIX} {outputs.getvalue().strip()}")
+
+    @staticmethod
+    def _extract_error_msg(output):
+        """Extract msg value from Ansible FAILED output.
+
+        Looks for the fatal error marker, then finds the "msg"
+        key and extracts its value up to the last closing brace.
+        Handles msg values that contain } characters.
+        """
+        fatal_marker = "fatal: [localhost]: FAILED! => {"
+        fatal_idx = output.find(fatal_marker)
+        if fatal_idx < 0:
+            return None
+        block = output[fatal_idx + len(fatal_marker) :]
+        msg_marker = '"msg": '
+        msg_idx = block.find(msg_marker)
+        if msg_idx < 0:
+            return None
+        msg_value = block[msg_idx + len(msg_marker) :]
+        brace_idx = msg_value.rfind("}")
+        if brace_idx < 0:
+            return None
+        return msg_value[:brace_idx]
 
 
 def is_refspec_valid(refspec: str, is_branch: bool) -> bool:
