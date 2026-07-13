@@ -383,6 +383,30 @@ def test_monitor_to_running_status(
 
 
 @pytest.mark.django_db
+def test_monitor_preserves_failure_count_on_running_transition(
+    starting_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    running_container_status_mock: MagicMock,
+):
+    """AAP-78375: failure_count must not reset on STARTING->RUNNING."""
+    starting_activation.failure_count = 3
+    starting_activation.save(update_fields=["failure_count"])
+
+    activation_manager = ActivationManager(
+        db_instance=starting_activation,
+        container_engine=container_engine_mock,
+    )
+    container_engine_mock.get_status.return_value = (
+        running_container_status_mock
+    )
+    activation_manager.monitor()
+
+    starting_activation.refresh_from_db()
+    assert starting_activation.status == enums.ActivationStatus.RUNNING
+    assert starting_activation.failure_count == 3
+
+
+@pytest.mark.django_db
 def test_monitor_container_engine_error_sets_workers_offline(
     running_activation: models.Activation,
     container_engine_mock: MagicMock,
