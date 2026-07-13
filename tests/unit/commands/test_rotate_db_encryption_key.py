@@ -26,11 +26,11 @@ from aap_eda.core.utils.crypto.fields import decrypt_string
 
 
 @pytest.mark.django_db
-def test_use_custom_key_requires_eda_secret_key():
-    """CommandError when --use-custom-key is set without EDA_SECRET_KEY."""
+def test_use_custom_key_requires_env_var():
+    """CommandError when --use-custom-key set without env var."""
     with patch.dict(os.environ, {}, clear=True):
-        os.environ.pop("EDA_SECRET_KEY", None)
-        with pytest.raises(CommandError, match="EDA_SECRET_KEY"):
+        os.environ.pop("EDA_DB_ROTATION_KEY", None)
+        with pytest.raises(CommandError, match="EDA_DB_ROTATION_KEY"):
             call_command("rotate_db_encryption_key", use_custom_key=True)
 
 
@@ -38,7 +38,7 @@ def test_use_custom_key_requires_eda_secret_key():
 def test_same_key_aborts(settings):
     """CommandError when the new key equals the current SECRET_KEY."""
     settings.SECRET_KEY = "identical-key"
-    with patch.dict(os.environ, {"EDA_SECRET_KEY": "identical-key"}):
+    with patch.dict(os.environ, {"EDA_DB_ROTATION_KEY": "identical-key"}):
         with pytest.raises(CommandError, match="identical"):
             call_command("rotate_db_encryption_key", use_custom_key=True)
 
@@ -59,7 +59,7 @@ def test_dry_run_reports_without_writing(settings):
     out = io.StringIO()
     with patch.dict(
         os.environ,
-        {"EDA_SECRET_KEY": "new-secret-key-for-rotation"},
+        {"EDA_DB_ROTATION_KEY": "new-secret-key-for-rotation"},
     ):
         call_command(
             "rotate_db_encryption_key",
@@ -129,7 +129,7 @@ def test_reencryption_with_custom_key(settings):
     assert "$encrypted$" in old_cipher
 
     out = io.StringIO()
-    with patch.dict(os.environ, {"EDA_SECRET_KEY": new_key}):
+    with patch.dict(os.environ, {"EDA_DB_ROTATION_KEY": new_key}):
         call_command(
             "rotate_db_encryption_key",
             use_custom_key=True,
