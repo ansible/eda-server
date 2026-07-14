@@ -639,3 +639,143 @@ def test_git_clone_gpg_add_key(
                 _executor=executor,
             )
         mock_add_gpg.assert_called_once()
+
+
+#################################################################
+# Tests for ScmRepository.decrypt_key_file and add_gpg_key
+#################################################################
+
+
+def test_decrypt_key_file_success():
+    mock_result = mock.Mock()
+    mock_result.returncode = 0
+
+    with mock.patch(
+        "aap_eda.services.project.scm.subprocess.run",
+        return_value=mock_result,
+    ) as mock_run:
+        scm.ScmRepository.decrypt_key_file("/tmp/keyfile", "passphrase")
+
+    mock_run.assert_called_once()
+    args = mock_run.call_args[0][0]
+    assert "-P" in args
+    assert "passphrase" in args
+
+
+def test_decrypt_key_file_failure():
+    mock_result = mock.Mock()
+    mock_result.returncode = 1
+    mock_result.stderr = "bad passphrase"
+    mock_result.stdout = ""
+
+    with mock.patch(
+        "aap_eda.services.project.scm.subprocess.run",
+        return_value=mock_result,
+    ):
+        with pytest.raises(scm.ScmError) as exc_info:
+            scm.ScmRepository.decrypt_key_file("/tmp/keyfile", "wrong")
+        assert "Failed to decrypt" in str(exc_info.value)
+
+
+def test_add_gpg_key_success():
+    mock_result = mock.Mock()
+    mock_result.returncode = 0
+
+    with mock.patch(
+        "aap_eda.services.project.scm.subprocess.run",
+        return_value=mock_result,
+    ) as mock_run:
+        scm.ScmRepository.add_gpg_key("/tmp/gpgkey", "/tmp/gnupg")
+
+    mock_run.assert_called_once()
+    call_kwargs = mock_run.call_args
+    assert call_kwargs[1]["env"] == {"GNUPGHOME": "/tmp/gnupg"}
+
+
+def test_add_gpg_key_failure():
+    mock_result = mock.Mock()
+    mock_result.returncode = 2
+    mock_result.stderr = "no valid OpenPGP data"
+    mock_result.stdout = ""
+
+    with mock.patch(
+        "aap_eda.services.project.scm.subprocess.run",
+        return_value=mock_result,
+    ):
+        with pytest.raises(scm.ScmError) as exc_info:
+            scm.ScmRepository.add_gpg_key("/tmp/gpgkey", "/tmp/gnupg")
+        assert "Failed to import" in str(exc_info.value)
+
+
+#################################################################
+# Tests for GitAnsibleRunnerExecutor.__call__
+#################################################################
+
+
+def _run_executor(runner_rc, runner_stdout):
+    """Helper to run GitAnsibleRunnerExecutor with mocked runner."""
+    executor = scm.GitAnsibleRunnerExecutor()
+    mock_runner = mock.Mock()
+    mock_runner.rc = runner_rc
+
+    def fake_run(**kwargs):
+        # Write to the captured stdout so redirect_stdout picks it up
+        import sys
+
+        sys.stdout.write(runner_stdout)
+        return mock_runner
+
+    with mock.patch(
+        "aap_eda.services.project.scm.ansible_runner.run",
+        side_effect=fake_run,
+    ):
+        return executor(
+            extra_vars={"project_path": "/tmp"},
+            env_vars={},
+        )
+
+
+def test_executor_call_success():
+    output = '"msg": "Repository Version abc123def456"'
+    result = _run_executor(0, output)
+    assert result == "abc123def456"
+
+
+def test_executor_call_success_no_version():
+    with pytest.raises(scm.ScmError) as exc_info:
+        _run_executor(0, "some output without version")
+    assert "Project Import Error:" in str(exc_info.value)
+
+
+def test_executor_call_auth_failure():
+    output = (
+        "fatal: [localhost]: FAILED! => "
+        '{"changed": false, "msg": "Authentication failed"}'
+    )
+    with pytest.raises(scm.ScmAuthenticationError):
+        _run_executor(1, output)
+
+
+def test_executor_call_username_prompt():
+    output = (
+        "fatal: [localhost]: FAILED! => " '{"msg": "could not read Username"}'
+    )
+    with pytest.raises(scm.ScmAuthenticationError) as exc_info:
+        _run_executor(1, output)
+    assert "Credentials not provided" in str(exc_info.value)
+
+
+def test_executor_call_generic_error():
+    output = (
+        "fatal: [localhost]: FAILED! => " '{"msg": "repository not found"}'
+    )
+    with pytest.raises(scm.ScmError) as exc_info:
+        _run_executor(1, output)
+    assert "Project Import Error:" in str(exc_info.value)
+    assert "repository not found" in str(exc_info.value)
+
+
+def test_executor_call_no_fatal_output():
+    with pytest.raises(scm.ScmError) as exc_info:
+        _run_executor(1, "some generic failure output")
+    assert "Project Import Error:" in str(exc_info.value)
