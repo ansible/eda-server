@@ -380,10 +380,10 @@ class GitAnsibleRunnerExecutor:
                 )
                 if match:
                     return match.group(1)
-            output = outputs.getvalue()
-            match = None
-            if "fatal: [localhost]: FAILED!" in output and '"msg":' in output:
-                match = re.search(r'"msg": ([^}]+)\}', output)
+            match = re.search(
+                r'fatal: \[localhost\]: FAILED! => \{.+"msg": (.+)\}',
+                outputs.getvalue(),
+            )
             if match:
                 err_msg = match.group(1)
                 if "Authentication failed" in err_msg:
