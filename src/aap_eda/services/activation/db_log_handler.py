@@ -83,6 +83,7 @@ class DBLogger(LogHandler):
                 models.RulebookProcessLog.objects.bulk_create(
                     self.activation_instance_log_buffer
                 )
+                self._enforce_max_log_lines()
         except IntegrityError:
             message = (
                 f"Instance id: {self.activation_instance_id} is not present."
@@ -90,6 +91,31 @@ class DBLogger(LogHandler):
             raise ContainerUpdateLogsError(message)
 
         self.activation_instance_log_buffer = []
+
+    def _enforce_max_log_lines(self) -> None:
+        max_lines = settings.MAX_LOG_LINES_PER_INSTANCE
+        if not max_lines:
+            return
+
+        total = self.num_of_log_lines()
+        if total <= max_lines:
+            return
+
+        excess = total - max_lines
+        oldest_ids = (
+            models.RulebookProcessLog.objects.filter(
+                activation_instance_id=self.activation_instance_id,
+            )
+            .order_by("id")
+            .values_list("id", flat=True)[:excess]
+        )
+        models.RulebookProcessLog.objects.filter(id__in=oldest_ids).delete()
+        LOGGER.warning(
+            "Trimmed %d oldest log lines for instance %d (cap: %d)",
+            excess,
+            self.activation_instance_id,
+            max_lines,
+        )
 
     def get_log_read_at(self) -> Optional[datetime]:
         try:

@@ -187,6 +187,12 @@ ANSIBLE_RULEBOOK_LOG_LEVEL: str = "error"
 ANSIBLE_RULEBOOK_FLUSH_AFTER: int = 100
 
 # ---------------------------------------------------------
+# RULEBOOK PROCESS LOG RETENTION
+# ---------------------------------------------------------
+LOG_RETENTION_DAYS: int = 30
+MAX_LOG_LINES_PER_INSTANCE: int = 500000
+
+# ---------------------------------------------------------
 # DJANGO ANSIBLE BASE JWT SETTINGS
 # ---------------------------------------------------------
 ANSIBLE_BASE_JWT_VALIDATE_CERT: bool = False
