@@ -112,6 +112,7 @@ dab_urls = [
     path("", include(dab_urls)),
     path("", include(resource_api_urls)),
     path("", include(rbac_service_urls)),
+    path("", include("ansible_base.prometheus.urls")),
 ]
 
 v1_urls = eda_v1_urls + dab_urls

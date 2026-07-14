@@ -261,3 +261,12 @@ INSIGHTS_TRACKING_STATE: bool = False
 AUTOMATION_ANALYTICS_GATHER_INTERVAL: int = 14400
 REDHAT_USERNAME: str = ""
 REDHAT_PASSWORD: str = ""
+
+# ---------------------------------------------------------
+# PROMETHEUS SETTINGS (ansible_base.prometheus)
+# ---------------------------------------------------------
+# Allow unauthenticated Prometheus scrapers to reach /api/eda/v1/metrics/.
+# When False (default), access requires superuser or platform_auditor.
+# Platform auditors are identified via the is_platform_auditor attribute
+# populated by EDAJWTAuthentication from JWT claims.
+ANSIBLE_PROMETHEUS_ALLOW_ANONYMOUS: bool = False

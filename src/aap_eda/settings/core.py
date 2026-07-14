@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "ansible_base.jwt_consumer",
     "ansible_base.rest_filters",
     "ansible_base.feature_flags",
+    "ansible_base.prometheus",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -45,6 +46,7 @@ MIDDLEWARE = [
     "aap_eda.middleware.request_log_middleware.RequestLogMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "ansible_base.prometheus.middleware.PrometheusMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
