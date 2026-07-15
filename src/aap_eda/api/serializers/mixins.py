@@ -22,7 +22,7 @@ from aap_eda.core import validators
 class SharedResourceSerializerMixin:
     """Serializer mixin which controls the access to shared resources."""
 
-    def validate_shared_resource(self, data=None):
+    def validate_shared_resource(self, _data=None):
         """
         Validate access to shared resources.
 
