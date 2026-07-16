@@ -452,99 +452,78 @@ def test_git_clone_ssh_key(ssh_credential: models.EdaCredential, url: str):
 
 
 #################################################################
+# Tests for GitAnsibleRunnerExecutor._extract_git_hash
+#################################################################
+
+_extract_hash = scm.GitAnsibleRunnerExecutor._extract_git_hash
+_extract_error = scm.GitAnsibleRunnerExecutor._extract_error_msg
+
+
+def _ok_event(res=None):
+    return {"event": "runner_on_ok", "event_data": {"res": res or {}}}
+
+
+def _failed_event(res=None):
+    return {
+        "event": "runner_on_failed",
+        "event_data": {"res": res or {}},
+    }
+
+
+def test_extract_git_hash_from_set_fact():
+    events = [
+        _ok_event({"changed": True}),
+        _ok_event(
+            {
+                "ansible_facts": {
+                    "scm_version": "abc123def456",
+                },
+            }
+        ),
+        _ok_event({"msg": "Repository Version abc123def456"}),
+    ]
+    assert _extract_hash(events) == "abc123def456"
+
+
+def test_extract_git_hash_no_matching_event():
+    events = [
+        _ok_event({"changed": True}),
+        {"event": "runner_on_start", "event_data": {}},
+    ]
+    assert _extract_hash(events) is None
+
+
+def test_extract_git_hash_empty_events():
+    assert _extract_hash([]) is None
+
+
+#################################################################
 # Tests for GitAnsibleRunnerExecutor._extract_error_msg
 #################################################################
 
-_extract = scm.GitAnsibleRunnerExecutor._extract_error_msg
+
+def test_extract_error_msg_from_failed_event():
+    events = [_failed_event({"msg": "Authentication failed"})]
+    assert _extract_error(events) == "Authentication failed"
 
 
-def test_extract_error_msg_standard():
-    output = (
-        "fatal: [localhost]: FAILED! => "
-        '{"changed": false, "msg": "Authentication failed"}'
-    )
-    assert _extract(output) == '"Authentication failed"'
+def test_extract_error_msg_no_failure_event():
+    events = [_ok_event({"changed": True})]
+    assert _extract_error(events) is None
 
 
-def test_extract_error_msg_multiple_keys():
-    output = (
-        "fatal: [localhost]: FAILED! => "
-        '{"changed": false, "rc": 1, '
-        '"msg": "Could not clone repo"}'
-    )
-    assert _extract(output) == '"Could not clone repo"'
+def test_extract_error_msg_missing_msg_key():
+    events = [_failed_event({"changed": False, "rc": 1})]
+    assert _extract_error(events) is None
 
 
-def test_extract_error_msg_only_key():
-    output = (
-        "fatal: [localhost]: FAILED! => " '{"msg": "could not read Username"}'
-    )
-    assert _extract(output) == '"could not read Username"'
+def test_extract_error_msg_empty_msg():
+    events = [_failed_event({"msg": ""})]
+    assert _extract_error(events) is None
 
 
-def test_extract_error_msg_brace_in_value():
-    output = (
-        "fatal: [localhost]: FAILED! => "
-        '{"changed": false, '
-        '"msg": "failed with {error: bad}"}'
-    )
-    assert _extract(output) == '"failed with {error: bad}"'
-
-
-def test_extract_error_msg_success_returns_none():
-    output = 'ok: [localhost]: SUCCESS => {"changed": true}'
-    assert _extract(output) is None
-
-
-def test_extract_error_msg_no_msg_key_returns_none():
-    output = (
-        "fatal: [localhost]: FAILED! => "
-        '{"changed": false, "error": "something"}'
-    )
-    assert _extract(output) is None
-
-
-def test_extract_error_msg_empty():
-    output = "fatal: [localhost]: FAILED! => " '{"changed": false, "msg": ""}'
-    assert _extract(output) == '""'
-
-
-def test_extract_error_msg_multiline():
-    output = (
-        "some log output\n"
-        "fatal: [localhost]: FAILED! => "
-        '{"msg": "real error"}'
-    )
-    assert _extract(output) == '"real error"'
-
-
-def test_extract_error_msg_auth_failed():
-    output = (
-        "fatal: [localhost]: FAILED! => "
-        '{"msg": "Authentication failed for user@host"}'
-    )
-    assert _extract(output) == '"Authentication failed for user@host"'
-
-
-def test_extract_error_msg_username_prompt():
-    output = (
-        "fatal: [localhost]: FAILED! => "
-        '{"msg": "could not read Username for '
-        "'https://git.example.com'\"}"
-    )
-    assert _extract(output) == (
-        '"could not read Username for ' "'https://git.example.com'\""
-    )
-
-
-def test_extract_error_msg_no_closing_brace():
-    output = 'fatal: [localhost]: FAILED! => {"msg": "truncated output'
-    assert _extract(output) is None
-
-
-def test_extract_error_msg_fatal_marker_only():
-    output = "fatal: [localhost]: FAILED! => {"
-    assert _extract(output) is None
+def test_extract_error_msg_empty_events():
+    assert _extract_error([]) is None
 
 
 @pytest.mark.django_db
@@ -712,70 +691,61 @@ def test_add_gpg_key_failure():
 #################################################################
 
 
-def _run_executor(runner_rc, runner_stdout):
+def _run_executor(runner_rc, events):
     """Helper to run GitAnsibleRunnerExecutor with mocked runner."""
     executor = scm.GitAnsibleRunnerExecutor()
     mock_runner = mock.Mock()
     mock_runner.rc = runner_rc
-
-    def fake_run(**kwargs):
-        # Write to the captured stdout so redirect_stdout picks it up
-        import sys
-
-        sys.stdout.write(runner_stdout)
-        return mock_runner
+    mock_runner.events = events
 
     with mock.patch(
         "aap_eda.services.project.scm.ansible_runner.run",
-        side_effect=fake_run,
+        return_value=mock_runner,
     ):
         return executor(
-            extra_vars={"project_path": "/tmp"},
+            extra_vars={"project_path": "/mock/path"},
             env_vars={},
         )
 
 
 def test_executor_call_success():
-    output = '"msg": "Repository Version abc123def456"'
-    result = _run_executor(0, output)
+    events = [
+        _ok_event({"ansible_facts": {"scm_version": "abc123def456"}}),
+    ]
+    result = _run_executor(0, events)
     assert result == "abc123def456"
 
 
 def test_executor_call_success_no_version():
+    events = [_ok_event({"changed": True})]
     with pytest.raises(scm.ScmError) as exc_info:
-        _run_executor(0, "some output without version")
+        _run_executor(0, events)
     assert "Project Import Error:" in str(exc_info.value)
 
 
 def test_executor_call_auth_failure():
-    output = (
-        "fatal: [localhost]: FAILED! => "
-        '{"changed": false, "msg": "Authentication failed"}'
-    )
+    events = [_failed_event({"msg": "Authentication failed"})]
     with pytest.raises(scm.ScmAuthenticationError):
-        _run_executor(1, output)
+        _run_executor(1, events)
 
 
 def test_executor_call_username_prompt():
-    output = (
-        "fatal: [localhost]: FAILED! => " '{"msg": "could not read Username"}'
-    )
+    events = [_failed_event({"msg": "could not read Username"})]
     with pytest.raises(scm.ScmAuthenticationError) as exc_info:
-        _run_executor(1, output)
+        _run_executor(1, events)
     assert "Credentials not provided" in str(exc_info.value)
 
 
 def test_executor_call_generic_error():
-    output = (
-        "fatal: [localhost]: FAILED! => " '{"msg": "repository not found"}'
-    )
+    events = [_failed_event({"msg": "repository not found"})]
     with pytest.raises(scm.ScmError) as exc_info:
-        _run_executor(1, output)
+        _run_executor(1, events)
     assert "Project Import Error:" in str(exc_info.value)
     assert "repository not found" in str(exc_info.value)
 
 
-def test_executor_call_no_fatal_output():
+def test_executor_call_no_error_event():
+    events = [_ok_event({"changed": True})]
     with pytest.raises(scm.ScmError) as exc_info:
-        _run_executor(1, "some generic failure output")
+        _run_executor(1, events)
     assert "Project Import Error:" in str(exc_info.value)

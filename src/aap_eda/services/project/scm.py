@@ -14,10 +14,8 @@
 from __future__ import annotations
 
 import contextlib
-import io
 import logging
 import os
-import re
 import shutil
 import subprocess
 import tempfile
@@ -365,22 +363,20 @@ class GitAnsibleRunnerExecutor:
             os.makedirs(env_dir)
             safe_yaml.dump(os.path.join(env_dir, "extravars"), extra_vars)
 
-            outputs = io.StringIO()
-            with contextlib.redirect_stdout(outputs):
-                runner = ansible_runner.run(
-                    private_data_dir=data_dir,
-                    playbook=PLAYBOOK,
-                    envvars=env_vars,
-                )
+            runner = ansible_runner.run(
+                private_data_dir=data_dir,
+                playbook=PLAYBOOK,
+                envvars=env_vars,
+                quiet=True,
+            )
+
+            events = list(runner.events)
 
             if runner.rc == 0:
-                match = re.search(
-                    r'"msg": "Repository Version ([0-9a-fA-F]+)"',
-                    outputs.getvalue(),
-                )
-                if match:
-                    return match.group(1)
-            err_msg = self._extract_error_msg(outputs.getvalue())
+                git_hash = self._extract_git_hash(events)
+                if git_hash:
+                    return git_hash
+            err_msg = self._extract_error_msg(events)
             if err_msg:
                 if "Authentication failed" in err_msg:
                     raise ScmAuthenticationError("Authentication failed")
@@ -391,30 +387,29 @@ class GitAnsibleRunnerExecutor:
                     err_msg = "Credentials not provided or incorrect"
                     raise ScmAuthenticationError(err_msg)
                 raise ScmError(f"{self.ERROR_PREFIX} {err_msg}")
-            raise ScmError(f"{self.ERROR_PREFIX} {outputs.getvalue().strip()}")
+            raise ScmError(self.ERROR_PREFIX)
 
     @staticmethod
-    def _extract_error_msg(output):
-        """Extract msg value from Ansible FAILED output.
+    def _extract_git_hash(events):
+        for event in events:
+            if event.get("event") != "runner_on_ok":
+                continue
+            res = event.get("event_data", {}).get("res", {})
+            scm_version = res.get("ansible_facts", {}).get("scm_version")
+            if scm_version:
+                return scm_version
+        return None
 
-        Looks for the fatal error marker, then finds the "msg"
-        key and extracts its value up to the last closing brace.
-        Handles msg values that contain } characters.
-        """
-        fatal_marker = "fatal: [localhost]: FAILED! => {"
-        fatal_idx = output.find(fatal_marker)
-        if fatal_idx < 0:
-            return None
-        block = output[fatal_idx + len(fatal_marker) :]
-        msg_marker = '"msg": '
-        msg_idx = block.find(msg_marker)
-        if msg_idx < 0:
-            return None
-        msg_value = block[msg_idx + len(msg_marker) :]
-        brace_idx = msg_value.rfind("}")
-        if brace_idx < 0:
-            return None
-        return msg_value[:brace_idx]
+    @staticmethod
+    def _extract_error_msg(events):
+        for event in events:
+            if event.get("event") != "runner_on_failed":
+                continue
+            res = event.get("event_data", {}).get("res", {})
+            msg = res.get("msg")
+            if msg:
+                return msg
+        return None
 
 
 def is_refspec_valid(refspec: str, is_branch: bool) -> bool:
