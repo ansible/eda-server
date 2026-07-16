@@ -154,6 +154,22 @@ def test_list_activation_instance_logs_filter_non_existent(
     assert data == []
 
 
+@pytest.mark.django_db
+def test_logs_page_size_capped_at_max(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}"
+        f"/logs/?page_size=999999"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["page_size"] == 1000
+
+
 def assert_activation_instance_data(
     data: Dict[str, Any], instance: models.RulebookProcess
 ):

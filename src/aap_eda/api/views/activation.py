@@ -31,6 +31,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api.pagination import LogPagination
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
@@ -815,7 +816,10 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
         return super().filter_queryset(queryset)
 
     @extend_schema(
-        description="List Activation instance logs",
+        description=(
+            "List Activation instance logs. "
+            "Results are paginated with a maximum page_size of 1000."
+        ),
         request=None,
         responses={
             status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer(
@@ -828,13 +832,20 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
                 type=int,
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this Activation Instance.",  # noqa: E501
-            )
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page (default: 20, max: 1000).",  # noqa: E501
+            ),
         ],
         extensions={
             "x-ai-description": (
                 "List logs for an activation instance by ID. "
                 "Returns log records with timestamps and levels. "
-                "Supports filtering and pagination."
+                "Supports filtering and pagination. "
+                "Maximum page_size is 1000."
             )
         },
     )
@@ -846,6 +857,7 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
         url_path="(?P<id>[^/.]+)/logs",
     )
     def logs(self, request, id):
+        self.pagination_class = LogPagination
         instance_exists = (
             models.RulebookProcess.access_qs(request.user)
             .filter(pk=id)

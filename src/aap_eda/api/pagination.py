@@ -20,6 +20,12 @@ from rest_framework.utils.urls import remove_query_param, replace_query_param
 class DefaultPagination(pagination.PageNumberPagination):
     page_size_query_param = "page_size"
 
+
+class LogPagination(DefaultPagination):
+    """Pagination for log endpoints, capped at 1000 results per page."""
+
+    max_page_size = 1000
+
     def get_next_link(self):
         if not self.page.has_next():
             return None
