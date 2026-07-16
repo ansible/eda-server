@@ -814,14 +814,14 @@ test-randomorder = ["pytest-randomly"]
 
 [[package]]
 name = "daphne"
-version = "4.0.0"
+version = "4.2.2"
 description = "Django ASGI (HTTP/WebSocket) server"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "daphne-4.0.0-py3-none-any.whl", hash = "sha256:a288ece46012b6b719c37150be67c69ebfca0793a8521bf821533bad983179b2"},
-    {file = "daphne-4.0.0.tar.gz", hash = "sha256:cce9afc8f49a4f15d4270b8cfb0e0fe811b770a5cc795474e97e4da287497666"},
+    {file = "daphne-4.2.2-py3-none-any.whl", hash = "sha256:466ba8a7c31c5b758953095b451dbad9dc23e5783c68a3716e5fc7aa5f26d168"},
+    {file = "daphne-4.2.2.tar.gz", hash = "sha256:6c3527d4ce32630ae054dfb0ef5578e9a35d2f39f0ebcd02ef4f9129a121ce8d"},
 ]
 
 [package.dependencies]
@@ -830,7 +830,7 @@ autobahn = ">=22.4.2"
 twisted = {version = ">=22.4", extras = ["tls"]}
 
 [package.extras]
-tests = ["django", "hypothesis", "pytest", "pytest-asyncio"]
+tests = ["black", "django", "flake8", "flake8-bugbear", "hypothesis", "mypy", "pytest", "pytest-asyncio", "pytest-cov", "tox"]
 
 [[package]]
 name = "decorator"
@@ -931,7 +931,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "26.6.15.0.dev6+gf36ec5ebe"
+version = "26.7.16.0.dev4+g7afebb4f2"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.11"
@@ -955,13 +955,13 @@ sqlparse = ">=0.5.2"
 urllib3 = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 
 [package.extras]
-all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular (<1.0)", "ldap-filter", "lxml (==5.3.0)", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "referencing (<0.37.0)", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
+all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular (<1.0)", "jwcrypto (>=1.5.7)", "ldap-filter", "lxml (==5.3.0)", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "referencing (<0.37.0)", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
 api-documentation = ["drf-spectacular (<1.0)", "referencing (<0.37.0)"]
 authentication = ["django-auth-ldap", "ldap-filter", "lxml (==5.3.0)", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
 feature-flags = ["django-flags"]
 jwt-consumer = ["pyjwt", "requests"]
-oauth2-provider = ["django-oauth-toolkit (<2.4.0)"]
+oauth2-provider = ["django-oauth-toolkit (<2.4.0)", "jwcrypto (>=1.5.7)"]
 redis-client = ["django-redis", "redis"]
 resource-registry = ["asgiref", "pyjwt", "requests", "urllib3"]
 testing = ["cryptography", "pytest", "pytest-django"]
@@ -970,7 +970,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "ssh://git@github.com/ansible-automation-platform/django-ansible-base.git"
 reference = "stable-2.7"
-resolved_reference = "f36ec5ebe4f28b208738073ac5aa8e94d259bc24"
+resolved_reference = "7afebb4f2144e824432cb1539aa7f258f445b5d4"
 
 [[package]]
 name = "django-crum"
@@ -3450,4 +3450,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "641df715dea1283adc50a456795032288313cc5b36a1223680701116287af0f0"
+content-hash = "b79adb8ad8a2123def5d2770214f4eb525a0c64add6a940280a870ab7e625606"
