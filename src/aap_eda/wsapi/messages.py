@@ -38,20 +38,20 @@ class ActionMessage(Message):
     status: Optional[str] = ""
     url: Optional[str] = ""
     rule_run_at: Optional[str] = ""
-    playbook_name: Optional[str]
-    job_template_name: Optional[str]
-    organization: Optional[str]
-    job_id: Optional[str]
-    rc: Optional[int]
-    delay: Optional[float]
-    message: Optional[str]
-    kind: Optional[str]
-    controller_job_id: Optional[str]
+    playbook_name: Optional[str] = None
+    job_template_name: Optional[str] = None
+    organization: Optional[str] = None
+    job_id: Optional[str] = None
+    rc: Optional[int] = None
+    delay: Optional[float] = None
+    message: Optional[str] = None
+    kind: Optional[str] = None
+    controller_job_id: Optional[str] = None
 
 
 class AnsibleEventMessage(Message):
     event: dict = {}
-    run_at: str = None
+    run_at: Optional[str] = None
 
 
 class JobMessage(Message):
@@ -95,7 +95,7 @@ class ControllerInfo(BaseModel):
 
 class VaultPassword(BaseModel):
     type: str = "VaultPassword"
-    label: Optional[str]
+    label: Optional[str] = None
     password: str
 
 

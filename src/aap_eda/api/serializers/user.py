@@ -122,9 +122,8 @@ class UserUpdateSerializerBase(
         return super().update(instance, validated_data)
 
     def validate_is_superuser(self, value):
-        if value is True:
-            if not self.context["request"].user.is_superuser:
-                raise PermissionDenied
+        if value is True and not self.context["request"].user.is_superuser:
+            raise PermissionDenied
         return value
 
     def validate(self, data):

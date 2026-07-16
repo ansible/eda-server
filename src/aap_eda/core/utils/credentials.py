@@ -560,7 +560,7 @@ def _validate_registry_host_name(host: str) -> list[str]:
     validity = validators.hostname(host)
     if isinstance(validity, Exception):
         if not isinstance(validity, validators.ValidationError):
-            raise
+            raise validity
         errors.append("Host format invalid")
     return errors
 
@@ -595,9 +595,8 @@ def _default_context(schema: dict, injectors: dict) -> dict:
             context[field["id"]] = default
 
         choices = field.get("choices")
-        if choices:
-            if isinstance(choices, list):
-                context[field["id"]] = choices[0]
+        if choices and isinstance(choices, list):
+            context[field["id"]] = choices[0]
 
     _add_file_template_keys(context, injectors.get("file", {}))
     return context

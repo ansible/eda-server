@@ -53,7 +53,7 @@ class RegistryData(object):
     hidden: bool = False
     defined_in_file: bool = False
     category: str = "System"
-    category_slug = "system"
+    category_slug: str = "system"
     unit: str = ""
     sync_group: str = ""
     min_value: Optional[int] = None
