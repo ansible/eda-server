@@ -42,7 +42,23 @@ def ssh_credential(
 ) -> models.EdaCredential:
     credential = models.EdaCredential.objects.create(
         name="test-ssh-credential",
-        inputs={"ssh_key_data": "-----BEGIN OPENSSH PRIVATE KEY-----\n"},
+        inputs={
+            "ssh_key_data": "-----BEGIN OPENSSH PRIVATE KEY-----\n",
+            "ssh_key_unlock": "passphrase",
+        },
+        organization=default_organization,
+    )
+    credential.refresh_from_db()
+    return credential
+
+
+@pytest.fixture
+def gpg_credential(
+    default_organization: models.Organization,
+) -> models.EdaCredential:
+    credential = models.EdaCredential.objects.create(
+        name="test-gpg-credential",
+        inputs={"gpg_public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n"},
         organization=default_organization,
     )
     credential.refresh_from_db()
@@ -159,39 +175,31 @@ def test_git_clone_sets_proxy_env_during_credential_resolution(
 @pytest.mark.django_db
 def test_set_proxy_environ_restores_existing_vars(
     credential: models.EdaCredential,
+    monkeypatch,
 ):
     """Pre-existing proxy env vars are restored after clone."""
     executor = mock.MagicMock()
     original_value = "http://original-proxy:8080"
 
     for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
-        os.environ[key] = original_value
+        monkeypatch.setenv(key, original_value)
 
-    try:
-        with tempfile.TemporaryDirectory() as dest_path:
-            scm.ScmRepository.clone(
-                "https://git.example.com/repo.git",
-                dest_path,
-                credential=credential,
-                proxy="http://override-proxy:3128",
-                _executor=executor,
-            )
+    with tempfile.TemporaryDirectory() as dest_path:
+        scm.ScmRepository.clone(
+            "https://git.example.com/repo.git",
+            dest_path,
+            credential=credential,
+            proxy="http://override-proxy:3128",
+            _executor=executor,
+        )
 
-        for key in (
-            "http_proxy",
-            "https_proxy",
-            "HTTP_PROXY",
-            "HTTPS_PROXY",
-        ):
-            assert os.environ.get(key) == original_value
-    finally:
-        for key in (
-            "http_proxy",
-            "https_proxy",
-            "HTTP_PROXY",
-            "HTTPS_PROXY",
-        ):
-            os.environ.pop(key, None)
+    for key in (
+        "http_proxy",
+        "https_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+    ):
+        assert os.environ.get(key) == original_value
 
 
 @pytest.mark.django_db
@@ -431,24 +439,28 @@ def test_is_refspec_valid(ref: str, is_branch: bool, expected: bool):
 def test_git_clone_ssh_key(ssh_credential: models.EdaCredential, url: str):
     """Clone with SSH key preserves URL and passes key_file."""
     executor = mock.MagicMock()
-    with tempfile.TemporaryDirectory() as dest_path:
-        scm.ScmRepository.clone(
-            url,
-            dest_path,
-            credential=ssh_credential,
-            depth=1,
-            _executor=executor,
-        )
-        executor.assert_called_once()
-        call_kwargs = executor.call_args
-        extra_vars = call_kwargs.kwargs["extra_vars"]
+    with mock.patch.object(
+        scm.ScmRepository, "decrypt_key_file"
+    ) as mock_decrypt:
+        with tempfile.TemporaryDirectory() as dest_path:
+            scm.ScmRepository.clone(
+                url,
+                dest_path,
+                credential=ssh_credential,
+                depth=1,
+                _executor=executor,
+            )
+            executor.assert_called_once()
+            call_kwargs = executor.call_args
+            extra_vars = call_kwargs.kwargs["extra_vars"]
 
-        # URL must reach the executor unchanged
-        assert extra_vars["scm_url"] == url
+            # URL must reach the executor unchanged
+            assert extra_vars["scm_url"] == url
 
-        # SSH key file must be provided
-        assert "key_file" in extra_vars
-        assert extra_vars["key_file"]  # non-empty path
+            # SSH key file must be provided
+            assert "key_file" in extra_vars
+            assert extra_vars["key_file"]  # non-empty path
+        mock_decrypt.assert_called_once()
 
 
 #################################################################
@@ -528,18 +540,12 @@ def test_extract_error_msg_empty_events():
 
 @pytest.mark.django_db
 def test_git_clone_gpg_credential(
-    default_organization: models.Organization,
+    gpg_credential: models.EdaCredential,
 ):
     """GPG credential sets up verify_commit and GNUPGHOME."""
-    gpg_credential = models.EdaCredential.objects.create(
-        name="test-gpg-credential",
-        inputs={"gpg_public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n"},
-        organization=default_organization,
-    )
-    gpg_credential.refresh_from_db()
     executor = mock.MagicMock()
 
-    with mock.patch.object(scm.ScmRepository, "add_gpg_key"):
+    with mock.patch.object(scm.ScmRepository, "add_gpg_key") as mock_add_gpg:
         with tempfile.TemporaryDirectory() as dest_path:
             scm.ScmRepository.clone(
                 "https://git.example.com/repo.git",
@@ -550,6 +556,7 @@ def test_git_clone_gpg_credential(
             call_kwargs = executor.call_args
             assert call_kwargs[1]["extra_vars"]["verify_commit"] == "true"
             assert "GNUPGHOME" in call_kwargs[1]["env_vars"]
+        mock_add_gpg.assert_called_once()
 
 
 @pytest.mark.django_db
@@ -565,59 +572,6 @@ def test_git_clone_creates_directory():
             _executor=executor,
         )
         assert os.path.isdir(dest_path)
-
-
-@pytest.mark.django_db
-def test_git_clone_decrypt_key_file(
-    default_organization: models.Organization,
-):
-    """Clone calls decrypt_key_file when ssh_key_unlock is provided."""
-    credential = models.EdaCredential.objects.create(
-        name="test-ssh-unlock",
-        inputs={
-            "ssh_key_data": "-----BEGIN OPENSSH PRIVATE KEY-----\n",
-            "ssh_key_unlock": "passphrase",
-        },
-        organization=default_organization,
-    )
-    credential.refresh_from_db()
-    executor = mock.MagicMock()
-
-    with mock.patch.object(
-        scm.ScmRepository, "decrypt_key_file"
-    ) as mock_decrypt:
-        with tempfile.TemporaryDirectory() as dest_path:
-            scm.ScmRepository.clone(
-                "git@git.example.com:repo.git",
-                dest_path,
-                credential=credential,
-                _executor=executor,
-            )
-        mock_decrypt.assert_called_once()
-
-
-@pytest.mark.django_db
-def test_git_clone_gpg_add_key(
-    default_organization: models.Organization,
-):
-    """Clone calls add_gpg_key when gpg_credential is provided."""
-    gpg_credential = models.EdaCredential.objects.create(
-        name="test-gpg",
-        inputs={"gpg_public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n"},
-        organization=default_organization,
-    )
-    gpg_credential.refresh_from_db()
-    executor = mock.MagicMock()
-
-    with mock.patch.object(scm.ScmRepository, "add_gpg_key") as mock_add_gpg:
-        with tempfile.TemporaryDirectory() as dest_path:
-            scm.ScmRepository.clone(
-                "https://git.example.com/repo.git",
-                dest_path,
-                gpg_credential=gpg_credential,
-                _executor=executor,
-            )
-        mock_add_gpg.assert_called_once()
 
 
 #################################################################
