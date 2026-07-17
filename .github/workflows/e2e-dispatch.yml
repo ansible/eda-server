@@ -40,7 +40,7 @@ jobs:
     steps:
       - name: Check if commenter has write access
         id: check-permission
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
         with:
           script: |
             const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
@@ -56,7 +56,7 @@ jobs:
 
       - name: Get PR info
         id: pr-info
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -72,7 +72,7 @@ jobs:
 
       - name: Create deployment
         id: create-deployment
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
         with:
           script: |
             try {
@@ -121,7 +121,7 @@ jobs:
     steps:
       - name: Update deployment to in_progress
         if: github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
         with:
           script: |
             await github.rest.repos.createDeploymentStatus({
@@ -134,13 +134,14 @@ jobs:
             });
 
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
+          persist-credentials: false
           repository: ${{ github.event_name == 'issue_comment' && needs.check-trigger.outputs.pr_repo || github.repository }}
           ref: ${{ github.event_name == 'issue_comment' && needs.check-trigger.outputs.pr_sha || github.sha }}
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0  # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.QUAY_USER }}
@@ -160,8 +161,9 @@ jobs:
           done
 
       - name: Fetch test suite
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
+          persist-credentials: false
           fetch-depth: 0
           repository: ansible/eda-qa
           ref: ${{ github.event.inputs.edaqa_ref }}
@@ -169,7 +171,7 @@ jobs:
           token: ${{ secrets.EDA_QA_GITHUB_TOKEN }}
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
           python-version: "3.11"
 
@@ -201,10 +203,14 @@ jobs:
       - name: Upload jUnit test results (APDE CI)
         working-directory: ${{ env.EDA_QA_PATH }}
         if: github.ref == 'refs/heads/main'
+        env:
+          PDE_UPLOAD_USER: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}
+          PDE_UPLOAD_PASSWORD: ${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}
+          PDE_UPLOAD_URL: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}
         run: >-
           http --check-status --ignore-stdin
-          --auth "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
-          -f POST "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}/api/results/upload/"
+          --auth "$PDE_UPLOAD_USER:$PDE_UPLOAD_PASSWORD"
+          -f POST "$PDE_UPLOAD_URL/api/results/upload/"
           xunit_xml@eda-qa-e2e-test-results.xml
           component_name=eda
           git_commit_sha=${{ env.GIT_SHA }}
@@ -219,7 +225,7 @@ jobs:
 
       - name: Update deployment status
         if: always() && github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
         with:
           script: |
             const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
@@ -244,21 +250,23 @@ jobs:
     environment: ${{ github.event_name == 'issue_comment' && 'protected' || '' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
+          persist-credentials: false
           repository: ${{ github.event_name == 'issue_comment' && needs.check-trigger.outputs.pr_repo || github.repository }}
           ref: ${{ github.event_name == 'issue_comment' && needs.check-trigger.outputs.pr_sha || github.sha }}
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0  # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.QUAY_USER }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Fetch test suite
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
+          persist-credentials: false
           fetch-depth: 0
           repository: ansible/eda-qa
           ref: ${{ github.event.inputs.edaqa_ref }}
@@ -266,7 +274,7 @@ jobs:
           token: ${{ secrets.EDA_QA_GITHUB_TOKEN }}
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
           python-version: "3.11"
 
@@ -301,10 +309,14 @@ jobs:
       - name: Upload jUnit test results (APDE CI)
         working-directory: ${{ env.EDA_QA_PATH }}
         if: github.ref == 'refs/heads/main'
+        env:
+          PDE_UPLOAD_USER: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}
+          PDE_UPLOAD_PASSWORD: ${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}
+          PDE_UPLOAD_URL: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}
         run: >-
           http --check-status --ignore-stdin
-          --auth "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
-          -f POST "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}/api/results/upload/"
+          --auth "$PDE_UPLOAD_USER:$PDE_UPLOAD_PASSWORD"
+          -f POST "$PDE_UPLOAD_URL/api/results/upload/"
           xunit_xml@eda-qa-e2e-multinode-test-results.xml
           component_name=eda
           git_commit_sha=${{ env.GIT_SHA }}
@@ -312,7 +324,7 @@ jobs:
 
       - name: Update deployment status
         if: always() && github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
         with:
           script: |
             const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';

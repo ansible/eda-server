@@ -37,7 +37,7 @@ jobs:
           echo "📌 EDA branch: $SOURCE_BRANCH → Spec repo branch: $SPEC_BRANCH"
 
       - name: Download spec artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
         with:
           name: openapi-spec
 
@@ -53,7 +53,7 @@ jobs:
       - name: Checkout spec repo
         id: checkout_spec_repo
         continue-on-error: true
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
           repository: ${{ secrets.OPENAPI_SPEC_REPO }}
           ref: ${{ steps.branch_map.outputs.spec_branch }}
