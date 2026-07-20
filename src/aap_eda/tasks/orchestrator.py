@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import logging
-import os
 import random
 import uuid
 from collections import Counter
@@ -137,9 +136,7 @@ def _manage_no_lock(
             )
             queue_name = None
 
-        local_queue = os.environ.get(
-            "EDA_RULEBOOK_QUEUE_NAME", settings.RULEBOOK_QUEUE_NAME
-        )
+        local_queue = settings.RULEBOOK_QUEUE_NAME
         if queue_name and queue_name != local_queue:
             LOGGER.info(
                 f"Skipping monitor for {process_parent_type} {id}: "
