@@ -57,7 +57,7 @@ def validate_pem(data, min_keys=0, max_keys=None, min_certs=0, max_certs=None):
         r"^(?P<dashes>-{4,}) *BEGIN (?P<type>[A-Z ]+?) *(?P=dashes)"
         + r"\s*(?P<data>.+?)\s*"
         + r"(?P=dashes) *END (?P=type) *(?P=dashes)"
-        + r"(?P<next>.*)$",
+        + r"(?P<next>.*?)$",
         re.DOTALL,
     )
     pem_obj_header_re = re.compile(r"^(.+?):\s*?(.+?)(\\??)$")
