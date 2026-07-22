@@ -215,8 +215,8 @@ def test_dispatcherd_command_general_exception(mock_logger):
             assert (
                 "Failed to start DefaultWorker: Service failed" in error_output
             )
-            mock_logger.error.assert_called_with(
-                "Failed to start DefaultWorker: Service failed", exc_info=True
+            mock_logger.exception.assert_called_with(
+                "Failed to start DefaultWorker: Service failed"
             )
 
 
@@ -413,8 +413,8 @@ def test_dispatcherctl_command_general_exception(mock_logger):
             assert "Failed to execute status: Control failed" in str(
                 exc_info.value
             )
-            mock_logger.error.assert_called_with(
-                "Failed to execute status: Control failed", exc_info=True
+            mock_logger.exception.assert_called_with(
+                "Failed to execute status: Control failed"
             )
 
 

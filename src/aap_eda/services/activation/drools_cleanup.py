@@ -294,11 +294,10 @@ def _delete_rows_by_ha_uuid(
                         conn.commit()
 
     except psycopg.Error as e:
-        LOGGER.error(
+        LOGGER.exception(
             "Error during Drools cleanup for ha_uuid %s: %s",
             ha_uuid,
             str(e),
-            exc_info=True,
         )
         # Return empty results dict to indicate cleanup failed
         # but don't re-raise to allow other cleanup operations to continue

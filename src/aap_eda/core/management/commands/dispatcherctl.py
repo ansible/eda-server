@@ -139,5 +139,5 @@ class Command(BaseCommand):
             raise CommandError("Command interrupted by user")
         except Exception as e:
             error_msg = f"Failed to execute {command}: {e}"
-            logger.error(error_msg, exc_info=True)
+            logger.exception(error_msg)
             raise CommandError(error_msg)

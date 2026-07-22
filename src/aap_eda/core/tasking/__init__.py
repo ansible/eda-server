@@ -47,9 +47,8 @@ def queue_cancel_job(queue_name: str, job_id: str) -> None:
         else:
             logger.debug(f"No jobs running with id {job_id} to cancel")
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Failed to cancel job {job_id} in queue {queue_name}: {e}",
-            exc_info=True,
         )
 
 

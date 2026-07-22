@@ -513,10 +513,9 @@ def test_check_rulebook_queue_health_logs_exceptions(
     assert result is False
 
     # Verify error was logged with exception info
-    mock_logger.error.assert_called_once()
-    log_call = mock_logger.error.call_args
+    mock_logger.exception.assert_called_once()
+    log_call = mock_logger.exception.call_args
     assert "Health check failed for queue test_queue" in log_call[0][0]
-    assert log_call[1]["exc_info"] is True
 
 
 @pytest.mark.django_db

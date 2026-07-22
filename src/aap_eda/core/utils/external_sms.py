@@ -47,6 +47,6 @@ def get_external_secrets(credential_id: int) -> dict:
                 f"credentials defined in: {obj.source_credential.name} "
                 f"Error: {str(err)}"
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
             raise CredentialPluginError(msg) from err
     return result

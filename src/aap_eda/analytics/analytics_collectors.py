@@ -811,10 +811,10 @@ def _copy_table(
             cursor.execute(f"DROP VIEW IF EXISTS {view_name}")
         return file.file_list()
     except DatabaseError as e:
-        logger.error(f"Database error occurred: {e}")
+        logger.exception(f"Database error occurred: {e}")
         return None
     except IOError as e:
-        logger.error(f"File I/O error occurred: {e}")
+        logger.exception(f"File I/O error occurred: {e}")
         return None
     except Exception as e:
         logger.exception(f"An unexpected error occurred: {e}")

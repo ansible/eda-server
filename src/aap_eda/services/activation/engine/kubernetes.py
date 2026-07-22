@@ -139,7 +139,7 @@ class Engine(ContainerEngine):
                 f"Failed to start job {self.job_name}, doing cleanup."
                 f"Reason: {e}"
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
             log_handler.write(msg, flush=True)
             self.cleanup(self.job_name, log_handler)
             raise
@@ -709,7 +709,7 @@ class Engine(ContainerEngine):
             LOGGER.info(f"Namespace is {self.namespace}")
         except FileNotFoundError as e:
             message = f"Namespace file {namespace_file} does not exist."
-            LOGGER.error(message)
+            LOGGER.exception(message)
             raise ContainerEngineInitError(message) from e
 
     def _create_secret(

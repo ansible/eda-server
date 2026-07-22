@@ -143,14 +143,14 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                 )
             except ValueError as exc:
                 message = f"Invalid content. Type: {content_type}"
-                logger.error(message)
+                logger.exception(message)
                 raise ParseError(message) from exc
         else:
             try:
                 data = yaml.safe_load(body.decode())
             except yaml.YAMLError as exc:
                 message = f"Invalid content. Type: {content_type}"
-                logger.error(message)
+                logger.exception(message)
                 raise ParseError(message) from exc
         return data
 
@@ -346,7 +346,7 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                     payload,
                 )()
             except PGNotifyError as e:
-                logger.error(e)
+                logger.exception(e)
                 return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_200_OK)

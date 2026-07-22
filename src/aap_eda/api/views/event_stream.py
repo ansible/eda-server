@@ -366,13 +366,15 @@ class EventStreamViewSet(
                 else:
                     obj.update()
             except CoreGatewayAPIError as ex:
-                logger.error("Could not %s certificates: %s", action, str(ex))
+                logger.exception(
+                    "Could not %s certificates: %s", action, str(ex)
+                )
                 raise api_exc.GatewayAPIError(
                     detail=f"Gateway API error during certificate {action}: "
                     f"{str(ex)}"
                 )
             except CoreMissingCredentials as ex:
-                logger.error(
+                logger.exception(
                     "Missing credentials for certificate %s: %s",
                     action,
                     str(ex),

@@ -142,15 +142,15 @@ class SyncCertificates:
             )
             return response
         except requests.exceptions.ConnectionError as ex:
-            LOGGER.error(
+            LOGGER.exception(
                 "Connection error while updating certificate: %s", str(ex)
             )
             raise GatewayAPIError(f"Connection error: {str(ex)}")
         except requests.exceptions.Timeout as ex:
-            LOGGER.error("Timeout while updating certificate: %s", str(ex))
+            LOGGER.exception("Timeout while updating certificate: %s", str(ex))
             raise GatewayAPIError(f"Request timeout: {str(ex)}")
         except requests.exceptions.RequestException as ex:
-            LOGGER.error(
+            LOGGER.exception(
                 "Request error while updating certificate: %s", str(ex)
             )
             raise GatewayAPIError(f"Request error: {str(ex)}")
@@ -199,15 +199,15 @@ class SyncCertificates:
                 timeout=DEFAULT_TIMEOUT,
             )
         except requests.exceptions.ConnectionError as ex:
-            LOGGER.error(
+            LOGGER.exception(
                 "Connection error while deleting certificate: %s", str(ex)
             )
             raise GatewayAPIError(f"Connection error: {str(ex)}")
         except requests.exceptions.Timeout as ex:
-            LOGGER.error("Timeout while deleting certificate: %s", str(ex))
+            LOGGER.exception("Timeout while deleting certificate: %s", str(ex))
             raise GatewayAPIError(f"Request timeout: {str(ex)}")
         except requests.exceptions.RequestException as ex:
-            LOGGER.error(
+            LOGGER.exception(
                 "Request error while deleting certificate: %s", str(ex)
             )
             raise GatewayAPIError(f"Request error: {str(ex)}")
@@ -240,15 +240,15 @@ class SyncCertificates:
                 timeout=DEFAULT_TIMEOUT,
             )
         except requests.exceptions.ConnectionError as ex:
-            LOGGER.error(
+            LOGGER.exception(
                 "Connection error while fetching certificate: %s", str(ex)
             )
             raise GatewayAPIError(f"Connection error: {str(ex)}")
         except requests.exceptions.Timeout as ex:
-            LOGGER.error("Timeout while fetching certificate: %s", str(ex))
+            LOGGER.exception("Timeout while fetching certificate: %s", str(ex))
             raise GatewayAPIError(f"Request timeout: {str(ex)}")
         except requests.exceptions.RequestException as ex:
-            LOGGER.error(
+            LOGGER.exception(
                 "Request error while fetching certificate: %s", str(ex)
             )
             raise GatewayAPIError(f"Request error: {str(ex)}")
@@ -301,6 +301,6 @@ def gw_handler(
             if len(objects) > 0:
                 SyncCertificates(instance.id).update()
         except (GatewayAPIError, MissingCredentials) as ex:
-            LOGGER.error(
+            LOGGER.exception(
                 "Couldn't trigger gateway certificate updates %s", str(ex)
             )

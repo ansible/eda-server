@@ -41,7 +41,7 @@ def build_source_list(rulesets_data: str) -> list[dict]:
     try:
         rulesets = yaml.safe_load(rulesets_data)
     except yaml.MarkedYAMLError as ex:
-        LOGGER.error("Invalid rulesets: %s", str(ex))
+        LOGGER.exception("Invalid rulesets: %s", str(ex))
         raise ParseError("Failed to parse rulebook data") from ex
 
     rulebook_hash = get_rulebook_hash(rulesets_data)

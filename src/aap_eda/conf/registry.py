@@ -254,7 +254,7 @@ class SettingsRegistry(object):
                 "Failed to fetch settings from gateway. Exception: "
                 f"{str(e)}. Default or stored values will be used"
             )
-            logger.error(msg)
+            logger.exception(msg)
             return
         if not res.ok:
             msg = (

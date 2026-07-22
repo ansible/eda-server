@@ -948,7 +948,7 @@ def validate_x509_subject_match(expected: str, actual: str) -> bool:
     try:
         actual_name = x509.Name.from_rfc4514_string(actual)
     except ValueError as e:
-        LOGGER.error(f"Invalid actual DN format: '{actual}': {e}")
+        LOGGER.exception(f"Invalid actual DN format: '{actual}': {e}")
         return False
 
     # Parse expected DN manually to handle regex patterns
@@ -1088,7 +1088,7 @@ def _match_regex_pattern_against_attrs(
             for attr in actual_attrs
         )
     except re.error as e:
-        LOGGER.error(f"Invalid regex pattern '{pattern}': {e}")
+        LOGGER.exception(f"Invalid regex pattern '{pattern}': {e}")
         return False
 
 
@@ -1123,7 +1123,7 @@ def _get_aes_key(
         )
         return base64.b64encode(raw_key).decode("utf-8")
     except Exception as e:
-        LOGGER.error(f"Failed to derive AES key: {e}")
+        LOGGER.exception(f"Failed to derive AES key: {e}")
         raise ValidationError(f"Failed to generate encryption key: {str(e)}")
 
 

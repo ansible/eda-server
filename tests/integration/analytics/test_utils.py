@@ -250,7 +250,7 @@ def test_yaml_error_handling():
         "aap_eda.analytics.utils.models.EdaCredential.objects.filter",
         return_value=[mock_credential],
     ), mock.patch(
-        "aap_eda.analytics.utils.logger.error"
+        "aap_eda.analytics.utils.logger.exception"
     ) as mock_logger:
         result = collect_controllers_info()
         assert result == {}
@@ -284,12 +284,12 @@ def test_key_error_handling(error_input, error_msg):
         "aap_eda.analytics.utils.models.EdaCredential.objects.filter",
         return_value=[mock_credential],
     ), mock.patch(
-        "aap_eda.analytics.utils.logger.error"
+        "aap_eda.analytics.utils.logger.exception"
     ) as mock_logger:
         result = collect_controllers_info()
         assert result == {}
         if error_msg.startswith("Unexpected error"):
-            mock_logger.assert_called_with(f"{error_msg}", exc_info=True)
+            mock_logger.assert_called_with(f"{error_msg}")
         else:
             mock_logger.assert_called_with(f"{error_msg}")
 
@@ -298,7 +298,7 @@ def test_key_error_handling(error_input, error_msg):
     "exception_cls,log_level",
     [
         (RequestException, "warning"),
-        (TimeoutError, "error"),
+        (TimeoutError, "exception"),
     ],
 )
 def test_request_exceptions(exception_cls, log_level):
@@ -333,7 +333,6 @@ def test_request_exceptions(exception_cls, log_level):
         else:
             mock_logger.assert_called_with(
                 f"Unexpected error processing credential 1: {exception_cls()}",
-                exc_info=True,
             )
 
 
@@ -366,7 +365,7 @@ def test_mixed_success_and_failure():
     ), mock.patch(
         "aap_eda.analytics.utils.requests.get"
     ) as mock_get, mock.patch(
-        "aap_eda.analytics.utils.logger.error"
+        "aap_eda.analytics.utils.logger.exception"
     ) as mock_logger:
         mock_response = mock.MagicMock()
         mock_response.status_code = 200
@@ -379,7 +378,6 @@ def test_mixed_success_and_failure():
             "Unexpected error processing credential 2: "
             "Invalid authentication configuration, must provide "
             "Token or username/password",
-            exc_info=True,
         )
 
 

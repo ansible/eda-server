@@ -325,7 +325,7 @@ class EdaCredentialViewSet(
                 serializer.validated_data["metadata"],
             )
         except Exception as err:
-            logger.error(
+            logger.exception(
                 "Plugin : %s call failed %s",
                 eda_credential.credential_type.namespace,
                 err,

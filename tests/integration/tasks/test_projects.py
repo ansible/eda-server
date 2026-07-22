@@ -138,10 +138,9 @@ def test_check_default_worker_health_logs_exceptions(
     mock_check_rulebook_health.assert_called_once_with("default")
 
     # Verify error was logged with exception info
-    mock_logger.error.assert_called_once()
-    log_call = mock_logger.error.call_args
+    mock_logger.exception.assert_called_once()
+    log_call = mock_logger.exception.call_args
     assert "Project queue health check failed" in log_call[0][0]
-    assert log_call[1]["exc_info"] is True
 
 
 @patch("aap_eda.tasks.project.check_rulebook_queue_health")
@@ -372,8 +371,8 @@ def test_import_project_no_lock_project_import_error(
     _import_project_no_lock(project.id)
 
     mock_import_service.import_project.assert_called_once_with(project)
-    mock_logger.error.assert_called_once()
-    log_call = mock_logger.error.call_args
+    mock_logger.exception.assert_called_once()
+    log_call = mock_logger.exception.call_args
     assert "Project import error for project" in log_call[0][0]
     # Should call error recovery to set FAILED state
     # (transaction.atomic rollback undoes the wrapper's state save)
@@ -410,10 +409,9 @@ def test_import_project_no_lock_database_error(
     mock_recovery.assert_called_once_with(
         project.id, "Database error during import"
     )
-    mock_logger.error.assert_called_once()
-    log_call = mock_logger.error.call_args
+    mock_logger.exception.assert_called_once()
+    log_call = mock_logger.exception.call_args
     assert "Database error during project import" in log_call[0][0]
-    assert log_call[1]["exc_info"] is True
 
 
 @pytest.mark.django_db
@@ -591,10 +589,9 @@ def test_import_project_no_lock_unexpected_exception(
         project.id,
         "Unexpected error during import: Something broke",
     )
-    mock_logger.error.assert_called_once()
-    log_call = mock_logger.error.call_args
+    mock_logger.exception.assert_called_once()
+    log_call = mock_logger.exception.call_args
     assert "Unexpected error during project import" in log_call[0][0]
-    assert log_call[1]["exc_info"] is True
 
 
 # ------------------------------------------------------------------
@@ -651,8 +648,8 @@ def test_sync_project_no_lock_project_import_error(
 
     _sync_project_no_lock(project.id)
 
-    mock_logger.error.assert_called_once()
-    log_call = mock_logger.error.call_args
+    mock_logger.exception.assert_called_once()
+    log_call = mock_logger.exception.call_args
     assert "Project sync error for project" in log_call[0][0]
     mock_recovery.assert_called_once_with(
         project.id, "Sync failed: Sync failed"
@@ -695,8 +692,7 @@ def test_sync_project_no_lock_database_error(
     mock_failure_handler.assert_called_once_with(
         project.id, "Database error during sync"
     )
-    mock_logger.error.assert_called_once()
-    assert mock_logger.error.call_args[1]["exc_info"] is True
+    mock_logger.exception.assert_called_once()
 
 
 @pytest.mark.django_db
@@ -736,8 +732,7 @@ def test_sync_project_no_lock_unexpected_exception(
         project.id,
         "Unexpected error during sync: Something broke",
     )
-    mock_logger.error.assert_called_once()
-    assert mock_logger.error.call_args[1]["exc_info"] is True
+    mock_logger.exception.assert_called_once()
 
 
 # ------------------------------------------------------------------
@@ -804,7 +799,7 @@ def test_recover_stuck_projects_database_error(
 
         _monitor_project_tasks()
 
-    error_calls = [c[0][0] for c in mock_logger.error.call_args_list]
+    error_calls = [c[0][0] for c in mock_logger.exception.call_args_list]
     assert any("Failed to recover project" in msg for msg in error_calls)
 
 

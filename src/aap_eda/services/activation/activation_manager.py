@@ -298,7 +298,7 @@ class ActivationManager(StatusManager):
                 f"latest instance {latest_instance.id} with pod id {pod_id}. "
                 f"Reason: {exc}"
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
             log_handler.write(msg, flush=True)
             return
 
@@ -435,7 +435,7 @@ class ActivationManager(StatusManager):
                 f"Activation {self.db_instance.id} failed to cleanup. "
                 f"Reason: {exc}"
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
             # Alex: Not sure if we want to change the status here.
             self.set_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationMonitorError(msg) from exc
@@ -542,7 +542,7 @@ class ActivationManager(StatusManager):
                     f"Activation {self.db_instance.id} failed to cleanup. "
                     f"Reason: {exc}"
                 )
-                LOGGER.error(msg)
+                LOGGER.exception(msg)
                 # Alex: Not sure if we want to change the status here.
                 self._error_instance(msg)
                 self.set_status(ActivationStatus.ERROR, msg)
@@ -577,7 +577,7 @@ class ActivationManager(StatusManager):
                     f"Activation {self.db_instance.id} failed to cleanup. "
                     f"Reason: {exc}"
                 )
-                LOGGER.error(msg)
+                LOGGER.exception(msg)
                 # Alex: Not sure if we want to change the status here.
                 self._error_instance(msg)
                 self.set_status(ActivationStatus.ERROR, msg)
@@ -609,7 +609,7 @@ class ActivationManager(StatusManager):
                     f"Activation {self.db_instance.id} failed to cleanup. "
                     f"Reason: {exc}"
                 )
-                LOGGER.error(msg)
+                LOGGER.exception(msg)
                 # Alex: Not sure if we want to change the status here.
                 self.set_status(ActivationStatus.ERROR, msg)
                 self.set_latest_instance_status(
@@ -711,7 +711,7 @@ class ActivationManager(StatusManager):
         try:
             self.db_instance.refresh_from_db()
         except ObjectDoesNotExist:
-            LOGGER.error(
+            LOGGER.exception(
                 f"Stop operation failed: Activation {self.db_instance.id} "
                 "does not exist.",
             )
@@ -725,7 +725,7 @@ class ActivationManager(StatusManager):
                 LOGGER.info(msg)
                 return
         except exceptions.ActivationInstanceNotFound:
-            LOGGER.error(
+            LOGGER.exception(
                 f"Stop operation activation id: {self.db_instance.id} "
                 "No instance found.",
             )
@@ -791,7 +791,7 @@ class ActivationManager(StatusManager):
                 f"Activation {self.db_instance.id} failed to clean up. "
                 f"Reason: {exc}"
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
         finally:
             drools_cleanup(self.db_instance)
 
@@ -804,7 +804,7 @@ class ActivationManager(StatusManager):
                 f"Delete operation failed: Activation {self.db_instance.id} "
                 "does not exist."
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
             raise exceptions.ActivationManagerError(msg) from None
 
         # Cancel any outstanding restart.
@@ -843,7 +843,7 @@ class ActivationManager(StatusManager):
         try:
             self.db_instance.refresh_from_db()
         except ObjectDoesNotExist:
-            LOGGER.error(
+            LOGGER.exception(
                 f"Monitor operation Failed: Activation {self.db_instance.id} "
                 "does not exist.",
             )
@@ -856,11 +856,11 @@ class ActivationManager(StatusManager):
         try:
             self._check_latest_instance_and_pod_id()
         except exceptions.ActivationInstanceNotFound as e:
-            LOGGER.error(f"Monitor operation Failed: {e}")
+            LOGGER.exception(f"Monitor operation Failed: {e}")
             self._error_activation(f"{e}")
             raise exceptions.ActivationMonitorError(f"{e}")
         except exceptions.ActivationInstancePodIdNotFound as e:
-            LOGGER.error(f"Monitor operation Failed: {e}")
+            LOGGER.exception(f"Monitor operation Failed: {e}")
             self._error_activation(f"{e}")
             self._error_instance(f"{e}")
             raise exceptions.ActivationMonitorError(f"{e}")
@@ -1032,7 +1032,7 @@ class ActivationManager(StatusManager):
                 f"Update logs operation failed for activation id: "
                 f"{self.db_instance.id} No instance or pod id found."
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
             # Alex: Not sure if we want to change the status here.
             # For now, we are not changing the status of the activation
             return
@@ -1051,7 +1051,7 @@ class ActivationManager(StatusManager):
                 f"Logs for activation {self.db_instance.id} could not be "
                 f"retrieved. Reason: {exc}"
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
             log_handler.write(msg, flush=True)
             # Alex: Not sure if we want to change the status here.
             # For now, we are not changing the status of the activation
