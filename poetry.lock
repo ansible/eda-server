@@ -931,7 +931,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "26.7.16.0.dev4+g7afebb4f2"
+version = "26.7.21.0.dev3+g3927b0f5b"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.11"
@@ -955,8 +955,8 @@ sqlparse = ">=0.5.2"
 urllib3 = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 
 [package.extras]
-all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular (<1.0)", "jwcrypto (>=1.5.7)", "ldap-filter", "lxml (==5.3.0)", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "referencing (<0.37.0)", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
-api-documentation = ["drf-spectacular (<1.0)", "referencing (<0.37.0)"]
+all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular (<1.0)", "jwcrypto (>=1.5.7)", "ldap-filter", "lxml (==5.3.0)", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "referencing (<0.37)", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
+api-documentation = ["drf-spectacular (<1.0)", "referencing (<0.37)"]
 authentication = ["django-auth-ldap", "ldap-filter", "lxml (==5.3.0)", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
 feature-flags = ["django-flags"]
@@ -970,7 +970,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "ssh://git@github.com/ansible-automation-platform/django-ansible-base.git"
 reference = "stable-2.7"
-resolved_reference = "7afebb4f2144e824432cb1539aa7f258f445b5d4"
+resolved_reference = "b6aa4323af77ecbe7e6ae4c7865111b1fe00c639"
 
 [[package]]
 name = "django-crum"
@@ -1276,6 +1276,21 @@ files = [
 
 [package.dependencies]
 flake8 = "*"
+
+[[package]]
+name = "freezegun"
+version = "1.5.5"
+description = "Let your Python tests travel through time"
+optional = false
+python-versions = ">=3.8"
+groups = ["test"]
+files = [
+    {file = "freezegun-1.5.5-py3-none-any.whl", hash = "sha256:cd557f4a75cf074e84bc374249b9dd491eaeacd61376b9eb3c423282211619d2"},
+    {file = "freezegun-1.5.5.tar.gz", hash = "sha256:ac7742a6cc6c25a2c35e9292dfd554b897b517d2dec26891a2e8debf205cb94a"},
+]
+
+[package.dependencies]
+python-dateutil = ">=2.7"
 
 [[package]]
 name = "google-auth"
@@ -2642,7 +2657,7 @@ version = "2.8.2"
 description = "Extensions to the standard Python datetime module"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
-groups = ["main"]
+groups = ["main", "test"]
 files = [
     {file = "python-dateutil-2.8.2.tar.gz", hash = "sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86"},
     {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
@@ -2963,7 +2978,7 @@ version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
-groups = ["main", "dev"]
+groups = ["main", "dev", "test"]
 files = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
@@ -3450,4 +3465,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "b79adb8ad8a2123def5d2770214f4eb525a0c64add6a940280a870ab7e625606"
+content-hash = "e8cecd2cff0f26a639e0bd7d980a8bdfff90bf5b8f0afce3da7a480ccad01162"
