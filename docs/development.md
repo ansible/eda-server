@@ -457,9 +457,32 @@ task docker:purge && EDA_SECRET_KEY=insecure task docker:up
 |----------|---------|
 | `EDA_SECRET_KEY` | Sets `settings.SECRET_KEY` via dynaconf. Used by Django for encryption at rest. |
 | `EDA_DB_ROTATION_KEY` | Provides the new key for `rotate_db_encryption_key --use-custom-key`. Operator-set, ad-hoc only. |
+| `EDA_ACTIVATION_DB_LOG_RETENTION_DAYS` | Days of rulebook process logs to retain. Disabled by default (`0`). Set to a positive integer (e.g. `30`) to enable automated hourly purging of logs older than that many days. |
 
 Do **not** confuse the two — see the command docstring in
 `src/aap_eda/core/management/commands/rotate_db_encryption_key.py`.
+
+### Log retention
+
+Automated log purging is **disabled by default**. To enable it, set `EDA_ACTIVATION_DB_LOG_RETENTION_DAYS`
+to a positive number of days (e.g. `30`). An hourly task will then purge all
+`core_rulebook_process_log` rows older than that threshold.
+
+For ad-hoc purging, use the management command:
+
+```shell
+# Purge logs older than ACTIVATION_DB_LOG_RETENTION_DAYS (requires EDA_ACTIVATION_DB_LOG_RETENTION_DAYS > 0)
+task manage -- purge_log_records
+
+# Purge logs older than a specific date
+task manage -- purge_log_records --date 2024-06-01
+
+# Include audit trail entries recording the purge
+task manage -- purge_log_records --date 2024-06-01 --audit-trail
+
+# Scope the audit trail to specific activations
+task manage -- purge_log_records --date 2024-06-01 --audit-trail --activation-ids 1 2 3
+```
 
 ### Running linters
 

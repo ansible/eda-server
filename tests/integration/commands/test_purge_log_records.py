@@ -18,6 +18,7 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import connection, transaction
+from django.test import override_settings
 from django.utils import timezone
 
 from aap_eda.core import enums, models
@@ -158,30 +159,37 @@ def prepare_log_records(
 
 
 @pytest.mark.django_db
-def test_purge_log_records_missing_required_params():
-    with pytest.raises(
-        CommandError,
-        match="Error: the following arguments are required: --date",
-    ):
-        call_command("purge_log_records")
+def test_purge_log_records_invalid_date():
+    with pytest.raises(CommandError):
+        call_command("purge_log_records", "--date", "not-a-date")
+
+
+@pytest.mark.django_db
+@override_settings(ACTIVATION_DB_LOG_RETENTION_DAYS=0)
+def test_purge_log_records_no_date_retention_disabled(capsys):
+    call_command("purge_log_records")
+    captured = capsys.readouterr()
+    assert "nothing to purge" in captured.out
+
+
+@pytest.mark.django_db
+@override_settings(ACTIVATION_DB_LOG_RETENTION_DAYS=15)
+def test_purge_log_records_defaults_to_retention_days(
+    prepare_log_records, capsys
+):
+    assert models.RulebookProcessLog.objects.count() == 8
+
+    call_command("purge_log_records")
+
+    captured = capsys.readouterr()
+    assert "Purged 4 log records" in captured.out
+    assert models.RulebookProcessLog.objects.count() == 4
 
 
 @pytest.mark.django_db
 def test_purge_log_records_with_nonexist_activation(capsys):
-    # With global purging, even non-existent activation filters will
-    # still purge old logs globally (if any exist)
     args = ("--activation-ids", "42", "--date", "2024-10-01")
-    call_command("purge_log_records", args)
-    captured = capsys.readouterr()
-
-    # Should report either no old logs found, or global purge count
-    assert (
-        "No log records found older than 2024-10-01" in captured.out
-        or "Purged" in captured.out
-    )
-
-    args = ("--activation-names", "na", "--date", "2024-10-01")
-    call_command("purge_log_records", args)
+    call_command("purge_log_records", *args)
     captured = capsys.readouterr()
 
     assert (
@@ -191,76 +199,73 @@ def test_purge_log_records_with_nonexist_activation(capsys):
 
 
 @pytest.mark.parametrize(
-    "identifiers, cutoff_days",
-    [("ids", 15), ("names", 5), ("none", 15), ("none", 5)],
+    "cutoff_days, expected_remaining",
+    [(15, 4), (5, 0)],
 )
 @pytest.mark.django_db
-def test_purge_log_records(
-    prepare_log_records, capsys, identifiers, cutoff_days
+def test_purge_log_records_with_date(
+    prepare_log_records, capsys, cutoff_days, expected_remaining
 ):
-    activations = prepare_log_records
-
     assert models.RulebookProcessLog.objects.count() == 8
-
-    command = "purge_log_records"
 
     ts = timezone.now() - timedelta(days=cutoff_days)
     date_str = ts.strftime("%Y-%m-%d")
 
-    if identifiers == "ids":
-        args = (
-            "--activation-ids",
-            activations[0].id,
-            activations[1].id,
-            "--date",
-            date_str,
-        )
-    elif identifiers == "names":
-        args = (
-            "--activation-names",
-            activations[0].name,
-            activations[1].name,
-            "--date",
-            date_str,
-        )
-    else:
-        args = (
-            "--date",
-            date_str,
-        )
+    call_command("purge_log_records", "--date", date_str)
 
-    call_command(command, args)
+    assert models.RulebookProcessLog.objects.count() == expected_remaining
+    assert "Purged" in capsys.readouterr().out
+
+
+@pytest.mark.django_db
+def test_purge_log_records_with_audit_trail(prepare_log_records, capsys):
+    activations = prepare_log_records
+    assert models.RulebookProcessLog.objects.count() == 8
+
+    ts = timezone.now() - timedelta(days=15)
+    date_str = ts.strftime("%Y-%m-%d")
+
+    call_command(
+        "purge_log_records",
+        "--date",
+        date_str,
+        "--audit-trail",
+        "--activation-ids",
+        str(activations[0].id),
+        str(activations[1].id),
+    )
 
     captured = capsys.readouterr()
 
-    if cutoff_days < 10:
-        # Global purge: all original logs deleted, audit logs created for
-        # all 4 RulebookProcess instances
-        assert models.RulebookProcessLog.objects.count() == 4
+    assert "Purged" in captured.out
+    assert "audit trail" in captured.out
 
-        for log_record in models.RulebookProcessLog.objects.all():
-            assert (
-                f"All log records older than {date_str} were purged at"
-                in log_record.log
-            )
-    else:
-        # Global purge: only 30-day logs deleted, 10-day logs remain,
-        # audit logs created for all 4 RulebookProcess instances
-        assert models.RulebookProcessLog.objects.count() == 8
+    audit_logs = models.RulebookProcessLog.objects.filter(
+        log__contains="were purged at"
+    )
+    assert audit_logs.count() == 4
 
-        # Check audit logs exist for all instances
-        audit_logs = models.RulebookProcessLog.objects.filter(
-            log__contains=f"All log records older than {date_str} were purged"
-        )
-        assert audit_logs.count() == 4
+    original_logs = models.RulebookProcessLog.objects.exclude(
+        log__contains="purged"
+    )
+    assert original_logs.count() == 4
 
-        # Check that 10-day logs still exist (not purged)
-        original_logs = models.RulebookProcessLog.objects.exclude(
-            log__contains="purged"
-        )
-        assert original_logs.count() == 4
 
-    assert "Purged" in captured.out and "globally" in captured.out
+@pytest.mark.django_db
+def test_purge_log_records_without_audit_trail(prepare_log_records, capsys):
+    assert models.RulebookProcessLog.objects.count() == 8
+
+    ts = timezone.now() - timedelta(days=5)
+    date_str = ts.strftime("%Y-%m-%d")
+
+    call_command("purge_log_records", "--date", date_str)
+
+    captured = capsys.readouterr()
+
+    assert "Purged" in captured.out
+    assert "audit trail" not in captured.out
+
+    assert models.RulebookProcessLog.objects.count() == 0
 
 
 @pytest.fixture
@@ -273,7 +278,6 @@ def null_activation_test_data(
 ):
     """Setup test data including a RulebookProcess with NULL activation."""
 
-    # Create a normal activation
     activation = models.Activation.objects.create(
         name="test-activation-null-bug",
         description="Test activation",
@@ -286,7 +290,6 @@ def null_activation_test_data(
         log_level="debug",
     )
 
-    # Create RulebookProcess with normal activation
     normal_process = models.RulebookProcess.objects.create(
         name="normal-process-null-test",
         activation=activation,
@@ -294,8 +297,6 @@ def null_activation_test_data(
         organization=default_organization,
     )
 
-    # Create RulebookProcess with NULL activation using raw SQL
-    # This bypasses the model validation
     with transaction.atomic():
         cursor = connection.cursor()
         cursor.execute(
@@ -312,22 +313,18 @@ def null_activation_test_data(
                 enums.ProcessParentType.ACTIVATION,
                 timezone.now(),
                 default_organization.id,
-                None,  # NULL activation
+                None,
             ],
         )
 
-    # Get the null process object
     null_process = models.RulebookProcess.objects.get(
         name="null-activation-process-test"
     )
 
-    # Create timestamp for old logs (20 days ago)
     old_timestamp = timezone.now() - timedelta(days=20)
 
-    # Create log records for both processes
     models.RulebookProcessLog.objects.bulk_create(
         [
-            # Logs for normal process
             models.RulebookProcessLog(
                 log="Normal process log for null test 1",
                 activation_instance=normal_process,
@@ -338,7 +335,6 @@ def null_activation_test_data(
                 activation_instance=normal_process,
                 log_timestamp=int(old_timestamp.timestamp()),
             ),
-            # Logs for NULL activation process
             models.RulebookProcessLog(
                 log="NULL activation process log for null test 1",
                 activation_instance=null_process,
@@ -363,48 +359,27 @@ def null_activation_test_data(
 def test_purge_without_activation_filter_handles_null_correctly(
     null_activation_test_data, capsys
 ):
-    """Test purge without activation filter includes NULL records.
-    This tests the customer scenario."""
-
-    # Get initial counts
     initial_log_count = models.RulebookProcessLog.objects.filter(
         log__contains="for null test"
     ).count()
-    assert initial_log_count == 4, "Should have 4 test log records"
+    assert initial_log_count == 4
 
-    # Test purge without activation filtering (customer's command scenario)
     cutoff_date = (timezone.now() - timedelta(days=10)).strftime("%Y-%m-%d")
 
-    call_command("purge_log_records", "--date", cutoff_date, verbosity=3)
+    call_command("purge_log_records", "--date", cutoff_date)
 
-    captured = capsys.readouterr()
-
-    # Check that logs were purged
     remaining_test_logs = models.RulebookProcessLog.objects.filter(
         log__contains="for null test"
-    ).exclude(log__contains="purged")
-
-    # Both NULL and normal activation logs should be purged in this scenario
-    assert (
-        remaining_test_logs.count() == 0
-    ), "All test logs should be purged when no activation filter is used"
-    assert "Purged" in captured.out and "globally" in captured.out
+    )
+    assert remaining_test_logs.count() == 0
+    captured = capsys.readouterr()
+    assert "Purged" in captured.out
 
 
 @pytest.mark.django_db
-def test_purge_with_activation_filter_now_includes_null_fix(
+def test_purge_with_audit_trail_includes_null_activation(
     null_activation_test_data, capsys
 ):
-    """Purge includes NULL records with filters."""
-
-    # Get initial counts
-    initial_log_count = models.RulebookProcessLog.objects.filter(
-        log__contains="for null test"
-    ).count()
-    assert initial_log_count == 4, "Should have 4 test log records"
-
-    # Test purge WITH activation filtering - this should now include
-    # NULL records
     cutoff_date = (timezone.now() - timedelta(days=10)).strftime("%Y-%m-%d")
     activation_id = null_activation_test_data["activation"].id
 
@@ -414,61 +389,24 @@ def test_purge_with_activation_filter_now_includes_null_fix(
         str(activation_id),
         "--date",
         cutoff_date,
-        verbosity=3,
+        "--audit-trail",
     )
 
     captured = capsys.readouterr()
 
-    # Check what logs remain
     remaining_test_logs = models.RulebookProcessLog.objects.filter(
         log__contains="for null test"
     ).exclude(log__contains="purged")
+    assert remaining_test_logs.count() == 0
 
-    # Verify the fix: NULL activation logs should now be purged
-    null_activation_logs = [
-        log
-        for log in remaining_test_logs
-        if log.activation_instance.activation_id is None
-    ]
-
-    # This validates the fix: NULL activation logs should now be
-    # included in purge
-    assert len(null_activation_logs) == 0, (
-        "All NULL activation logs should be purged "
-        "when using --activation-ids filter"
-    )
-
-    # Also verify that normal activation logs WERE purged
-    normal_activation_logs = [
-        log
-        for log in remaining_test_logs
-        if log.activation_instance.activation_id is not None
-    ]
-    assert (
-        len(normal_activation_logs) == 0
-    ), "Normal activation logs should have been purged"
-
-    # Verify that the command output mentions orphaned records
-    assert (
-        "Audit trail will include" in captured.out
-        and "orphaned" in captured.out
-    ), "Should mention orphaned records in output"
+    assert "Purged" in captured.out
+    assert "audit trail" in captured.out
 
 
 @pytest.mark.django_db
-def test_purge_with_activation_name_filter_also_includes_null_fix(
+def test_purge_with_audit_trail_by_name_includes_null(
     null_activation_test_data, capsys
 ):
-    """Test that the fix also works when using --activation-names parameter."""
-
-    # Get initial counts
-    initial_log_count = models.RulebookProcessLog.objects.filter(
-        log__contains="for null test"
-    ).count()
-    assert initial_log_count == 4, "Should have 4 test log records"
-
-    # Test purge with activation NAME filtering - should now include
-    # NULL records (fix)
     cutoff_date = (timezone.now() - timedelta(days=10)).strftime("%Y-%m-%d")
     activation_name = null_activation_test_data["activation"].name
 
@@ -478,32 +416,15 @@ def test_purge_with_activation_name_filter_also_includes_null_fix(
         activation_name,
         "--date",
         cutoff_date,
-        verbosity=3,
+        "--audit-trail",
     )
 
     captured = capsys.readouterr()
 
-    # Check what logs remain
     remaining_test_logs = models.RulebookProcessLog.objects.filter(
         log__contains="for null test"
     ).exclude(log__contains="purged")
+    assert remaining_test_logs.count() == 0
 
-    # Verify the fix: NULL activation logs should now be purged
-    # with name filtering too
-    null_activation_logs = [
-        log
-        for log in remaining_test_logs
-        if log.activation_instance.activation_id is None
-    ]
-
-    # This validates the fix works with activation name filtering
-    assert len(null_activation_logs) == 0, (
-        "All NULL activation logs should be purged "
-        "when using --activation-names filter"
-    )
-
-    # Verify that the command output mentions orphaned records
-    assert (
-        "Audit trail will include" in captured.out
-        and "orphaned" in captured.out
-    ), "Should mention orphaned records in output"
+    assert "Purged" in captured.out
+    assert "audit trail" in captured.out
