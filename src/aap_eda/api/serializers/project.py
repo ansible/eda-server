@@ -395,7 +395,7 @@ class ProjectRefSerializer(serializers.ModelSerializer):
 
 
 def get_proxy_for_display(proxy: str) -> str:
-    if not (proxy.startswith("http://") or proxy.startswith("https://")):
+    if not proxy.startswith(("http://", "https://")):
         return proxy
     result = urlparse(proxy)
     if "@" not in proxy:
