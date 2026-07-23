@@ -850,3 +850,164 @@ def test_gw_handler_gateway_error_logs_exception(
     mock_logger.exception.assert_called_once()
     log_msg = mock_logger.exception.call_args[0][0]
     assert "gateway certificate" in log_msg
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.LOGGER")
+@patch("aap_eda.services.sync_certs.requests.post")
+def test_make_request_timeout_logs_exception(
+    mock_post,
+    mock_logger,
+    mock_settings,
+    default_mtls_credential,
+    mock_service_token,
+):
+    """Verify LOGGER.exception on Timeout in _make_request."""
+    mock_post.side_effect = requests.exceptions.Timeout("timed out")
+    sync = SyncCertificates(default_mtls_credential.id)
+
+    with patch.object(sync, "_fetch_from_gateway", return_value={}):
+        with pytest.raises(GatewayAPIError):
+            sync.update()
+
+    mock_logger.exception.assert_called_once()
+    log_msg = mock_logger.exception.call_args[0][0]
+    assert "Timeout" in log_msg
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.LOGGER")
+@patch("aap_eda.services.sync_certs.requests.post")
+def test_make_request_request_exception_logs_exception(
+    mock_post,
+    mock_logger,
+    mock_settings,
+    default_mtls_credential,
+    mock_service_token,
+):
+    """Verify LOGGER.exception on RequestException in _make_request."""
+    mock_post.side_effect = requests.exceptions.RequestException("fail")
+    sync = SyncCertificates(default_mtls_credential.id)
+
+    with patch.object(sync, "_fetch_from_gateway", return_value={}):
+        with pytest.raises(GatewayAPIError):
+            sync.update()
+
+    mock_logger.exception.assert_called_once()
+    log_msg = mock_logger.exception.call_args[0][0]
+    assert "Request error" in log_msg
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.LOGGER")
+@patch("aap_eda.services.sync_certs.requests.delete")
+def test_delete_from_gateway_connection_error_logs_exception(
+    mock_delete,
+    mock_logger,
+    mock_settings,
+    default_mtls_credential,
+    mock_service_token,
+):
+    """Verify LOGGER.exception on ConnectionError in _delete_from_gateway."""
+    mock_delete.side_effect = requests.exceptions.ConnectionError("refused")
+    sync = SyncCertificates(default_mtls_credential.id)
+
+    with pytest.raises(GatewayAPIError):
+        sync._delete_from_gateway({"id": 123})
+
+    mock_logger.exception.assert_called_once()
+    log_msg = mock_logger.exception.call_args[0][0]
+    assert "Connection error" in log_msg
+    assert "deleting" in log_msg
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.LOGGER")
+@patch("aap_eda.services.sync_certs.requests.delete")
+def test_delete_from_gateway_timeout_logs_exception(
+    mock_delete,
+    mock_logger,
+    mock_settings,
+    default_mtls_credential,
+    mock_service_token,
+):
+    """Verify LOGGER.exception on Timeout in _delete_from_gateway."""
+    mock_delete.side_effect = requests.exceptions.Timeout("timed out")
+    sync = SyncCertificates(default_mtls_credential.id)
+
+    with pytest.raises(GatewayAPIError):
+        sync._delete_from_gateway({"id": 123})
+
+    mock_logger.exception.assert_called_once()
+    log_msg = mock_logger.exception.call_args[0][0]
+    assert "Timeout" in log_msg
+    assert "deleting" in log_msg
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.LOGGER")
+@patch("aap_eda.services.sync_certs.requests.delete")
+def test_delete_from_gateway_request_exception_logs_exception(
+    mock_delete,
+    mock_logger,
+    mock_settings,
+    default_mtls_credential,
+    mock_service_token,
+):
+    """Verify LOGGER.exception on RequestException in _delete_from_gateway."""
+    mock_delete.side_effect = requests.exceptions.RequestException("fail")
+    sync = SyncCertificates(default_mtls_credential.id)
+
+    with pytest.raises(GatewayAPIError):
+        sync._delete_from_gateway({"id": 123})
+
+    mock_logger.exception.assert_called_once()
+    log_msg = mock_logger.exception.call_args[0][0]
+    assert "Request error" in log_msg
+    assert "deleting" in log_msg
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.LOGGER")
+@patch("aap_eda.services.sync_certs.requests.get")
+def test_fetch_from_gateway_connection_error_logs_exception(
+    mock_get,
+    mock_logger,
+    mock_settings,
+    default_mtls_credential,
+    mock_service_token,
+):
+    """Verify LOGGER.exception on ConnectionError in _fetch_from_gateway."""
+    mock_get.side_effect = requests.exceptions.ConnectionError("refused")
+    sync = SyncCertificates(default_mtls_credential.id)
+
+    with pytest.raises(GatewayAPIError):
+        sync._fetch_from_gateway()
+
+    mock_logger.exception.assert_called_once()
+    log_msg = mock_logger.exception.call_args[0][0]
+    assert "Connection error" in log_msg
+    assert "fetching" in log_msg
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.LOGGER")
+@patch("aap_eda.services.sync_certs.requests.get")
+def test_fetch_from_gateway_request_exception_logs_exception(
+    mock_get,
+    mock_logger,
+    mock_settings,
+    default_mtls_credential,
+    mock_service_token,
+):
+    """Verify LOGGER.exception on RequestException in _fetch_from_gateway."""
+    mock_get.side_effect = requests.exceptions.RequestException("fail")
+    sync = SyncCertificates(default_mtls_credential.id)
+
+    with pytest.raises(GatewayAPIError):
+        sync._fetch_from_gateway()
+
+    mock_logger.exception.assert_called_once()
+    log_msg = mock_logger.exception.call_args[0][0]
+    assert "Request error" in log_msg
+    assert "fetching" in log_msg

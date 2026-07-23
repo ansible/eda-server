@@ -1092,3 +1092,227 @@ def test_monitor_logs_exception_when_activation_deleted(
         if r.exc_info and r.exc_info[0] is not None
     ]
     assert len(exc_records) >= 1
+
+
+@pytest.mark.django_db
+def test_missing_container_policy_cleanup_failure_logs_exception(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test _missing_container_policy LOGGER.exception on cleanup error."""
+    manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    with patch.object(
+        manager,
+        "_fail_instance",
+        side_effect=engine_exceptions.ContainerCleanupError("boom"),
+    ):
+        with pytest.raises(exceptions.ActivationMonitorError):
+            manager._missing_container_policy()
+
+    assert "failed to cleanup" in eda_caplog.text
+    exc_records = [
+        r
+        for r in eda_caplog.records
+        if r.exc_info and r.exc_info[0] is not None
+    ]
+    assert len(exc_records) >= 1
+    assert any(
+        issubclass(r.exc_info[0], engine_exceptions.ContainerCleanupError)
+        for r in exc_records
+    )
+
+
+@pytest.mark.django_db
+def test_failed_policy_never_restart_cleanup_failure_logs_exception(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test _failed_policy NEVER restart LOGGER.exception on cleanup."""
+    running_activation.restart_policy = "never"
+    running_activation.save(update_fields=["restart_policy"])
+
+    manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    with patch.object(
+        manager,
+        "_fail_instance",
+        side_effect=engine_exceptions.ContainerCleanupError("boom"),
+    ):
+        with pytest.raises(exceptions.ActivationMonitorError):
+            manager._failed_policy("")
+
+    assert "failed to cleanup" in eda_caplog.text
+    exc_records = [
+        r
+        for r in eda_caplog.records
+        if r.exc_info and r.exc_info[0] is not None
+    ]
+    assert len(exc_records) >= 1
+
+
+@pytest.mark.django_db
+def test_failed_policy_max_restarts_cleanup_failure_logs_exception(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+    settings: SettingsWrapper,
+):
+    """Test _failed_policy max restarts LOGGER.exception on cleanup."""
+    settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE = 3
+    running_activation.restart_policy = "always"
+    running_activation.failure_count = 3
+    running_activation.save(
+        update_fields=["restart_policy", "failure_count"],
+    )
+
+    manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    with patch.object(
+        manager,
+        "_fail_instance",
+        side_effect=engine_exceptions.ContainerCleanupError("boom"),
+    ):
+        with pytest.raises(exceptions.ActivationMonitorError):
+            manager._failed_policy("")
+
+    assert "failed to cleanup" in eda_caplog.text
+    exc_records = [
+        r
+        for r in eda_caplog.records
+        if r.exc_info and r.exc_info[0] is not None
+    ]
+    assert len(exc_records) >= 1
+
+
+@pytest.mark.django_db
+def test_failed_policy_restart_path_cleanup_failure_logs_exception(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+    settings: SettingsWrapper,
+):
+    """Test _failed_policy restart path LOGGER.exception on cleanup."""
+    settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE = 5
+    running_activation.restart_policy = "always"
+    running_activation.failure_count = 0
+    running_activation.save(
+        update_fields=["restart_policy", "failure_count"],
+    )
+
+    manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    with patch.object(
+        manager,
+        "_fail_instance",
+        side_effect=engine_exceptions.ContainerCleanupError("boom"),
+    ):
+        with pytest.raises(exceptions.ActivationMonitorError):
+            manager._failed_policy("")
+
+    assert "failed to cleanup" in eda_caplog.text
+    exc_records = [
+        r
+        for r in eda_caplog.records
+        if r.exc_info and r.exc_info[0] is not None
+    ]
+    assert len(exc_records) >= 1
+
+
+@pytest.mark.django_db
+def test_monitor_logs_exception_on_instance_not_found(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test monitor LOGGER.exception on ActivationInstanceNotFound."""
+    manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+    # Remove the latest instance so _check_latest_instance raises
+    running_activation.latest_instance.delete()
+    models.RulebookProcess.objects.filter(
+        activation=running_activation,
+    ).delete()
+
+    with pytest.raises(exceptions.ActivationMonitorError):
+        manager.monitor()
+
+    assert "Monitor operation Failed" in eda_caplog.text
+    exc_records = [
+        r
+        for r in eda_caplog.records
+        if r.exc_info and r.exc_info[0] is not None
+    ]
+    assert len(exc_records) >= 1
+
+
+@pytest.mark.django_db
+def test_monitor_logs_exception_on_pod_id_not_found(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test monitor LOGGER.exception on ActivationInstancePodIdNotFound."""
+    running_activation.latest_instance.activation_pod_id = None
+    running_activation.latest_instance.save(
+        update_fields=["activation_pod_id"],
+    )
+
+    manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    with pytest.raises(exceptions.ActivationMonitorError):
+        manager.monitor()
+
+    assert "Monitor operation Failed" in eda_caplog.text
+    exc_records = [
+        r
+        for r in eda_caplog.records
+        if r.exc_info and r.exc_info[0] is not None
+    ]
+    assert len(exc_records) >= 1
+
+
+@pytest.mark.django_db
+def test_update_logs_no_instance_or_pod_id_logs_exception(
+    activation_with_instance: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test update_logs LOGGER.exception when no instance or pod_id."""
+    activation_with_instance.latest_instance.activation_pod_id = None
+    activation_with_instance.latest_instance.save(
+        update_fields=["activation_pod_id"],
+    )
+
+    manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=activation_with_instance,
+    )
+    manager.update_logs()
+
+    assert "No instance or pod id found" in eda_caplog.text
+    exc_records = [
+        r
+        for r in eda_caplog.records
+        if r.exc_info and r.exc_info[0] is not None
+    ]
+    assert len(exc_records) >= 1

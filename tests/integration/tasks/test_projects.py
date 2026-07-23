@@ -2221,6 +2221,51 @@ def test_auto_restart_content_changed_still_works(
 
 
 @pytest.mark.django_db
+@patch("aap_eda.tasks.project.logger")
+@patch("aap_eda.tasks.project.start_rulebook_process")
+def test_resume_waiting_double_failure_logs_exception(
+    mock_start,
+    mock_logger,
+    default_organization,
+):
+    """Test _resume_waiting_activations double-failure logs exception."""
+    mock_start.side_effect = RuntimeError("queue full")
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="double-fail-resume",
+        is_enabled=False,
+        awaiting_project_sync=True,
+        status=ActivationStatus.PENDING,
+    )
+
+    with patch.object(
+        type(activation),
+        "save",
+        side_effect=[None, RuntimeError("save failed")],
+    ):
+        _resume_waiting_activations(project)
+
+    exception_calls = [
+        c
+        for c in mock_logger.exception.call_args_list
+        if "Failed to update activation status" in c[0][0]
+    ]
+    assert len(exception_calls) >= 1
+
+
+@pytest.mark.django_db
 @patch("aap_eda.tasks.project.restart_rulebook_process")
 def test_auto_restart_failed_with_content_change(
     mock_restart,

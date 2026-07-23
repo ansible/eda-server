@@ -35,6 +35,7 @@ from aap_eda.tasks.orchestrator import (
     _resolve_existing_queue,
     get_least_busy_queue_name,
     get_process_parent,
+    queue_dispatch,
 )
 
 
@@ -985,5 +986,57 @@ def test_handle_unhealthy_queue_restart_no_healthy():
 
     assert result is None
     status_manager.set_status.assert_called_once_with(
+        ActivationStatus.PENDING, mock.ANY
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.LOGGER")
+def test_queue_dispatch_start_no_healthy_queues_logs_exception(
+    mock_logger,
+):
+    """Test queue_dispatch LOGGER.exception on HealthyQueueNotFoundError."""
+    process_parent = mock.Mock(spec=Activation)
+    process_parent.id = 1
+    process_parent.status = ActivationStatus.RUNNING
+    process_parent.log_tracking_id = str(uuid.uuid4())
+
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_process_parent",
+            return_value=process_parent,
+        ),
+        mock.patch(
+            "aap_eda.tasks.orchestrator.assign_request_id",
+        ),
+        mock.patch(
+            "aap_eda.tasks.orchestrator.assign_log_tracking_id",
+        ),
+        mock.patch(
+            "aap_eda.tasks.orchestrator.advisory_lock",
+        ) as mock_lock,
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
+            side_effect=HealthyQueueNotFoundError,
+        ),
+        mock.patch(
+            "aap_eda.tasks.orchestrator.StatusManager",
+        ) as mock_status_cls,
+    ):
+        mock_lock.return_value.__enter__ = mock.Mock(return_value=True)
+        mock_lock.return_value.__exit__ = mock.Mock(return_value=None)
+        mock_status_manager = mock.Mock()
+        mock_status_cls.return_value = mock_status_manager
+
+        queue_dispatch(
+            ProcessParentType.ACTIVATION,
+            1,
+            ActivationRequest.START,
+        )
+
+    mock_logger.exception.assert_called_once()
+    log_msg = mock_logger.exception.call_args[0][0]
+    assert "no healthy queues" in log_msg
+    mock_status_manager.set_status.assert_called_once_with(
         ActivationStatus.PENDING, mock.ANY
     )

@@ -1253,12 +1253,13 @@ def test_set_namespace_logs_exception_on_missing_file(
     init_kubernetes_data,
 ):
     """_set_namespace calls LOGGER.exception when file is missing."""
-    activation_id = init_kubernetes_data.activation.id
+    aid = str(init_kubernetes_data.activation.id)
+    client = mock.Mock()
     with pytest.raises(ContainerEngineInitError):
         Engine(
-            activation_id=str(activation_id),
+            activation_id=aid,
             resource_prefix=ProcessParentType.ACTIVATION,
-            client=mock.Mock(),
+            client=client,
         )
 
     mock_logger.exception.assert_called_once()
