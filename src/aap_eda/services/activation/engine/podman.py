@@ -56,7 +56,7 @@ def get_podman_client() -> PodmanClient:
     try:
         return PodmanClient(**params)
     except ValueError as e:
-        LOGGER.exception(f"Failed to initialize podman client: f{e}")
+        LOGGER.exception("Failed to initialize podman client")
         raise exceptions.ContainerEngineInitError(str(e)) from e
 
 
@@ -75,7 +75,7 @@ class Engine(ContainerEngine):
             LOGGER.debug(self.client.version())
 
         except APIError as e:
-            LOGGER.exception(f"Failed to initialize podman engine: f{e}")
+            LOGGER.exception("Failed to initialize podman engine")
             raise exceptions.ContainerEngineInitError(str(e))
 
         self.JobTimeoutException = self._get_job_timeout_exception()
@@ -354,7 +354,7 @@ class Engine(ContainerEngine):
         except NotFound:
             LOGGER.warning(f"Container {container_id} not found.")
         except APIError as e:
-            LOGGER.exception(f"Failed to cleanup {container_id}: {e}")
+            LOGGER.exception(f"Failed to cleanup {container_id}")
             raise exceptions.ContainerCleanupError(str(e))
 
     def _get_ports(self, found_ports: list[tuple]) -> dict:
@@ -427,7 +427,7 @@ class Engine(ContainerEngine):
                 LOGGER.exception(msg)
                 log_handler.write(msg, True)
                 raise exceptions.ContainerImagePullError(msg)
-            LOGGER.exception(f"Failed to pull image {request.image_url}: {e}")
+            LOGGER.exception(f"Failed to pull image {request.image_url}")
             raise exceptions.ContainerStartError(str(e))
         except self.JobTimeoutException as e:
             msg = f"Timeout: {e}"

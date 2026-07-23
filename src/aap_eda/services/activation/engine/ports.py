@@ -56,7 +56,7 @@ def _extract_port(source, context):
             return (host, int(maybe_port))
         return None
     except ValueError as e:
-        LOGGER.exception(f"find_ports error: {e}")
+        LOGGER.exception("find_ports error")
         raise exceptions.ActivationStartError(str(e))
     except (UndefinedError, SecurityError) as e:
         raise exceptions.ActivationStartError(str(e))

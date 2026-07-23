@@ -65,8 +65,8 @@ class AnalyticsCollector(Collector):
             self.logger.info(f"Last collect entries: {last_entries}")
 
             return json.loads(last_entries, object_hook=utils.datetime_hook)
-        except (json.JSONDecodeError, TypeError) as e:
-            self.logger.exception(f"Failed to load last entries: {str(e)}")
+        except (json.JSONDecodeError, TypeError):
+            self.logger.exception("Failed to load last entries")
             return {}
 
     def _save_last_gathered_entries(self, last_gathered_entries: dict) -> None:

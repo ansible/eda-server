@@ -1619,7 +1619,7 @@ def _validate_sources_with_event_streams(data: dict) -> None:
     try:
         source_mappings = yaml.safe_load(source_mappings)
     except yaml.MarkedYAMLError as ex:
-        logger.exception("Invalid source mappings: %s", str(ex))
+        logger.exception("Invalid source mappings")
         raise serializers.ValidationError(
             {
                 SOURCE_MAPPING_ERROR_KEY: [

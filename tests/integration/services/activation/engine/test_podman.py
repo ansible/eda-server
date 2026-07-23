@@ -53,6 +53,7 @@ from aap_eda.utils.podman import parse_repository
 from .utils import InitData, get_ansible_rulebook_cmdline, get_request
 
 DATA_DIR = Path(__file__).parent / "data"
+PODMAN_LOGGER = "aap_eda.services.activation.engine.podman"
 
 
 def get_request_with_never_pull_policy(
@@ -972,3 +973,83 @@ def test_engine_update_logs_with_exception(init_podman_data, podman_engine):
 
     with pytest.raises(ContainerUpdateLogsError, match="Not found"):
         engine.update_logs("100", log_handler)
+
+
+def test_get_podman_client_logs_exception_on_value_error():
+    """Verify LOGGER.exception on ValueError (S8572)."""
+    with mock.patch.object(
+        PodmanClient,
+        "__init__",
+        side_effect=ValueError("bad socket"),
+    ), mock.patch(
+        f"{PODMAN_LOGGER}.LOGGER",
+    ) as mock_logger, pytest.raises(
+        ContainerEngineInitError
+    ):
+        get_podman_client()
+
+    mock_logger.exception.assert_called_once()
+    assert "Failed to initialize podman client" in (
+        mock_logger.exception.call_args[0][0]
+    )
+
+
+@pytest.mark.django_db
+def test_cleanup_logs_exception_on_api_error(
+    init_podman_data,
+    podman_engine,
+):
+    """Verify LOGGER.exception in _cleanup on APIError (S8572)."""
+    engine = podman_engine
+    log_handler = DBLogger(
+        init_podman_data.activation_instance.id,
+    )
+
+    container_mock = mock.Mock()
+    engine.client.containers.get.return_value = container_mock
+    container_mock.logs.return_value = []
+    container_mock.remove.side_effect = APIError(
+        "remove fail",
+    )
+
+    with mock.patch(
+        f"{PODMAN_LOGGER}.LOGGER",
+    ) as mock_logger, pytest.raises(ContainerCleanupError):
+        engine.cleanup("100", log_handler)
+
+    mock_logger.exception.assert_called_once()
+    assert "Failed to cleanup 100" in (mock_logger.exception.call_args[0][0])
+
+
+@pytest.mark.django_db
+def test_start_logs_exception_on_container_error(
+    init_podman_data,
+    podman_engine,
+    default_organization,
+):
+    """Verify LOGGER.exception in start (S8572)."""
+    engine = podman_engine
+    log_handler = DBLogger(
+        init_podman_data.activation_instance.id,
+    )
+    request = get_request(
+        init_podman_data,
+        "me",
+        default_organization,
+        mounts=[{"/dev": "/opt"}],
+    )
+
+    engine.client.containers.run.side_effect = ContainerError(
+        container="c",
+        exit_status=1,
+        command="cmd",
+        image="img",
+    )
+
+    with mock.patch(
+        f"{PODMAN_LOGGER}.LOGGER",
+    ) as mock_logger, pytest.raises(ContainerStartError):
+        engine.start(request, log_handler)
+
+    mock_logger.exception.assert_called_once()
+    assert "Container Start Error" in (mock_logger.exception.call_args[0][0])

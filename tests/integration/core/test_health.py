@@ -17,7 +17,10 @@ from unittest.mock import patch
 import pytest
 
 from aap_eda.api import exceptions as api_exc
-from aap_eda.core.health import check_dispatcherd_workers_health
+from aap_eda.core.health import (
+    check_activation_worker_health,
+    check_dispatcherd_workers_health,
+)
 
 
 @pytest.mark.django_db
@@ -184,3 +187,55 @@ def test_check_dispatcherd_workers_health_specific_queue_raises():
                 raise_exceptions=True, queue_name="secondary"
             )
         assert "Activation" in str(exc_info.value.detail)
+
+
+@pytest.mark.django_db
+def test_check_activation_worker_health_logs_exception():
+    """Test that check_activation_worker_health uses logger.exception
+    when an unexpected error occurs (S8572)."""
+    with patch(
+        "aap_eda.core.health.check_rulebook_queue_health",
+        side_effect=RuntimeError("connection lost"),
+    ), patch(
+        "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
+        ["activation"],
+    ), patch(
+        "aap_eda.core.health.logger",
+    ) as mock_logger:
+        result = check_activation_worker_health()
+        assert result is False
+        mock_logger.exception.assert_called_once()
+        assert "activation workers" in mock_logger.exception.call_args[0][0]
+
+
+@pytest.mark.django_db
+def test_check_dispatcherd_workers_health_logs_exception_no_raise():
+    """Test that check_dispatcherd_workers_health uses logger.exception
+    when raise_exceptions=False and an error occurs (S8572)."""
+    with patch(
+        "aap_eda.core.health.check_default_worker_health",
+        side_effect=Exception("unexpected failure"),
+    ), patch(
+        "aap_eda.core.health.logger",
+    ) as mock_logger:
+        result = check_dispatcherd_workers_health(raise_exceptions=False)
+        assert result is False
+        mock_logger.exception.assert_called_once()
+        assert "dispatcherd workers" in (mock_logger.exception.call_args[0][0])
+
+
+@pytest.mark.django_db
+def test_check_dispatcherd_workers_health_logs_exception_with_raise():
+    """Test that check_dispatcherd_workers_health uses logger.exception
+    and raises WorkerUnavailable for non-WorkerUnavailable exceptions
+    when raise_exceptions=True (S8572)."""
+    with patch(
+        "aap_eda.core.health.check_default_worker_health",
+        side_effect=RuntimeError("database gone"),
+    ), patch(
+        "aap_eda.core.health.logger",
+    ) as mock_logger:
+        with pytest.raises(api_exc.WorkerUnavailable):
+            check_dispatcherd_workers_health(raise_exceptions=True)
+        mock_logger.exception.assert_called_once()
+        assert "dispatcherd workers" in (mock_logger.exception.call_args[0][0])

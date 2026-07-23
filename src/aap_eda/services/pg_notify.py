@@ -98,5 +98,5 @@ class PGNotify:
                             "SELECT pg_notify(%s, %s)", [self.channel, payload]
                         )
         except psycopg.OperationalError as e:
-            logger.exception("PG Notify operational error %s", str(e))
+            logger.exception("PG Notify operational error")
             raise PGNotifyError() from e

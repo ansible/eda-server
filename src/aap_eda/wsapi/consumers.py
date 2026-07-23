@@ -125,10 +125,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 await self.handle_heartbeat(HeartbeatMessage.parse_obj(data))
             else:
                 logger.warning(f"Unsupported message received: {data}")
-        except (DatabaseError, ObjectDoesNotExist) as err:
-            logger.exception(f"Failed to parse {data} due to DB error: {err}")
-        except InvalidEnvKeyError as err:
-            logger.exception(f"Failed to parse {data} due to Env error: {err}")
+        except (DatabaseError, ObjectDoesNotExist):
+            logger.exception(f"Failed to parse {data} due to DB error")
+        except InvalidEnvKeyError:
+            logger.exception(f"Failed to parse {data} due to Env error")
 
     async def handle_workers(self, message: WorkerMessage):
         additional_credentials = []

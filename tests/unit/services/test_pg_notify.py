@@ -1,7 +1,9 @@
 from unittest.mock import MagicMock, patch
 
+import psycopg
 import pytest
 
+from aap_eda.core.exceptions import PGNotifyError
 from aap_eda.services.pg_notify import PGNotify
 
 
@@ -87,3 +89,26 @@ def test_sql_metacharacters_are_parameterized(mock_psycopg, malicious_value):
     sql, params = mock_cursor.execute.call_args[0]
     assert sql == "SELECT pg_notify(%s, %s)"
     assert malicious_value in params[1]
+
+
+@patch("aap_eda.services.pg_notify.logger")
+@patch("aap_eda.services.pg_notify.psycopg")
+def test_operational_error_logs_exception(mock_psycopg, mock_logger):
+    mock_psycopg.OperationalError = psycopg.OperationalError
+    mock_psycopg.connect.side_effect = psycopg.OperationalError(
+        "connection refused"
+    )
+
+    notifier = PGNotify(
+        dsn="postgresql://localhost/eda",
+        channel="test_chan",
+        data={"event": "test"},
+    )
+
+    with pytest.raises(PGNotifyError):
+        notifier()
+
+    mock_logger.exception.assert_called_once()
+    assert (
+        "PG Notify operational error" in mock_logger.exception.call_args[0][0]
+    )

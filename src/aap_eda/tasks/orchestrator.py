@@ -512,8 +512,8 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
                 f"Worker queue [{queue_name}] was found to not be healthy"
             )
         return bool(alive)
-    except Exception as e:
-        LOGGER.exception(f"Health check failed for queue {queue_name}: {e}")
+    except Exception:
+        LOGGER.exception(f"Health check failed for queue {queue_name}")
         return False
 
 

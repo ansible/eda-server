@@ -856,11 +856,11 @@ class ActivationManager(StatusManager):
         try:
             self._check_latest_instance_and_pod_id()
         except exceptions.ActivationInstanceNotFound as e:
-            LOGGER.exception(f"Monitor operation Failed: {e}")
+            LOGGER.exception("Monitor operation Failed")
             self._error_activation(f"{e}")
             raise exceptions.ActivationMonitorError(f"{e}")
         except exceptions.ActivationInstancePodIdNotFound as e:
-            LOGGER.exception(f"Monitor operation Failed: {e}")
+            LOGGER.exception("Monitor operation Failed")
             self._error_activation(f"{e}")
             self._error_instance(f"{e}")
             raise exceptions.ActivationMonitorError(f"{e}")

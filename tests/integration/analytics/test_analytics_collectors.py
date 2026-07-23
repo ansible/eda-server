@@ -947,7 +947,7 @@ def test_database_error_propagation(tmp_path, mock_queryset, caplog_factory):
         result = _copy_table("test", mock_queryset, str(tmp_path))
 
         assert result is None
-        assert "Database error occurred: View creation failed" in eda_log.text
+        assert "Database error occurred" in eda_log.text
 
 
 @pytest.mark.django_db

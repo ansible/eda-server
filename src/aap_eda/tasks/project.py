@@ -45,8 +45,8 @@ def check_default_worker_health() -> bool:
     try:
         queue_name = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)
         return check_rulebook_queue_health(queue_name)
-    except Exception as e:
-        logger.exception(f"Project queue health check failed: {e}")
+    except Exception:
+        logger.exception("Project queue health check failed")
         return False
 
 

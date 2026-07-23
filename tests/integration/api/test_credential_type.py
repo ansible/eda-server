@@ -1267,3 +1267,39 @@ def test_eda_rule_engine_credential_validates_required_fields(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "postgres_db_name" in str(response.data)
+
+
+@pytest.mark.django_db
+def test_credential_type_test_logs_exception_on_plugin_failure(
+    superuser_client: APIClient,
+    preseed_credential_types,
+):
+    """Verify logger.exception is called when run_plugin raises."""
+    hashi_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.HASHICORP_LOOKUP
+    )
+
+    data_in = {
+        "inputs": {
+            "url": "https://www.example.com",
+            "api_version": "v2",
+            "token": "token123",
+        },
+        "metadata": {
+            "secret_path": "secret/foo",
+            "secret_key": "bar",
+        },
+    }
+
+    url = f"{api_url_v1}/credential-types/{hashi_type.id}/test/"
+    with patch(
+        "aap_eda.api.views.credential_type.run_plugin",
+        side_effect=Exception("kaboom"),
+    ), patch(
+        "aap_eda.api.views.credential_type.logger",
+    ) as mock_logger:
+        response = superuser_client.post(url, data=data_in)
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    mock_logger.exception.assert_called_once()
+    assert "Plugin call failed" in mock_logger.exception.call_args[0][0]

@@ -127,3 +127,39 @@ def test_get_external_secrets(
         ):
             result = get_external_secrets(target_credential["id"])
             assert result[input_field_name] == "abc"
+
+
+@mock.patch("aap_eda.core.utils.external_sms.LOGGER")
+@mock.patch("aap_eda.core.utils.external_sms.run_plugin")
+@mock.patch("aap_eda.core.utils.external_sms.models")
+def test_get_external_secrets_logs_exception(
+    mock_models, mock_run_plugin, mock_logger
+):
+    """Test that CredentialPluginError is logged."""
+    mock_source = mock.MagicMock()
+    mock_source.credential_type.namespace = "test"
+    mock_source.inputs.get_secret_value.return_value = (
+        "url: https://example.com"
+    )
+    mock_source.name = "source-cred"
+
+    mock_target = mock.MagicMock()
+    mock_target.name = "target-cred"
+
+    mock_obj = mock.MagicMock()
+    mock_obj.input_field_name = "password"
+    mock_obj.source_credential = mock_source
+    mock_obj.target_credential = mock_target
+    mock_obj.metadata.get_secret_value.return_value = "secret_key: bar"
+
+    qs = mock_models.CredentialInputSource.objects
+    qs.filter.return_value = [mock_obj]
+    mock_run_plugin.side_effect = CredentialPluginError("Kaboom")
+
+    with pytest.raises(CredentialPluginError):
+        get_external_secrets(1)
+
+    mock_logger.exception.assert_called_once()
+    logged_msg = mock_logger.exception.call_args[0][0]
+    assert "password" in logged_msg
+    assert "Kaboom" in logged_msg

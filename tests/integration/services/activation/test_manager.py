@@ -999,3 +999,96 @@ def test_stop_cancels_auto_restart_when_no_instance(
         enums.ProcessParentType.ACTIVATION,
         basic_activation.id,
     )
+
+
+# -----------------------------------------------------------
+# Tests for LOGGER.exception (S8572: .error -> .exception)
+# Verify that except blocks use LOGGER.exception (which
+# includes exc_info / traceback) rather than LOGGER.error.
+# -----------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_cleanup_logs_exception_on_cleanup_error(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test _cleanup uses LOGGER.exception on cleanup error."""
+    manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+    container_engine_mock.cleanup.side_effect = (
+        engine_exceptions.ContainerCleanupError("boom")
+    )
+
+    # _cleanup swallows the error and returns
+    manager._cleanup()
+
+    assert "failed to cleanup" in eda_caplog.text
+    exc_records = [
+        r
+        for r in eda_caplog.records
+        if r.exc_info and r.exc_info[0] is not None
+    ]
+    assert len(exc_records) == 1
+    assert issubclass(
+        exc_records[0].exc_info[0],
+        engine_exceptions.ContainerCleanupError,
+    )
+
+
+@pytest.mark.django_db
+def test_update_logs_logs_exception_on_engine_error(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test update_logs uses LOGGER.exception on engine error."""
+    manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+    container_engine_mock.update_logs.side_effect = (
+        engine_exceptions.ContainerEngineError("log err")
+    )
+
+    manager.update_logs()
+
+    assert "could not be retrieved" in eda_caplog.text
+    exc_records = [
+        r
+        for r in eda_caplog.records
+        if r.exc_info and r.exc_info[0] is not None
+    ]
+    assert len(exc_records) == 1
+    assert issubclass(
+        exc_records[0].exc_info[0],
+        engine_exceptions.ContainerEngineError,
+    )
+
+
+@pytest.mark.django_db
+def test_monitor_logs_exception_when_activation_deleted(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test monitor uses LOGGER.exception when activation deleted."""
+    manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+    running_activation.delete()
+
+    with pytest.raises(exceptions.ActivationMonitorError):
+        manager.monitor()
+
+    assert "does not exist" in eda_caplog.text
+    exc_records = [
+        r
+        for r in eda_caplog.records
+        if r.exc_info and r.exc_info[0] is not None
+    ]
+    assert len(exc_records) >= 1
