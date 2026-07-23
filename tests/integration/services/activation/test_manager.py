@@ -187,6 +187,14 @@ def running_container_status_mock():
     return status_mock
 
 
+@pytest.fixture
+def failing_cleanup(container_engine_mock):
+    container_engine_mock.cleanup.side_effect = (
+        engine_exceptions.ContainerCleanupError("cleanup failed")
+    )
+    return container_engine_mock
+
+
 @pytest.mark.django_db
 def test_get_container_request(
     activation_with_instance: models.Activation,
@@ -1011,6 +1019,7 @@ SYSTEM_RESTART_PATH = (
 def test_unresponsive_policy_skips_restart_on_cleanup_failure(
     starting_activation: models.Activation,
     container_engine_mock: MagicMock,
+    failing_cleanup,
 ):
     """When cleanup fails, _unresponsive_policy should not restart."""
     activation = starting_activation
@@ -1022,21 +1031,8 @@ def test_unresponsive_policy_skips_restart_on_cleanup_failure(
         container_engine=container_engine_mock,
     )
 
-    cleanup_calls = 0
-
-    def cleanup_side_effect():
-        nonlocal cleanup_calls
-        cleanup_calls += 1
-        if cleanup_calls == 1:
-            raise engine_exceptions.ContainerCleanupError("cleanup failed")
-
-    with patch.object(
-        activation_manager,
-        "_cleanup",
-        side_effect=cleanup_side_effect,
-    ):
-        with patch(SYSTEM_RESTART_PATH) as restart_mock:
-            activation_manager._unresponsive_policy(check_type="Readiness")
+    with patch(SYSTEM_RESTART_PATH) as restart_mock:
+        activation_manager._unresponsive_policy(check_type="Readiness")
 
     restart_mock.assert_not_called()
     activation.refresh_from_db()
@@ -1058,9 +1054,8 @@ def test_unresponsive_policy_restarts_on_cleanup_success(
         container_engine=container_engine_mock,
     )
 
-    with patch.object(activation_manager, "_cleanup"):
-        with patch(SYSTEM_RESTART_PATH) as restart_mock:
-            activation_manager._unresponsive_policy(check_type="Readiness")
+    with patch(SYSTEM_RESTART_PATH) as restart_mock:
+        activation_manager._unresponsive_policy(check_type="Readiness")
 
     restart_mock.assert_called_once()
     activation.refresh_from_db()
@@ -1082,9 +1077,8 @@ def test_unresponsive_policy_never_restart_skips_restart(
         container_engine=container_engine_mock,
     )
 
-    with patch.object(activation_manager, "_cleanup"):
-        with patch(SYSTEM_RESTART_PATH) as restart_mock:
-            activation_manager._unresponsive_policy(check_type="Readiness")
+    with patch(SYSTEM_RESTART_PATH) as restart_mock:
+        activation_manager._unresponsive_policy(check_type="Readiness")
 
     restart_mock.assert_not_called()
     activation.refresh_from_db()
@@ -1095,6 +1089,7 @@ def test_unresponsive_policy_never_restart_skips_restart(
 def test_handle_unresponsive_activation_reraises_cleanup_error(
     starting_activation: models.Activation,
     container_engine_mock: MagicMock,
+    failing_cleanup,
 ):
     """_handle_unresponsive_activation re-raises ContainerCleanupError."""
     activation = starting_activation
@@ -1103,23 +1098,10 @@ def test_handle_unresponsive_activation_reraises_cleanup_error(
         container_engine=container_engine_mock,
     )
 
-    cleanup_calls = 0
-
-    def cleanup_side_effect():
-        nonlocal cleanup_calls
-        cleanup_calls += 1
-        if cleanup_calls == 1:
-            raise engine_exceptions.ContainerCleanupError("cleanup failed")
-
-    with patch.object(
-        activation_manager,
-        "_cleanup",
-        side_effect=cleanup_side_effect,
-    ):
-        with pytest.raises(engine_exceptions.ContainerCleanupError):
-            activation_manager._handle_unresponsive_activation(
-                check_type="Readiness",
-            )
+    with pytest.raises(engine_exceptions.ContainerCleanupError):
+        activation_manager._handle_unresponsive_activation(
+            check_type="Readiness",
+        )
 
     activation.refresh_from_db()
     assert activation.status == enums.ActivationStatus.FAILED
@@ -1137,10 +1119,9 @@ def test_handle_unresponsive_activation_fails_instance_on_success(
         container_engine=container_engine_mock,
     )
 
-    with patch.object(activation_manager, "_cleanup"):
-        activation_manager._handle_unresponsive_activation(
-            check_type="Liveness",
-        )
+    activation_manager._handle_unresponsive_activation(
+        check_type="Liveness",
+    )
 
     activation.refresh_from_db()
     assert activation.status == enums.ActivationStatus.FAILED

@@ -50,6 +50,8 @@ KEEP_JOBS_FOR_SECONDS = 300
 
 K8S_API_RETRIES = 3
 K8S_API_RETRY_BACKOFF = 1.0
+# 410 (AKA Gone) is included for watch streams where a stale resourceVersion
+# triggers this status; rare outside watch contexts.
 K8S_API_TRANSIENT_STATUS_CODES = {401, 403, 410, 500, 502, 503, 504}
 
 INVALID_IMAGE_NAME = "InvalidImageName"
@@ -650,7 +652,7 @@ class Engine(ContainerEngine):
                 flush=True,
             )
             raise ContainerCleanupError(
-                f"Error during cleanup: {str(exc)}"
+                f"Error during cleanup: {exc!s}"
             ) from exc
         self._log_and_backoff(
             exc, attempt, f"watch pod deletion {self.job_name}"
@@ -680,6 +682,12 @@ class Engine(ContainerEngine):
                     return
             finally:
                 watcher.stop()
+
+        if last_exc is None:
+            raise ContainerCleanupError(
+                f"Timed out waiting for pod deletion of {self.job_name} "
+                f"after {K8S_API_RETRIES} attempts"
+            )
         raise ContainerCleanupError(
             f"{desc} failed after {K8S_API_RETRIES} retries: {last_exc}"
         ) from last_exc
@@ -713,7 +721,7 @@ class Engine(ContainerEngine):
             )
         return False
 
-    def _wait_for_pod_to_start(self, log_handler: LogHandler) -> None:
+    def _wait_for_pod_to_start(self, _log_handler: LogHandler) -> None:
         LOGGER.info("Waiting for pod to start")
         desc = f"watch pod start {self.job_name}"
         last_exc = None

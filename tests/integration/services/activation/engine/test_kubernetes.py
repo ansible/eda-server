@@ -1238,7 +1238,7 @@ def test_watch_pod_deletion_timeout_without_deleted_event(
     with mock.patch.object(
         engine, "_get_resource_version", return_value="999"
     ):
-        with pytest.raises(ContainerCleanupError, match="retries"):
+        with pytest.raises(ContainerCleanupError, match="attempts"):
             engine._watch_pod_deletion(log_handler, resource_version="1")
 
     assert mock_watch.return_value.stream.call_count == K8S_API_RETRIES
@@ -1263,7 +1263,7 @@ def test_watch_pod_deletion_empty_stream_retries(
     with mock.patch.object(
         engine, "_get_resource_version", return_value="999"
     ):
-        with pytest.raises(ContainerCleanupError, match="retries"):
+        with pytest.raises(ContainerCleanupError, match="attempts"):
             engine._watch_pod_deletion(log_handler, resource_version="1")
 
     assert mock_watch.return_value.stream.call_count == K8S_API_RETRIES
