@@ -42,7 +42,23 @@ def ssh_credential(
 ) -> models.EdaCredential:
     credential = models.EdaCredential.objects.create(
         name="test-ssh-credential",
-        inputs={"ssh_key_data": "-----BEGIN OPENSSH PRIVATE KEY-----\n"},
+        inputs={
+            "ssh_key_data": "-----BEGIN OPENSSH PRIVATE KEY-----\n",
+            "ssh_key_unlock": "passphrase",
+        },
+        organization=default_organization,
+    )
+    credential.refresh_from_db()
+    return credential
+
+
+@pytest.fixture
+def gpg_credential(
+    default_organization: models.Organization,
+) -> models.EdaCredential:
+    credential = models.EdaCredential.objects.create(
+        name="test-gpg-credential",
+        inputs={"gpg_public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n"},
         organization=default_organization,
     )
     credential.refresh_from_db()
@@ -154,6 +170,36 @@ def test_git_clone_sets_proxy_env_during_credential_resolution(
     # Env vars should be cleaned up after the with block
     for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
         assert os.environ.get(key) is None
+
+
+@pytest.mark.django_db
+def test_set_proxy_environ_restores_existing_vars(
+    credential: models.EdaCredential,
+    monkeypatch,
+):
+    """Pre-existing proxy env vars are restored after clone."""
+    executor = mock.MagicMock()
+    original_value = "http://original-proxy:8080"
+
+    for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+        monkeypatch.setenv(key, original_value)
+
+    with tempfile.TemporaryDirectory() as dest_path:
+        scm.ScmRepository.clone(
+            "https://git.example.com/repo.git",
+            dest_path,
+            credential=credential,
+            proxy="http://override-proxy:3128",
+            _executor=executor,
+        )
+
+    for key in (
+        "http_proxy",
+        "https_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+    ):
+        assert os.environ.get(key) == original_value
 
 
 @pytest.mark.django_db
@@ -393,21 +439,267 @@ def test_is_refspec_valid(ref: str, is_branch: bool, expected: bool):
 def test_git_clone_ssh_key(ssh_credential: models.EdaCredential, url: str):
     """Clone with SSH key preserves URL and passes key_file."""
     executor = mock.MagicMock()
-    with tempfile.TemporaryDirectory() as dest_path:
+    with mock.patch.object(
+        scm.ScmRepository, "decrypt_key_file"
+    ) as mock_decrypt:
+        with tempfile.TemporaryDirectory() as dest_path:
+            scm.ScmRepository.clone(
+                url,
+                dest_path,
+                credential=ssh_credential,
+                depth=1,
+                _executor=executor,
+            )
+            executor.assert_called_once()
+            call_kwargs = executor.call_args
+            extra_vars = call_kwargs.kwargs["extra_vars"]
+
+            # URL must reach the executor unchanged
+            assert extra_vars["scm_url"] == url
+
+            # SSH key file must be provided
+            assert "key_file" in extra_vars
+            assert extra_vars["key_file"]  # non-empty path
+        mock_decrypt.assert_called_once()
+
+
+#################################################################
+# Tests for GitAnsibleRunnerExecutor._extract_git_hash
+#################################################################
+
+_extract_hash = scm.GitAnsibleRunnerExecutor._extract_git_hash
+_extract_error = scm.GitAnsibleRunnerExecutor._extract_error_msg
+
+
+def _ok_event(res=None):
+    return {"event": "runner_on_ok", "event_data": {"res": res or {}}}
+
+
+def _failed_event(res=None):
+    return {
+        "event": "runner_on_failed",
+        "event_data": {"res": res or {}},
+    }
+
+
+def test_extract_git_hash_from_set_fact():
+    events = [
+        _ok_event({"changed": True}),
+        _ok_event(
+            {
+                "ansible_facts": {
+                    "scm_version": "abc123def456",
+                },
+            }
+        ),
+        _ok_event({"msg": "Repository Version abc123def456"}),
+    ]
+    assert _extract_hash(events) == "abc123def456"
+
+
+def test_extract_git_hash_no_matching_event():
+    events = [
+        _ok_event({"changed": True}),
+        {"event": "runner_on_start", "event_data": {}},
+    ]
+    assert _extract_hash(events) is None
+
+
+def test_extract_git_hash_empty_events():
+    assert _extract_hash([]) is None
+
+
+#################################################################
+# Tests for GitAnsibleRunnerExecutor._extract_error_msg
+#################################################################
+
+
+def test_extract_error_msg_from_failed_event():
+    events = [_failed_event({"msg": "Authentication failed"})]
+    assert _extract_error(events) == "Authentication failed"
+
+
+def test_extract_error_msg_no_failure_event():
+    events = [_ok_event({"changed": True})]
+    assert _extract_error(events) is None
+
+
+def test_extract_error_msg_missing_msg_key():
+    events = [_failed_event({"changed": False, "rc": 1})]
+    assert _extract_error(events) is None
+
+
+def test_extract_error_msg_empty_msg():
+    events = [_failed_event({"msg": ""})]
+    assert _extract_error(events) is None
+
+
+def test_extract_error_msg_empty_events():
+    assert _extract_error([]) is None
+
+
+@pytest.mark.django_db
+def test_git_clone_gpg_credential(
+    gpg_credential: models.EdaCredential,
+):
+    """GPG credential sets up verify_commit and GNUPGHOME."""
+    executor = mock.MagicMock()
+
+    with mock.patch.object(scm.ScmRepository, "add_gpg_key") as mock_add_gpg:
+        with tempfile.TemporaryDirectory() as dest_path:
+            scm.ScmRepository.clone(
+                "https://git.example.com/repo.git",
+                dest_path,
+                gpg_credential=gpg_credential,
+                _executor=executor,
+            )
+            call_kwargs = executor.call_args
+            assert call_kwargs[1]["extra_vars"]["verify_commit"] == "true"
+            assert "GNUPGHOME" in call_kwargs[1]["env_vars"]
+        mock_add_gpg.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_git_clone_creates_directory():
+    """Clone creates the destination directory if it doesn't exist."""
+    executor = mock.MagicMock()
+
+    with tempfile.TemporaryDirectory() as parent:
+        dest_path = os.path.join(parent, "nonexistent")
         scm.ScmRepository.clone(
-            url,
+            "https://git.example.com/repo.git",
             dest_path,
-            credential=ssh_credential,
-            depth=1,
             _executor=executor,
         )
-        executor.assert_called_once()
-        call_kwargs = executor.call_args
-        extra_vars = call_kwargs.kwargs["extra_vars"]
+        assert os.path.isdir(dest_path)
 
-        # URL must reach the executor unchanged
-        assert extra_vars["scm_url"] == url
 
-        # SSH key file must be provided
-        assert "key_file" in extra_vars
-        assert extra_vars["key_file"]  # non-empty path
+#################################################################
+# Tests for ScmRepository.decrypt_key_file and add_gpg_key
+#################################################################
+
+
+def test_decrypt_key_file_success():
+    mock_result = mock.Mock()
+    mock_result.returncode = 0
+
+    with mock.patch(
+        "aap_eda.services.project.scm.subprocess.run",
+        return_value=mock_result,
+    ) as mock_run:
+        scm.ScmRepository.decrypt_key_file("/tmp/keyfile", "passphrase")
+
+    mock_run.assert_called_once()
+    args = mock_run.call_args[0][0]
+    assert "-P" in args
+    assert "passphrase" in args
+
+
+def test_decrypt_key_file_failure():
+    mock_result = mock.Mock()
+    mock_result.returncode = 1
+    mock_result.stderr = "bad passphrase"
+    mock_result.stdout = ""
+
+    with mock.patch(
+        "aap_eda.services.project.scm.subprocess.run",
+        return_value=mock_result,
+    ):
+        with pytest.raises(scm.ScmError) as exc_info:
+            scm.ScmRepository.decrypt_key_file("/tmp/keyfile", "wrong")
+        assert "Failed to decrypt" in str(exc_info.value)
+
+
+def test_add_gpg_key_success():
+    mock_result = mock.Mock()
+    mock_result.returncode = 0
+
+    with mock.patch(
+        "aap_eda.services.project.scm.subprocess.run",
+        return_value=mock_result,
+    ) as mock_run:
+        scm.ScmRepository.add_gpg_key("/tmp/gpgkey", "/tmp/gnupg")
+
+    mock_run.assert_called_once()
+    call_kwargs = mock_run.call_args
+    assert call_kwargs[1]["env"] == {"GNUPGHOME": "/tmp/gnupg"}
+
+
+def test_add_gpg_key_failure():
+    mock_result = mock.Mock()
+    mock_result.returncode = 2
+    mock_result.stderr = "no valid OpenPGP data"
+    mock_result.stdout = ""
+
+    with mock.patch(
+        "aap_eda.services.project.scm.subprocess.run",
+        return_value=mock_result,
+    ):
+        with pytest.raises(scm.ScmError) as exc_info:
+            scm.ScmRepository.add_gpg_key("/tmp/gpgkey", "/tmp/gnupg")
+        assert "Failed to import" in str(exc_info.value)
+
+
+#################################################################
+# Tests for GitAnsibleRunnerExecutor.__call__
+#################################################################
+
+
+def _run_executor(runner_rc, events):
+    """Helper to run GitAnsibleRunnerExecutor with mocked runner."""
+    executor = scm.GitAnsibleRunnerExecutor()
+    mock_runner = mock.Mock()
+    mock_runner.rc = runner_rc
+    mock_runner.events = events
+
+    with mock.patch(
+        "aap_eda.services.project.scm.ansible_runner.run",
+        return_value=mock_runner,
+    ):
+        return executor(
+            extra_vars={"project_path": "/mock/path"},
+            env_vars={},
+        )
+
+
+def test_executor_call_success():
+    events = [
+        _ok_event({"ansible_facts": {"scm_version": "abc123def456"}}),
+    ]
+    result = _run_executor(0, events)
+    assert result == "abc123def456"
+
+
+def test_executor_call_success_no_version():
+    events = [_ok_event({"changed": True})]
+    with pytest.raises(scm.ScmError) as exc_info:
+        _run_executor(0, events)
+    assert "Project Import Error:" in str(exc_info.value)
+
+
+def test_executor_call_auth_failure():
+    events = [_failed_event({"msg": "Authentication failed"})]
+    with pytest.raises(scm.ScmAuthenticationError):
+        _run_executor(1, events)
+
+
+def test_executor_call_username_prompt():
+    events = [_failed_event({"msg": "could not read Username"})]
+    with pytest.raises(scm.ScmAuthenticationError) as exc_info:
+        _run_executor(1, events)
+    assert "Credentials not provided" in str(exc_info.value)
+
+
+def test_executor_call_generic_error():
+    events = [_failed_event({"msg": "repository not found"})]
+    with pytest.raises(scm.ScmError) as exc_info:
+        _run_executor(1, events)
+    assert "Project Import Error:" in str(exc_info.value)
+    assert "repository not found" in str(exc_info.value)
+
+
+def test_executor_call_no_error_event():
+    events = [_ok_event({"changed": True})]
+    with pytest.raises(scm.ScmError) as exc_info:
+        _run_executor(1, events)
+    assert "Project Import Error:" in str(exc_info.value)
