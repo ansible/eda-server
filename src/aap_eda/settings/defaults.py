@@ -227,6 +227,11 @@ API_PATH_UI_PATH_MAP: dict = {"/api/controller": "/execution", "/": "/#"}
 PG_NOTIFY_DSN_SERVER: Optional[str] = None
 EVENT_STREAM_BASE_URL: UrlSlash = None
 EVENT_STREAM_MTLS_BASE_URL: UrlSlash = None
+# Require X-Trusted-Proxy header validation for external event streams
+# Default: True (secure by default - requires Gateway/Envoy Proxy)
+# Set to False for local development without proxy:
+#   export EDA_EVENT_STREAM_REQUIRE_TRUSTED_PROXY=False
+EVENT_STREAM_REQUIRE_TRUSTED_PROXY: bool = True
 MAX_PG_NOTIFY_MESSAGE_SIZE: int = 6144
 
 # Database credentials for the event streams user
