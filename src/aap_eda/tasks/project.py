@@ -45,8 +45,8 @@ def check_default_worker_health() -> bool:
     try:
         queue_name = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)
         return check_rulebook_queue_health(queue_name)
-    except Exception as e:
-        logger.error(f"Project queue health check failed: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Project queue health check failed")
         return False
 
 
@@ -95,21 +95,18 @@ def _import_project_no_lock(project_id: int):
             project.last_synced_at = timezone.now()
             project.save(update_fields=["last_synced_at"])
     except ProjectImportError as e:
-        logger.error(
+        logger.exception(
             f"Project import error for project {project_id}: {e}",
-            exc_info=True,
         )
         error_message = f"Import failed: {str(e)}"
     except DatabaseError as e:
-        logger.error(
+        logger.exception(
             f"Database error during project import {project_id}: {e}",
-            exc_info=True,
         )
         error_message = "Database error during import"
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Unexpected error during project import {project_id}: {e}",
-            exc_info=True,
         )
         error_message = f"Unexpected error during import: {str(e)}"
     finally:
@@ -169,21 +166,18 @@ def _sync_project_no_lock(project_id: int):
             project.last_synced_at = timezone.now()
             project.save(update_fields=["last_synced_at"])
     except ProjectImportError as e:
-        logger.error(
+        logger.exception(
             f"Project sync error for project {project_id}: {e}",
-            exc_info=True,
         )
         error_message = f"Sync failed: {str(e)}"
     except DatabaseError as e:
-        logger.error(
+        logger.exception(
             f"Database error during project sync {project_id}: {e}",
-            exc_info=True,
         )
         error_message = "Database error during sync"
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Unexpected error during project sync {project_id}: {e}",
-            exc_info=True,
         )
         error_message = f"Unexpected error during sync: {str(e)}"
 
@@ -205,18 +199,16 @@ def _handle_post_sync_activations(project: models.Project):
     try:
         _auto_restart_activations(project)
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Auto-restart failed for project {project.id}: {e}",
-            exc_info=True,
         )
 
     try:
         _resume_waiting_activations(project)
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Resume waiting activations failed for "
             f"project {project.id}: {e}",
-            exc_info=True,
         )
 
 
@@ -247,11 +239,10 @@ def _auto_restart_activations(project: models.Project):
                 f"'{activation.name}' no longer exists"
             )
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Failed to check activation "
                 f"'{activation.name}' for "
                 f"auto-restart: {e}",
-                exc_info=True,
             )
 
     logger.info(
@@ -333,10 +324,9 @@ def _restart_activation(activation: models.Activation) -> bool:
             request_id="",
         )
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Failed to restart activation "
             f"'{activation.name}' after sync: {e}",
-            exc_info=True,
         )
         try:
             activation.status = ActivationStatus.ERROR
@@ -345,10 +335,9 @@ def _restart_activation(activation: models.Activation) -> bool:
             )
             activation.save(update_fields=["status", "status_message"])
         except Exception as save_err:
-            logger.error(
+            logger.exception(
                 f"Failed to set error state for "
                 f"'{activation.name}': {save_err}",
-                exc_info=True,
             )
         return False
 
@@ -434,10 +423,9 @@ def _resume_waiting_activations(project: models.Project):
                     request_id="",
                 )
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Failed to resume activation "
                 f"'{activation.name}' after sync: {e}",
-                exc_info=True,
             )
             try:
                 activation.status = ActivationStatus.ERROR
@@ -453,10 +441,9 @@ def _resume_waiting_activations(project: models.Project):
                     ]
                 )
             except Exception as save_err:
-                logger.error(
+                logger.exception(
                     f"Failed to update activation status "
                     f"after resume failure: {save_err}",
-                    exc_info=True,
                 )
 
 
@@ -486,18 +473,16 @@ def _handle_sync_failure_activations(project_id: int, error_message: str):
                     f"to ERROR after sync failure"
                 )
             except Exception as e:
-                logger.error(
+                logger.exception(
                     f"Failed to update activation "
                     f"'{activation.name}' after "
                     f"sync failure: {e}",
-                    exc_info=True,
                 )
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Failed to handle sync failure "
             f"activations for project "
             f"{project_id}: {e}",
-            exc_info=True,
         )
 
 
@@ -595,9 +580,8 @@ def _recover_stuck_projects(
         except ObjectDoesNotExist:
             logger.warning(f"Project {project.id} was deleted during recovery")
         except DatabaseError as e:
-            logger.error(
+            logger.exception(
                 f"Failed to recover project {project.id}: {e}",
-                exc_info=True,
             )
 
     return recovered
@@ -660,10 +644,9 @@ def _recover_orphaned_awaiting_activations() -> int:
                     )
                 recovered += 1
             except Exception as e:
-                logger.error(
+                logger.exception(
                     f"Failed to recover orphaned "
                     f"activation '{activation.name}': {e}",
-                    exc_info=True,
                 )
 
     return recovered
@@ -679,7 +662,7 @@ def _get_project_safely(project_id: int) -> Optional[models.Project]:
     try:
         return models.Project.objects.get(pk=project_id)
     except ObjectDoesNotExist:
-        logger.error(f"Project {project_id} does not exist or was deleted")
+        logger.exception(f"Project {project_id} does not exist or was deleted")
         return None
 
 

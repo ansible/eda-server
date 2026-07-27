@@ -125,10 +125,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 await self.handle_heartbeat(HeartbeatMessage.parse_obj(data))
             else:
                 logger.warning(f"Unsupported message received: {data}")
-        except (DatabaseError, ObjectDoesNotExist) as err:
-            logger.error(f"Failed to parse {data} due to DB error: {err}")
-        except InvalidEnvKeyError as err:
-            logger.error(f"Failed to parse {data} due to Env error: {err}")
+        except (DatabaseError, ObjectDoesNotExist):
+            logger.exception(f"Failed to parse {data} due to DB error")
+        except InvalidEnvKeyError:
+            logger.exception(f"Failed to parse {data} due to Env error")
 
     async def handle_workers(self, message: WorkerMessage):
         additional_credentials = []
@@ -280,7 +280,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 id=message.activation_id
             )
         except ObjectDoesNotExist:
-            logger.error(f"RulebookProcess {message.activation_id} not found")
+            logger.exception(
+                f"RulebookProcess {message.activation_id} not found"
+            )
             raise
 
         audit_rule = self._get_or_create_audit_rule(
@@ -424,7 +426,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
             return rulebook_process_instance.get_parent()
         except ObjectDoesNotExist:
-            logger.error(f"RulebookProcess {rulebook_process_id} not found")
+            logger.exception(
+                f"RulebookProcess {rulebook_process_id} not found"
+            )
             raise
 
     @database_sync_to_async

@@ -22,7 +22,9 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from aap_eda.api.exceptions import InvalidEventStreamSource
 from aap_eda.api.serializers.activation import (
+    _update_event_stream_source,
     get_rules_count,
     is_activation_valid,
 )
@@ -1593,6 +1595,46 @@ def test_enable_sync_failure_resets_flag(
     "aap_eda.api.views.activation.check_dispatcherd_workers_health",
 )
 @mock.patch("aap_eda.api.views.activation.sync_project")
+@mock.patch("aap_eda.api.views.activation.logger")
+def test_enable_sync_failure_logs_exception(
+    mock_logger,
+    mock_sync,
+    mock_health,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Enable logs via logger.exception when sync_project throws."""
+    mock_sync.side_effect = RuntimeError("dispatcherd down")
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+        ]
+    )
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    mock_logger.exception.assert_called_once()
+    log_msg = mock_logger.exception.call_args[0][0]
+    assert "Failed to start project sync" in log_msg
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
+@mock.patch("aap_eda.api.views.activation.sync_project")
 def test_disable_clears_awaiting_project_sync(
     mock_sync,
     mock_health,
@@ -2897,3 +2939,22 @@ def test_create_activation_with_only_rule_engine_credential(
     assert activation.rule_engine_credential.id == (
         rule_engine_credential.id
     ), "Rule engine credential should be in FK field"
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.serializers.activation.logger")
+def test_update_event_stream_source_logs_exception_on_failure(
+    mock_logger,
+):
+    """_update_event_stream_source logs via logger.exception on error."""
+    validated_data = {
+        "source_mappings": "[{event_stream_id: 99999}]",
+        "rulebook_rulesets": "---",
+    }
+
+    with pytest.raises(InvalidEventStreamSource):
+        _update_event_stream_source(validated_data)
+
+    mock_logger.exception.assert_called_once()
+    log_msg = mock_logger.exception.call_args[0][0]
+    assert "Failed to update event stream source" in log_msg

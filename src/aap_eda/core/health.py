@@ -49,9 +49,8 @@ def check_activation_worker_health(
         # healthy
         return True
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Health check failed for activation workers: {e}",
-            exc_info=True,
         )
         return False
 
@@ -95,9 +94,8 @@ def check_dispatcherd_workers_health(
 
     except Exception as e:
         if not raise_exceptions:
-            logger.error(
+            logger.exception(
                 f"Health check failed for dispatcherd workers: {e}",
-                exc_info=True,
             )
             return False
         else:
@@ -108,8 +106,7 @@ def check_dispatcherd_workers_health(
             ):
                 raise
             # For other exceptions, log and raise a generic WorkerUnavailable
-            logger.error(
+            logger.exception(
                 f"Health check failed for dispatcherd workers: {e}",
-                exc_info=True,
             )
             raise api_exc.WorkerUnavailable()

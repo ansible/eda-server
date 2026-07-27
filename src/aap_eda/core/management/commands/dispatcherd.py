@@ -107,5 +107,5 @@ class Command(BaseCommand):
         except Exception as e:
             error_msg = f"Failed to start {worker_class}: {e}"
             self.stderr.write(self.style.ERROR(error_msg))
-            logger.error(error_msg, exc_info=True)
+            logger.exception(error_msg)
             raise SystemExit(1)

@@ -12,10 +12,12 @@ import pytest_asyncio
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import DatabaseError
 from django.utils import timezone
 from pydantic.error_wrappers import ValidationError
 
 from aap_eda.core import enums, models
+from aap_eda.core.exceptions import InvalidEnvKeyError
 from aap_eda.core.models.activation import ActivationStatus
 from aap_eda.services.activation.activation_manager import ActivationManager
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer, logger
@@ -1347,6 +1349,56 @@ async def test_receive_object_not_exist(
     }
     await ws_communicator.send_json_to(payload)
     await ws_communicator.wait()
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_receive_logs_db_error(
+    ws_communicator: WebsocketCommunicator,
+    eda_caplog,
+    default_organization: models.Organization,
+):
+    """Test receive logs DatabaseError via logger.exception."""
+    rulebook_process_id = await _prepare_db_data(
+        default_organization,
+    )
+    payload = {
+        "type": "Worker",
+        "activation_id": rulebook_process_id,
+    }
+    with patch(
+        "aap_eda.wsapi.consumers." "AnsibleRulebookConsumer.handle_workers",
+        side_effect=DatabaseError("test db error"),
+    ):
+        await ws_communicator.send_json_to(payload)
+        await ws_communicator.wait()
+
+    assert "due to DB error" in eda_caplog.text
+    assert "test db error" in eda_caplog.text
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_receive_logs_env_error(
+    ws_communicator: WebsocketCommunicator,
+    eda_caplog,
+    default_organization: models.Organization,
+):
+    """Test receive logs InvalidEnvKeyError via logger.exception."""
+    rulebook_process_id = await _prepare_db_data(
+        default_organization,
+    )
+    payload = {
+        "type": "Worker",
+        "activation_id": rulebook_process_id,
+    }
+    with patch(
+        "aap_eda.wsapi.consumers." "AnsibleRulebookConsumer.handle_workers",
+        side_effect=InvalidEnvKeyError("bad key"),
+    ):
+        await ws_communicator.send_json_to(payload)
+        await ws_communicator.wait()
+
+    assert "due to Env error" in eda_caplog.text
+    assert "bad key" in eda_caplog.text
 
 
 @pytest.mark.django_db(transaction=True)

@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import hmac
+import logging
 import secrets
 import uuid
 from typing import List
@@ -24,6 +25,7 @@ from rest_framework import status
 from rest_framework.renderers import JSONRenderer
 from rest_framework.test import APIClient
 
+from aap_eda.api.views.event_stream import logger as event_stream_logger
 from aap_eda.core import enums, models
 from aap_eda.core.exceptions import (
     GatewayAPIError as CoreGatewayAPIError,
@@ -1007,3 +1009,106 @@ def test_create_event_stream_sync_success(
     # Verify event stream was created
     event_stream = models.EventStream.objects.get(name="test-stream")
     assert event_stream.eda_credential == credential
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.SyncCertificates.update")
+def test_sync_certificates_gateway_error_logs_exception(
+    mock_sync_update,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    caplog_factory,
+):
+    """Verify logger.exception is called for CoreGatewayAPIError."""
+    eda_caplog = caplog_factory(event_stream_logger, logging.ERROR)
+
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+    credential = models.EdaCredential.objects.create(
+        name="mtls-credential",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+
+    mock_sync_update.side_effect = CoreGatewayAPIError(
+        "Gateway connection timeout"
+    )
+
+    data_in = {
+        "name": "test-stream-log",
+        "eda_credential_id": credential.id,
+        "organization_id": default_organization.id,
+    }
+
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/",
+        EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        admin_client.post(f"{api_url_v1}/event-streams/", data=data_in)
+
+    error_records = [
+        r for r in eda_caplog.records if r.levelno >= logging.ERROR
+    ]
+    assert any(
+        "Could not create certificates" in r.message for r in error_records
+    )
+    assert any(r.exc_info is not None for r in error_records)
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.SyncCertificates.update")
+def test_sync_certificates_missing_credentials_logs_exception(
+    mock_sync_update,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    caplog_factory,
+):
+    """Verify logger.exception is called for CoreMissingCredentials."""
+    eda_caplog = caplog_factory(event_stream_logger, logging.ERROR)
+
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+    credential = models.EdaCredential.objects.create(
+        name="mtls-credential",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+
+    mock_sync_update.side_effect = CoreMissingCredentials(
+        "Required credentials not found"
+    )
+
+    data_in = {
+        "name": "test-stream-log",
+        "eda_credential_id": credential.id,
+        "organization_id": default_organization.id,
+    }
+
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/",
+        EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        admin_client.post(f"{api_url_v1}/event-streams/", data=data_in)
+
+    error_records = [
+        r for r in eda_caplog.records if r.levelno >= logging.ERROR
+    ]
+    assert any(
+        "Missing credentials for certificate create" in r.message
+        for r in error_records
+    )
+    assert any(r.exc_info is not None for r in error_records)

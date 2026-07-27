@@ -241,8 +241,8 @@ def test_queue_cancel_job_connection_error():
             queue_cancel_job(queue_name, job_id)
 
             # Verify error logging was called (lines 50-53)
-            mock_logger.error.assert_called_once()
-            call_args = mock_logger.error.call_args
+            mock_logger.exception.assert_called_once()
+            call_args = mock_logger.exception.call_args
 
             # Verify error message format
             error_msg = call_args[0][0]
@@ -251,8 +251,6 @@ def test_queue_cancel_job_connection_error():
                 in error_msg
             )
             assert "Failed to connect to dispatcherd" in error_msg
-            # Verify exc_info=True was passed
-            assert call_args[1]["exc_info"] is True
 
 
 @pytest.mark.django_db
@@ -275,8 +273,8 @@ def test_queue_cancel_job_control_interface_error():
             queue_cancel_job(queue_name, job_id)
 
             # Verify error logging was called (lines 50-53)
-            mock_logger.error.assert_called_once()
-            call_args = mock_logger.error.call_args
+            mock_logger.exception.assert_called_once()
+            call_args = mock_logger.exception.call_args
 
             # Verify error message format
             error_msg = call_args[0][0]
@@ -285,8 +283,6 @@ def test_queue_cancel_job_control_interface_error():
                 in error_msg
             )
             assert "Control timeout" in error_msg
-            # Verify exc_info=True was passed
-            assert call_args[1]["exc_info"] is True
 
 
 @pytest.mark.django_db
@@ -309,8 +305,8 @@ def test_queue_cancel_job_general_exception():
             queue_cancel_job(queue_name, job_id)
 
             # Verify error logging was called (lines 50-53)
-            mock_logger.error.assert_called_once()
-            call_args = mock_logger.error.call_args
+            mock_logger.exception.assert_called_once()
+            call_args = mock_logger.exception.call_args
 
             # Verify error message format
             error_msg = call_args[0][0]
@@ -319,5 +315,3 @@ def test_queue_cancel_job_general_exception():
                 in error_msg
             )
             assert "Invalid format" in error_msg
-            # Verify exc_info=True was passed
-            assert call_args[1]["exc_info"] is True

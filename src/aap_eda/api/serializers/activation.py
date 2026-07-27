@@ -107,7 +107,7 @@ def _update_event_stream_source(validated_data: dict) -> str:
         )
         # TODO: Can we catch a better exception
     except Exception as e:
-        logger.error(
+        logger.exception(
             "Failed to update event stream source in rulesets: %s", str(e)
         )
         raise InvalidEventStreamSource(e) from e
@@ -1619,7 +1619,7 @@ def _validate_sources_with_event_streams(data: dict) -> None:
     try:
         source_mappings = yaml.safe_load(source_mappings)
     except yaml.MarkedYAMLError as ex:
-        logger.error("Invalid source mappings: %s", str(ex))
+        logger.exception("Invalid source mappings")
         raise serializers.ValidationError(
             {
                 SOURCE_MAPPING_ERROR_KEY: [

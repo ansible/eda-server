@@ -15,15 +15,19 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+from django.core.exceptions import ValidationError
 
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import (
     PROTECTED_PASSPHRASE_ERROR,
     SUPPORTED_KEYS_IN_INJECTORS,
+    _get_aes_key,
+    _match_regex_pattern_against_attrs,
     add_default_values_to_user_inputs,
     validate_injectors,
     validate_inputs,
     validate_schema,
+    validate_x509_subject_match,
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -713,3 +717,51 @@ def test_add_default_values_to_user_inputs():
         "",
         False,
     ]
+
+
+@mock.patch("aap_eda.core.utils.credentials.LOGGER")
+def test_validate_x509_subject_match_invalid_dn_logs_exception(
+    mock_logger,
+):
+    """Test that invalid actual DN logs via LOGGER.exception (S8572)."""
+    result = validate_x509_subject_match("CN=test", "===invalid dn===")
+
+    assert result is False
+    mock_logger.exception.assert_called_once()
+    assert "Invalid actual DN format" in (
+        mock_logger.exception.call_args[0][0]
+    )
+
+
+@mock.patch("aap_eda.core.utils.credentials.LOGGER")
+def test_match_regex_pattern_invalid_regex_logs_exception(
+    mock_logger,
+):
+    """Test that invalid regex logs via LOGGER.exception (S8572)."""
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+
+    name = x509.Name.from_rfc4514_string("CN=test.example.com")
+    actual_attrs = name.get_attributes_for_oid(NameOID.COMMON_NAME)
+
+    result = _match_regex_pattern_against_attrs("[invalid", actual_attrs)
+
+    assert result is False
+    mock_logger.exception.assert_called_once()
+    assert "Invalid regex pattern" in (mock_logger.exception.call_args[0][0])
+
+
+@mock.patch("aap_eda.core.utils.credentials.LOGGER")
+def test_get_aes_key_failure_logs_exception(mock_logger):
+    """Test that AES key derivation failure logs (S8572)."""
+    with mock.patch(
+        "aap_eda.core.utils.credentials.hashlib.pbkdf2_hmac"
+    ) as mock_pbkdf2:
+        mock_pbkdf2.side_effect = ValueError("hash error")
+        with pytest.raises(ValidationError):
+            _get_aes_key("password", "salt")
+
+    mock_logger.exception.assert_called_once()
+    assert "Failed to derive AES key" in (
+        mock_logger.exception.call_args[0][0]
+    )

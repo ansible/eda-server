@@ -91,12 +91,12 @@ def collect_controllers_info() -> dict:
                 controller_info["install_uuid"] = resp.json()["install_uuid"]
                 info[host] = controller_info
 
-        except KeyError as e:
-            logger.error(f"Missing key in credential inputs: {e}")
+        except KeyError:
+            logger.exception("Missing key in credential inputs")
             continue
-        except yaml.YAMLError as e:
-            logger.error(
-                f"YAML parsing error for credential {credential.id}: {e}"
+        except yaml.YAMLError:
+            logger.exception(
+                "YAML parsing error for credential" f" {credential.id}"
             )
             continue
         except requests.exceptions.RequestException as e:
@@ -104,9 +104,9 @@ def collect_controllers_info() -> dict:
                 f"Controller connection failed for {credential.name}: {e}"
             )
             continue
-        except Exception as e:
+        except Exception:
             logger.exception(
-                f"Unexpected error processing credential {credential.id}: {e}"
+                "Unexpected error processing credential" f" {credential.id}"
             )
             continue
 
@@ -205,13 +205,13 @@ def generate_token() -> ServiceToken:
         )
         resp.raise_for_status()
     except requests.exceptions.SSLError:
-        logger.error("SSL certificate verification failed")
+        logger.exception("SSL certificate verification failed")
         raise
     except requests.exceptions.Timeout:
-        logger.error("Token request timed out")
+        logger.exception("Token request timed out")
         raise
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Token request failed: {str(e)}")
+    except requests.exceptions.RequestException:
+        logger.exception("Token request failed")
         raise
 
     data = resp.json()
@@ -304,7 +304,7 @@ def get_analytics_interval() -> int:
     try:
         return int(interval)
     except ValueError as e:
-        logger.error(
+        logger.exception(
             f"Invalid analytics interval value '{interval}'. "
             f"Using default interval. Error: {str(e)}"
         )

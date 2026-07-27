@@ -2812,3 +2812,52 @@ def test_list_eda_credentials_filter_kind_and_namespace_not_in(
     assert (
         response.data["results"][0]["credential_type"]["namespace"] != "drools"
     )
+
+
+@pytest.mark.django_db
+def test_eda_credential_test_logs_exception_on_plugin_failure(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Verify logger.exception is called when run_plugin raises."""
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.HASHICORP_LOOKUP
+    )
+
+    data_in = {
+        "name": "eda-credential-log-test",
+        "inputs": {
+            "url": "https://www.example.com",
+            "api_version": "v2",
+            "token": secrets.token_hex(32),
+        },
+        "credential_type_id": credential_type.id,
+        "organization_id": default_organization.id,
+    }
+
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    obj = response.json()
+
+    with patch(
+        "aap_eda.api.views.eda_credential.run_plugin",
+        side_effect=Exception("kaboom"),
+    ), patch(
+        "aap_eda.api.views.eda_credential.logger",
+    ) as mock_logger:
+        response = admin_client.post(
+            f"{api_url_v1}/eda-credentials/{obj['id']}/test/",
+            data={
+                "metadata": {
+                    "secret_path": "secret/foo",
+                    "secret_key": "bar",
+                },
+            },
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    mock_logger.exception.assert_called_once()
+    assert "call failed" in mock_logger.exception.call_args[0][0]

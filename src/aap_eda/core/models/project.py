@@ -174,7 +174,7 @@ class Project(BaseOrgModel, UniqueNamedModel, PrimordialModel):
 
         except (AttributeError, TypeError, ValueError) as e:
             # Log error but return safe default to prevent activation failures
-            logger.error(
+            logger.exception(
                 f"Error determining sync status for project {self.pk}: {e}"
             )
             # Safe default: assume sync needed to prevent stale content

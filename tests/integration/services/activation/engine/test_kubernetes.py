@@ -1242,3 +1242,59 @@ def test_process_pod_start_event_unrecognized(kubernetes_engine):
     )
     event = {"object": pod}
     assert engine._process_pod_start_event(event) is False
+
+
+@mock.patch(
+    "aap_eda.services.activation.engine.kubernetes.LOGGER",
+)
+@pytest.mark.django_db
+def test_set_namespace_logs_exception_on_missing_file(
+    mock_logger,
+    init_kubernetes_data,
+):
+    """_set_namespace calls LOGGER.exception when file is missing."""
+    aid = str(init_kubernetes_data.activation.id)
+    client = mock.Mock()
+    with pytest.raises(ContainerEngineInitError):
+        Engine(
+            activation_id=aid,
+            resource_prefix=ProcessParentType.ACTIVATION,
+            client=client,
+        )
+
+    mock_logger.exception.assert_called_once()
+    call_msg = mock_logger.exception.call_args[0][0]
+    assert "does not exist" in call_msg
+
+
+@mock.patch(
+    "aap_eda.services.activation.engine.kubernetes.LOGGER",
+)
+@pytest.mark.django_db
+def test_start_logs_exception_on_container_engine_error(
+    mock_logger,
+    init_kubernetes_data,
+    kubernetes_engine,
+    default_organization,
+):
+    """start() calls LOGGER.exception on ContainerEngineError."""
+    engine = kubernetes_engine
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=(init_kubernetes_data.activation.k8s_service_name),
+    )
+    log_handler = mock.MagicMock(spec=LogHandler)
+
+    with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
+        batch_api_mock.create_namespaced_job.side_effect = ApiException(
+            "Job create error"
+        )
+        with mock.patch.object(engine, "cleanup"):
+            with pytest.raises(ContainerEngineError):
+                engine.start(request, log_handler)
+
+    mock_logger.exception.assert_called_once()
+    call_msg = mock_logger.exception.call_args[0][0]
+    assert "Failed to start job" in call_msg

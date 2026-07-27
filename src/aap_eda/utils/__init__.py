@@ -28,7 +28,7 @@ def get_package_version(package_name: str) -> str:
     try:
         return importlib.metadata.version(package_name)
     except importlib.metadata.PackageNotFoundError:
-        logger.error(
+        logger.exception(
             "The package '%s' is not installed; returning 'unknown' "
             "version for it",
             package_name,

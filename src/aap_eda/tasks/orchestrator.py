@@ -258,7 +258,7 @@ def queue_dispatch(
                 "There may be an issue with the system; please contact "
                 "the administrator."
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
             status_manager.set_status(
                 ActivationStatus.PENDING,
                 msg,
@@ -343,7 +343,7 @@ def _resolve_existing_queue(
                 "There may be an issue with the system; "
                 "please contact the administrator."
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
             status_manager.set_status(
                 ActivationStatus.PENDING,
                 msg,
@@ -432,7 +432,7 @@ def _handle_unhealthy_queue(
             "with the system; please contact the "
             "administrator."
         )
-        LOGGER.error(msg)
+        LOGGER.exception(msg)
         status_manager.set_status(
             ActivationStatus.PENDING,
             msg,
@@ -512,10 +512,8 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
                 f"Worker queue [{queue_name}] was found to not be healthy"
             )
         return bool(alive)
-    except Exception as e:
-        LOGGER.error(
-            f"Health check failed for queue {queue_name}: {e}", exc_info=True
-        )
+    except Exception:
+        LOGGER.exception(f"Health check failed for queue {queue_name}")
         return False
 
 

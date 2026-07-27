@@ -246,7 +246,7 @@ class CredentialTypeViewSet(
                 serializer.validated_data["metadata"],
             )
         except Exception as err:
-            logger.error("Plugin call failed %s", err)
+            logger.exception("Plugin call failed %s", err)
             return Response(status=status.HTTP_400_BAD_REQUEST, data={})
 
         return Response(status=status.HTTP_202_ACCEPTED, data={})

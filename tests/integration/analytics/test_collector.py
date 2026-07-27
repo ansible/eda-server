@@ -174,9 +174,8 @@ def test_load_entries_with_invalid_json_logs_error(collector, mock_settings):
     ):
         result = collector._load_last_gathered_entries()
         assert result == {}
-        collector.logger.error.assert_called_once_with(
-            "Failed to load last entries: Expecting value: "
-            "line 1 column 1 (char 0)"
+        collector.logger.exception.assert_called_once_with(
+            "Failed to load last entries"
         )
 
 

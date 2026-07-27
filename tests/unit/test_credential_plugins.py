@@ -64,3 +64,21 @@ def test_run_plugin_exception():
             str(exc_info.value)
             == "Error executing credential plugin aim: Kaboom"
         )
+
+
+@mock.patch(
+    "aap_eda.core.utils.credential_plugins.LOGGER",
+)
+def test_run_plugin_exception_logs_via_logger_exception(
+    mock_logger,
+):
+    """Test that plugin failure logs via LOGGER.exception (S8572)."""
+    with mock.patch.object(CredentialPlugin, "backend") as mock_backend:
+        mock_backend.side_effect = Exception("connection refused")
+        with pytest.raises(CredentialPluginError):
+            run_plugin("aim", {}, {})
+
+    mock_logger.exception.assert_called_once()
+    assert "Error executing credential plugin aim" in (
+        mock_logger.exception.call_args[0][0]
+    )

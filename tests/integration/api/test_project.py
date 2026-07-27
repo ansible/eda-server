@@ -1445,6 +1445,32 @@ def test_project_needs_update_on_launch_property(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.core.models.project.logger")
+def test_project_needs_update_on_launch_logs_exception(
+    mock_logger,
+    default_organization: models.Organization,
+):
+    """Test that needs_update_on_launch logs via logger.exception on error."""
+    project = models.Project.objects.create(
+        name="test-project-exception-log",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+        git_hash="abc123",
+        update_revision_on_launch=True,
+        scm_update_cache_timeout=300,
+    )
+
+    project.last_synced_at = "not-a-datetime"
+    result = project.needs_update_on_launch
+
+    assert result is True
+    mock_logger.exception.assert_called_once()
+    assert "Error determining sync status" in (
+        mock_logger.exception.call_args[0][0]
+    )
+
+
+@pytest.mark.django_db
 @mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_retrieve_includes_sync_fields(
     mock_health_check, default_project: models.Project, admin_client: APIClient

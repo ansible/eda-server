@@ -65,11 +65,10 @@ def test_check_project_queue_health_exception_handling(
 
     assert result is False
     mock_health_check.assert_called_once_with("default")
-    mock_logger.error.assert_called_once()
+    mock_logger.exception.assert_called_once()
     # Verify the error message contains expected content
-    call_args = mock_logger.error.call_args
+    call_args = mock_logger.exception.call_args
     assert "Project queue health check failed" in call_args[0][0]
-    assert call_args[1]["exc_info"] is True
 
 
 @pytest.mark.django_db

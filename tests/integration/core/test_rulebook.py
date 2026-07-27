@@ -11,9 +11,12 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from unittest import mock
+
 import pytest
 import yaml
 
+from aap_eda.core.exceptions import ParseError
 from aap_eda.core.utils.rulebook import (
     DEFAULT_SOURCE_NAME_PREFIX,
     build_source_list,
@@ -337,3 +340,17 @@ def test_swap_event_stream_sources(
         input_rulesets, event_stream_source, source_mappings
     )
     assert yaml.safe_load(result) == yaml.safe_load(output_rulesets)
+
+
+@mock.patch("aap_eda.core.utils.rulebook.LOGGER")
+def test_build_source_list_invalid_yaml_logs_exception(
+    mock_logger,
+):
+    """Test that invalid YAML rulesets logs via LOGGER.exception (S8572)."""
+    invalid_yaml = "---\n- name: test\n  sources:\n    - {bad yaml: ["
+
+    with pytest.raises(ParseError):
+        build_source_list(invalid_yaml)
+
+    mock_logger.exception.assert_called_once()
+    assert "Invalid rulesets" in (mock_logger.exception.call_args[0][0])

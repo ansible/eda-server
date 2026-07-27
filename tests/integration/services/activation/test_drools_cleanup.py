@@ -317,9 +317,9 @@ class TestDeleteRowsByHaUuid:
         assert result == {}
 
         # Verify error was logged
-        mock_logger.error.assert_called_once()
+        mock_logger.exception.assert_called_once()
         assert "Error during Drools cleanup" in str(
-            mock_logger.error.call_args
+            mock_logger.exception.call_args
         )
 
     @patch("aap_eda.services.activation.drools_cleanup.psycopg.connect")

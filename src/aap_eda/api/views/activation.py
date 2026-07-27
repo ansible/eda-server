@@ -712,10 +712,9 @@ class ActivationViewSet(
             try:
                 sync_project(activation.project.id)
             except Exception as e:
-                logger.error(
+                logger.exception(
                     f"Failed to start project sync for "
                     f"'{activation.name}': {e}",
-                    exc_info=True,
                 )
                 activation.awaiting_project_sync = False
                 activation.status = ActivationStatus.ERROR

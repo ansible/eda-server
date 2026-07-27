@@ -58,7 +58,7 @@ def run_plugin(plugin_type: str, inputs: dict, metadata: dict) -> dict:
             msg = (
                 f"Error executing credential plugin {plugin_type}: {str(err)}"
             )
-            LOGGER.error(msg)
+            LOGGER.exception(msg)
             raise CredentialPluginError(msg) from err
 
     raise UnknownPluginTypeError(
