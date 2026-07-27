@@ -11,7 +11,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
 import types
+import uuid
 from typing import Optional, Union, get_args, get_origin, get_type_hints
 
 from django.core.exceptions import ImproperlyConfigured
@@ -21,6 +23,28 @@ from aap_eda import utils
 from aap_eda.core.enums import RulebookProcessLogLevel
 
 from . import defaults
+
+logger = logging.getLogger(__name__)
+
+MAX_PG_IDENTIFIER_LENGTH = 63
+
+
+def _normalize_queue_name(name: str) -> str:
+    """Normalize a queue name to fit PostgreSQL's 63-byte identifier limit.
+
+    Short names are returned unchanged. Names exceeding the limit are
+    replaced with a deterministic UUID5-based name and a warning is logged.
+    """
+    if len(name) <= MAX_PG_IDENTIFIER_LENGTH:
+        return name
+    normalized = f"eda-{uuid.uuid5(uuid.NAMESPACE_OID, name)}"
+    logger.warning(
+        "Queue name '%s' exceeds %d characters; changed into '%s'.",
+        name,
+        MAX_PG_IDENTIFIER_LENGTH,
+        normalized,
+    )
+    return normalized
 
 
 def _get_secret_key(settings: Dynaconf) -> str:
@@ -532,6 +556,27 @@ def post_loading(loaded_settings: Dynaconf):
             },
         },
     }
+
+    if (
+        settings.RULEBOOK_WORKER_QUEUES
+        and settings.RULEBOOK_QUEUE_NAME not in settings.RULEBOOK_WORKER_QUEUES
+    ):
+        raise ImproperlyConfigured(
+            f"RULEBOOK_QUEUE_NAME '{settings.RULEBOOK_QUEUE_NAME}' "
+            f"is not in RULEBOOK_WORKER_QUEUES: "
+            f"{settings.RULEBOOK_WORKER_QUEUES}. "
+            f"The worker's queue name must be listed in the "
+            f"worker queues configuration."
+        )
+
+    if settings.get("DISPATCHERD_DEFAULT_WORKER_SETTINGS"):
+        settings.RULEBOOK_QUEUE_NAME = _normalize_queue_name(
+            settings.RULEBOOK_QUEUE_NAME,
+        )
+        settings.RULEBOOK_WORKER_QUEUES = [
+            _normalize_queue_name(name)
+            for name in settings.RULEBOOK_WORKER_QUEUES
+        ]
 
     data = {
         key: settings[key]
