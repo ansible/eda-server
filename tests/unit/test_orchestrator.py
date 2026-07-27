@@ -419,9 +419,9 @@ def test_manage_monitor_called_with_no_requests(
             "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
             return_value="activation",
         ),
-        mock.patch.dict(
-            "os.environ",
-            {"EDA_RULEBOOK_QUEUE_NAME": "activation"},
+        mock.patch(
+            "aap_eda.tasks.orchestrator.settings.RULEBOOK_QUEUE_NAME",
+            "activation",
         ),
     ):
         mock_manager.return_value = manager_mock
@@ -641,9 +641,9 @@ def test_manage_monitor_skipped_on_wrong_queue(
             "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
             return_value="eda-other-node-queue",
         ),
-        mock.patch.dict(
-            "os.environ",
-            {"EDA_RULEBOOK_QUEUE_NAME": "eda-local-node-queue"},
+        mock.patch(
+            "aap_eda.tasks.orchestrator.settings.RULEBOOK_QUEUE_NAME",
+            "eda-local-node-queue",
         ),
     ):
         mock_manager.return_value = manager_mock
@@ -671,9 +671,9 @@ def test_manage_monitor_runs_on_matching_queue(
             "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
             return_value="eda-local-node-queue",
         ),
-        mock.patch.dict(
-            "os.environ",
-            {"EDA_RULEBOOK_QUEUE_NAME": "eda-local-node-queue"},
+        mock.patch(
+            "aap_eda.tasks.orchestrator.settings.RULEBOOK_QUEUE_NAME",
+            "eda-local-node-queue",
         ),
     ):
         mock_manager.return_value = manager_mock
@@ -701,9 +701,9 @@ def test_manage_monitor_runs_when_no_queue_assigned(
             "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
             side_effect=ValueError("No queue"),
         ),
-        mock.patch.dict(
-            "os.environ",
-            {"EDA_RULEBOOK_QUEUE_NAME": "eda-local-node-queue"},
+        mock.patch(
+            "aap_eda.tasks.orchestrator.settings.RULEBOOK_QUEUE_NAME",
+            "eda-local-node-queue",
         ),
     ):
         mock_manager.return_value = manager_mock
@@ -731,9 +731,9 @@ def test_manage_monitor_runs_when_queue_returns_none(
             "aap_eda.tasks.orchestrator" ".get_queue_name_by_parent_id",
             return_value=None,
         ),
-        mock.patch.dict(
-            "os.environ",
-            {"EDA_RULEBOOK_QUEUE_NAME": "eda-local-node-queue"},
+        mock.patch(
+            "aap_eda.tasks.orchestrator.settings.RULEBOOK_QUEUE_NAME",
+            "eda-local-node-queue",
         ),
     ):
         mock_manager.return_value = manager_mock

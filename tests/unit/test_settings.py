@@ -105,6 +105,16 @@ def test_duplicated_worker_queue(mock_settings):
         post_loading(mock_settings)
 
 
+def test_rulebook_queue_name_exists_in_worker_queues(mock_settings):
+    mock_settings.RULEBOOK_WORKER_QUEUES = [
+        "activation-node1",
+        "activation-node2",
+    ]
+    mock_settings.RULEBOOK_QUEUE_NAME = "some-other-name"
+    with pytest.raises(ImproperlyConfigured):
+        post_loading(mock_settings)
+
+
 @pytest.mark.parametrize(
     ("name", "value", "expected"),
     [
@@ -123,7 +133,7 @@ def test_duplicated_worker_queue(mock_settings):
         ("SESSION_COOKIE_AGE", "20", 20),
         ("SESSION_COOKIE_AGE", 20, 20),
         ("SESSION_COOKIE_AGE", "not number", ImproperlyConfigured),
-        ("RULEBOOK_QUEUE_NAME", " act ", "act"),
+        ("RULEBOOK_QUEUE_NAME", " activation ", "activation"),
         ("RULEBOOK_QUEUE_NAME", ["name"], ImproperlyConfigured),
         ("RULEBOOK_QUEUE_NAME", 20, ImproperlyConfigured),
         ("ALLOWED_HOSTS", "h1,h2", ["h1", "h2"]),
