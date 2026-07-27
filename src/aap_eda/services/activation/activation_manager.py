@@ -264,7 +264,7 @@ class ActivationManager(StatusManager):
 
         self.update_logs()
 
-    def _cleanup(self):
+    def _cleanup(self, raise_on_error=False):
         """Cleanup the latest instance of the activation."""
         LOGGER.info(
             "Cleanup operation requested for activation id: "
@@ -299,6 +299,8 @@ class ActivationManager(StatusManager):
             )
             LOGGER.error(msg)
             log_handler.write(msg, flush=True)
+            if raise_on_error:
+                raise
             return
 
     def _is_in_status(self, status: ActivationStatus) -> bool:
@@ -371,50 +373,60 @@ class ActivationManager(StatusManager):
         return False
 
     def _unresponsive_policy(self, check_type: str):
-        """Apply the unresponsive restart policy."""
         LOGGER.info(
             "Unresponsive policy called for "
             f"activation id: {self.db_instance.id}",
         )
+        try:
+            self._handle_unresponsive_activation(check_type=check_type)
+        except engine_exceptions.ContainerCleanupError:
+            LOGGER.exception(
+                "Cleanup failed while handling unresponsive activation "
+                f"{self.db_instance.id}. Skipping restart."
+            )
+            return
+
         container_logger = self.container_logger_class(self.latest_instance.id)
+
         if self.db_instance.restart_policy == RestartPolicy.NEVER:
             LOGGER.info(
                 f"Activation id: {self.db_instance.id} "
-                f"Restart policy is set to {self.db_instance.restart_policy}."
-                "No restart policy is applied."
-            )
-            user_msg = (
-                "Activation is unresponsive. "
-                f"{check_type} check for ansible-rulebook timed out. "
+                f"Restart policy is set to {self.db_instance.restart_policy}. "
                 "Restart policy is not applicable."
             )
-            container_logger.write(user_msg, flush=True)
-            self._fail_instance(user_msg)
-            self.set_status(
-                ActivationStatus.FAILED,
-                user_msg,
+            container_logger.write(
+                "Restart policy is not applicable.", flush=True
             )
-
         else:
             LOGGER.info(
                 f"Activation id: {self.db_instance.id} "
-                f"Restart policy is set to {self.db_instance.restart_policy}."
-                "Restart policy is applied.",
+                f"Restart policy is set to {self.db_instance.restart_policy}. "
+                "Restart policy is applied."
             )
-            user_msg = (
-                "Activation is unresponsive. "
-                f"{check_type} check for ansible-rulebook timed out. "
-                "Activation is going to be restarted."
-            )
-            container_logger.write(user_msg, flush=True)
-            self._fail_instance(msg=user_msg)
-            self.set_status(
-                ActivationStatus.FAILED,
-                user_msg,
+            container_logger.write(
+                "Activation is going to be restarted.", flush=True
             )
             system_restart_activation(
                 self.db_instance_type, self.db_instance.id, delay_seconds=1
             )
+
+    def _handle_unresponsive_activation(self, check_type: str):
+        """Clean up and fail an unresponsive activation.
+
+        Attempts cleanup of the container, then marks the activation
+        as FAILED regardless of cleanup outcome. If cleanup raises
+        ContainerCleanupError, the exception propagates to the caller
+        after the activation is marked FAILED.
+        """
+        try:
+            self._cleanup(raise_on_error=True)
+        finally:
+            user_msg = (
+                "Activation is unresponsive. "
+                f"{check_type} check for ansible-rulebook timed out."
+            )
+            self._fail_instance(msg=user_msg, cleanup_already_done=True)
+            self.set_status(ActivationStatus.FAILED, user_msg)
 
     def _missing_container_policy(self):
         LOGGER.info(
@@ -628,12 +640,15 @@ class ActivationManager(StatusManager):
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
             )
 
-    def _fail_instance(self, msg: tp.Optional[str] = None):
+    def _fail_instance(
+        self, msg: tp.Optional[str] = None, cleanup_already_done=False
+    ):
         """Fail the latest activation instance."""
         kwargs = {}
         if msg:
             kwargs["status_message"] = msg
-        self._cleanup()
+        if not cleanup_already_done:
+            self._cleanup()
         self.set_latest_instance_status(ActivationStatus.FAILED, **kwargs)
         self._set_activation_pod_id(pod_id=None)
         self._increase_failure_count()

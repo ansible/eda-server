@@ -50,7 +50,9 @@ KEEP_JOBS_FOR_SECONDS = 300
 
 K8S_API_RETRIES = 3
 K8S_API_RETRY_BACKOFF = 1.0
-K8S_API_TRANSIENT_STATUS_CODES = {401, 403, 500, 502, 503, 504}
+# 410 (AKA Gone) is included for watch streams where a stale resourceVersion
+# triggers this status; rare outside watch contexts.
+K8S_API_TRANSIENT_STATUS_CODES = {401, 403, 410, 500, 502, 503, 504}
 
 INVALID_IMAGE_NAME = "InvalidImageName"
 IMAGE_PULL_BACK_OFF = "ImagePullBackOff"
@@ -566,9 +568,22 @@ class Engine(ContainerEngine):
         activation_job_name = activation_job.items[0].metadata.name
         self._delete_job_resource(activation_job_name, log_handler)
 
+    def _get_resource_version(self) -> str:
+        """Return the current resourceVersion for this job's pods."""
+        pod_list = self._call_k8s_api(
+            self.client.core_api.list_namespaced_pod,
+            namespace=self.namespace,
+            label_selector=f"job-name={self.job_name}",
+            error_cls=ContainerCleanupError,
+            description=f"List pods for {self.job_name}",
+        )
+        return pod_list.metadata.resource_version
+
     def _delete_job_resource(
         self, job_name: str, log_handler: LogHandler
     ) -> None:
+        resource_version = self._get_resource_version()
+
         result = self._call_k8s_api(
             self.client.batch_api.delete_namespaced_job,
             name=job_name,
@@ -581,52 +596,98 @@ class Engine(ContainerEngine):
         if result.status == "Failure":
             raise ContainerCleanupError(f"{result}")
 
-        self._watch_pod_deletion(log_handler)
+        self._watch_pod_deletion(
+            log_handler, resource_version=resource_version
+        )
 
-    def _watch_pod_deletion(self, log_handler: LogHandler) -> None:
+    def _watch_for_deleted_event(
+        self,
+        watcher: watch.Watch,
+        resource_version: str,
+        log_handler: LogHandler,
+    ) -> bool:
+        """Watch the event stream for a DELETED event.
+
+        Returns True if the pod was deleted, False if the stream
+        ended without a DELETED event (timeout).
+        """
+        for event in watcher.stream(
+            self.client.core_api.list_namespaced_pod,
+            namespace=self.namespace,
+            label_selector=f"job-name={self.job_name}",
+            timeout_seconds=POD_DELETE_TIMEOUT,
+            resource_version=resource_version,
+        ):
+            if event["type"] == "DELETED":
+                log_handler.write(
+                    f"Pod '{self.job_name}' is deleted.",
+                    flush=True,
+                )
+                log_handler.write(
+                    f"Job {self.job_name} is cleaned up.",
+                    flush=True,
+                )
+                return True
+        return False
+
+    def _handle_watch_pod_deletion_exception(
+        self, exc: ApiException, attempt: int, log_handler: LogHandler
+    ) -> bool:
+        """Handle API exceptions during pod deletion watch.
+
+        Returns True if the pod is confirmed deleted (404),
+        False if the error is transient and should be retried.
+        Raises ContainerCleanupError for non-transient errors.
+        """
+        if exc.status == status.HTTP_404_NOT_FOUND:
+            msg = (
+                f"Pod '{self.job_name}' not found (404), "
+                "assuming it's already deleted."
+            )
+            log_handler.write(msg, flush=True)
+            return True
+        if exc.status not in K8S_API_TRANSIENT_STATUS_CODES:
+            log_handler.write(
+                f"Error while waiting for deletion: {exc}",
+                flush=True,
+            )
+            raise ContainerCleanupError(
+                f"Error during cleanup: {exc!s}"
+            ) from exc
+        self._log_and_backoff(
+            exc, attempt, f"watch pod deletion {self.job_name}"
+        )
+        return False
+
+    def _watch_pod_deletion(
+        self, log_handler: LogHandler, resource_version: str
+    ) -> None:
         """Watch for pod deletion with retry on transient errors."""
         desc = f"watch pod deletion {self.job_name}"
         last_exc = None
         for attempt in range(1, K8S_API_RETRIES + 1):
             watcher = watch.Watch()
+            if attempt > 1:
+                resource_version = self._get_resource_version()
             try:
-                for event in watcher.stream(
-                    self.client.core_api.list_namespaced_pod,
-                    namespace=self.namespace,
-                    label_selector=f"job-name={self.job_name}",
-                    timeout_seconds=POD_DELETE_TIMEOUT,
+                if self._watch_for_deleted_event(
+                    watcher, resource_version, log_handler
                 ):
-                    if event["type"] == "DELETED":
-                        log_handler.write(
-                            f"Pod '{self.job_name}' is deleted.",
-                            flush=True,
-                        )
-                        break
-                log_handler.write(
-                    f"Job {self.job_name} is cleaned up.",
-                    flush=True,
-                )
-                return
+                    return
             except ApiException as exc:
                 last_exc = exc
-                if exc.status == status.HTTP_404_NOT_FOUND:
-                    msg = (
-                        f"Pod '{self.job_name}' not found (404), "
-                        "assuming it's already deleted."
-                    )
-                    log_handler.write(msg, flush=True)
+                if self._handle_watch_pod_deletion_exception(
+                    exc, attempt, log_handler
+                ):
                     return
-                if exc.status not in K8S_API_TRANSIENT_STATUS_CODES:
-                    log_handler.write(
-                        f"Error while waiting for deletion: {exc}",
-                        flush=True,
-                    )
-                    raise ContainerCleanupError(
-                        f"Error during cleanup: {str(exc)}"
-                    ) from exc
-                self._log_and_backoff(exc, attempt, desc)
             finally:
                 watcher.stop()
+
+        if last_exc is None:
+            raise ContainerCleanupError(
+                f"Timed out waiting for pod deletion of {self.job_name} "
+                f"after {K8S_API_RETRIES} attempts"
+            )
         raise ContainerCleanupError(
             f"{desc} failed after {K8S_API_RETRIES} retries: {last_exc}"
         ) from last_exc

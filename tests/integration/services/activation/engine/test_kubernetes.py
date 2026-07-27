@@ -714,7 +714,11 @@ def test_delete_job(mock_watch, init_kubernetes_data, kubernetes_engine):
 
     with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
         batch_api_mock.list_namespaced_job.return_value.items = [job_mock]
-        engine._delete_job(log_handler)
+        mock_watch.return_value.stream.return_value = [{"type": "DELETED"}]
+        with mock.patch.object(
+            engine, "_get_resource_version", return_value="1"
+        ):
+            engine._delete_job(log_handler)
 
         batch_api_mock.delete_namespaced_job.assert_called_once()
 
@@ -730,7 +734,10 @@ def test_delete_job(mock_watch, init_kubernetes_data, kubernetes_engine):
     with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
         batch_api_mock.list_namespaced_job.return_value.items = [job_mock]
         mock_watch.return_value.stream.return_value = [event]
-        engine._delete_job(log_handler)
+        with mock.patch.object(
+            engine, "_get_resource_version", return_value="1"
+        ):
+            engine._delete_job(log_handler)
 
         log_messages = [
             record.log for record in models.RulebookProcessLog.objects.all()
@@ -1153,8 +1160,11 @@ def test_watch_pod_deletion_retries_on_transient(
 
     mock_watch.return_value.stream.side_effect = ApiException(status=503)
 
-    with pytest.raises(ContainerCleanupError, match="retries"):
-        engine._watch_pod_deletion(log_handler)
+    with mock.patch.object(
+        engine, "_get_resource_version", return_value="999"
+    ):
+        with pytest.raises(ContainerCleanupError, match="retries"):
+            engine._watch_pod_deletion(log_handler, resource_version="1")
 
     assert mock_watch.return_value.stream.call_count == K8S_API_RETRIES
     assert mock_watch.return_value.stop.call_count == K8S_API_RETRIES
@@ -1202,6 +1212,91 @@ def test_wait_for_pod_to_start_raises_on_non_transient(
         engine._wait_for_pod_to_start(log_handler)
 
     assert mock_watch.return_value.stream.call_count == 1
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@mock.patch("aap_eda.services.activation.engine.kubernetes.time.sleep")
+@pytest.mark.django_db
+def test_watch_pod_deletion_timeout_without_deleted_event(
+    sleep_mock,
+    mock_watch,
+    init_kubernetes_data,
+    kubernetes_engine,
+):
+    """_watch_pod_deletion raises ContainerCleanupError when watch times out
+    without receiving a DELETED event across all retries."""
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+
+    mock_watch.return_value.stream.return_value = iter(
+        [
+            {"type": "MODIFIED"},
+        ]
+    )
+
+    with mock.patch.object(
+        engine, "_get_resource_version", return_value="999"
+    ):
+        with pytest.raises(ContainerCleanupError, match="attempts"):
+            engine._watch_pod_deletion(log_handler, resource_version="1")
+
+    assert mock_watch.return_value.stream.call_count == K8S_API_RETRIES
+    assert mock_watch.return_value.stop.call_count == K8S_API_RETRIES
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@pytest.mark.django_db
+def test_watch_pod_deletion_empty_stream_retries(
+    mock_watch,
+    init_kubernetes_data,
+    kubernetes_engine,
+):
+    """_watch_pod_deletion retries when the watch stream ends without any
+    events (simulating a pure timeout with no events)."""
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+
+    mock_watch.return_value.stream.return_value = iter([])
+
+    with mock.patch.object(
+        engine, "_get_resource_version", return_value="999"
+    ):
+        with pytest.raises(ContainerCleanupError, match="attempts"):
+            engine._watch_pod_deletion(log_handler, resource_version="1")
+
+    assert mock_watch.return_value.stream.call_count == K8S_API_RETRIES
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@pytest.mark.django_db
+def test_watch_pod_deletion_success_on_deleted_event(
+    mock_watch,
+    init_kubernetes_data,
+    kubernetes_engine,
+):
+    """_watch_pod_deletion returns successfully when a DELETED event
+    is received."""
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+
+    mock_watch.return_value.stream.return_value = iter(
+        [
+            {"type": "MODIFIED"},
+            {"type": "DELETED"},
+        ]
+    )
+
+    engine._watch_pod_deletion(log_handler, resource_version="1")
+
+    assert mock_watch.return_value.stream.call_count == 1
+    log_messages = [
+        record.log for record in models.RulebookProcessLog.objects.all()
+    ]
+    assert f"Pod '{engine.job_name}' is deleted." in log_messages
+    assert f"Job {engine.job_name} is cleaned up." in log_messages
 
 
 @pytest.mark.django_db
