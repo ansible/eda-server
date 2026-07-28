@@ -27,6 +27,7 @@ from . import defaults
 logger = logging.getLogger(__name__)
 
 MAX_PG_IDENTIFIER_LENGTH = 63
+DEFAULT_RULEBOOK_QUEUE_NAME = "activation"
 
 
 def _normalize_queue_name(name: str) -> str:
@@ -474,7 +475,7 @@ def post_loading(loaded_settings: Dynaconf):
 
     # If the list is empty, use the default queue name for single node mode
     if not settings.RULEBOOK_WORKER_QUEUES:
-        settings.RULEBOOK_WORKER_QUEUES = ["activation"]
+        settings.RULEBOOK_WORKER_QUEUES = [DEFAULT_RULEBOOK_QUEUE_NAME]
 
     # ---------------------------------------------------------
     # APPLICATION SETTINGS
@@ -558,7 +559,7 @@ def post_loading(loaded_settings: Dynaconf):
     }
 
     if (
-        settings.RULEBOOK_WORKER_QUEUES
+        settings.RULEBOOK_QUEUE_NAME != DEFAULT_RULEBOOK_QUEUE_NAME
         and settings.RULEBOOK_QUEUE_NAME not in settings.RULEBOOK_WORKER_QUEUES
     ):
         raise ImproperlyConfigured(

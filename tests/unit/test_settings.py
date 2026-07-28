@@ -106,6 +106,7 @@ def test_duplicated_worker_queue(mock_settings):
 
 
 def test_rulebook_queue_name_exists_in_worker_queues(mock_settings):
+    """Explicitly set queue name not in worker queues should fail."""
     mock_settings.RULEBOOK_WORKER_QUEUES = [
         "activation-node1",
         "activation-node2",
@@ -113,6 +114,26 @@ def test_rulebook_queue_name_exists_in_worker_queues(mock_settings):
     mock_settings.RULEBOOK_QUEUE_NAME = "some-other-name"
     with pytest.raises(ImproperlyConfigured):
         post_loading(mock_settings)
+
+
+def test_default_queue_name_skips_validation_in_multinode(mock_settings):
+    """Non-worker services keep the default queue name in multinode."""
+    mock_settings.RULEBOOK_WORKER_QUEUES = [
+        "activation-node1",
+        "activation-node2",
+    ]
+    mock_settings.RULEBOOK_QUEUE_NAME = "activation"
+    post_loading(mock_settings)
+
+
+def test_matching_queue_name_passes_validation(mock_settings):
+    """Activation worker with queue name in worker queues should pass."""
+    mock_settings.RULEBOOK_WORKER_QUEUES = [
+        "activation-node1",
+        "activation-node2",
+    ]
+    mock_settings.RULEBOOK_QUEUE_NAME = "activation-node1"
+    post_loading(mock_settings)
 
 
 @pytest.mark.parametrize(
