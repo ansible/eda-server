@@ -159,6 +159,7 @@ DISPATCHERD_STARTUP_TASKS = {
 DISPATCHERD_SCHEDULE_TASKS = {
     "aap_eda.tasks.orchestrator.monitor_rulebook_processes": {"schedule": 5},
     "aap_eda.tasks.project.monitor_project_tasks": {"schedule": 30},
+    "aap_eda.tasks.log_cleanup.purge_old_log_records": {"schedule": 3600},
 }
 
 
