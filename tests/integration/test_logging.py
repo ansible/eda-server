@@ -53,6 +53,6 @@ def test_worker_startup_logs():
 
     error_message = (
         f"Expected message '{expected_message}' "
-        f"not found in stderr output: {stderr}"
+        f"not found in stderr output: {stderr}"  # noqa: E713
     )
     assert found, error_message

@@ -968,7 +968,7 @@ def validate_x509_subject_match(expected: str, actual: str) -> bool:
         actual_attrs = actual_name.get_attributes_for_oid(attr_oid)
         if not actual_attrs:
             LOGGER.error(
-                f"Required attribute {attr_name} not found in actual subject"
+                f"Required attribute {attr_name} not found in actual subject"  # noqa: E713,E501
             )
             return False
 

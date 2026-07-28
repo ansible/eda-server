@@ -192,15 +192,9 @@ def test_jobs_stats_collector(
     time_start = until - timedelta(hours=9)
     job_ids = ["8018", "8020"]
     intall_uuids = [str(uuid.uuid4()), str(uuid.uuid4())]
-    audit_action_1.url = (
-        f"https://controller_1/#/jobs/playbook/{job_ids[0]}/details/"
-    )
-    audit_action_2.url = (
-        f"https://controller_2/#/jobs/workflow/{job_ids[0]}/details/"
-    )
-    audit_action_3.url = (
-        f"https://controller_1/#/jobs/workflow/{job_ids[1]}/details/"
-    )
+    audit_action_1.url = f"https://controller_1/#/jobs/playbook/{job_ids[0]}/details/"  # noqa: E231,E501
+    audit_action_2.url = f"https://controller_2/#/jobs/workflow/{job_ids[0]}/details/"  # noqa: E231,E501
+    audit_action_3.url = f"https://controller_1/#/jobs/workflow/{job_ids[1]}/details/"  # noqa: E231,E501
     audit_action_1.save(update_fields=["url"])
     audit_action_2.save(update_fields=["url"])
     audit_action_3.save(update_fields=["url"])

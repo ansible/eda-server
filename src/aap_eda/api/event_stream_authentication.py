@@ -152,7 +152,7 @@ class BasicAuthentication(EventStreamAuthentication):
         if self.authorization.startswith("Basic"):
             auth_str = self.authorization.split("Basic ")[1]
 
-        user_pass = f"{self.username}:{self.password}"
+        user_pass = f"{self.username}:{self.password}"  # noqa: E231
         b64_value = base64.b64encode(user_pass.encode()).decode()
         if auth_str != b64_value:
             message = "Credential mismatch"

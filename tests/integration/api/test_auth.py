@@ -23,7 +23,7 @@ from tests.integration.constants import api_url_v1
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
-auth_url = f"https://testserver{api_url_v1}/auth/session"
+auth_url = f"https://testserver{api_url_v1}/auth/session"  # noqa: E231
 login_url = f"{auth_url}/login/"
 logout_url = f"{auth_url}/logout/"
 
@@ -104,7 +104,7 @@ def test_refresh_token(base_client: RequestsClient):
         is_service_account=True,
     )
     data = {"refresh": jwt_refresh_token(user.id)}
-    url = f"https://testserver{api_url_v1}/auth/token/refresh/"
+    url = f"https://testserver{api_url_v1}/auth/token/refresh/"  # noqa: E231
     response = base_client.post(url, data)
     assert response.status_code == status.HTTP_200_OK
     assert "access" in response.data
@@ -113,7 +113,7 @@ def test_refresh_token(base_client: RequestsClient):
 @pytest.mark.django_db
 def test_refresh_token_with_bad_token(base_client: RequestsClient):
     data = {"refresh": "bad token"}
-    url = f"https://testserver{api_url_v1}/auth/token/refresh/"
+    url = f"https://testserver{api_url_v1}/auth/token/refresh/"  # noqa: E231
     response = base_client.post(url, data)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -131,7 +131,7 @@ def test_refresh_token_preserves_activation_instance_id(
     _, refresh_token = create_jwt_token(activation_instance_id=activation_id)
 
     data = {"refresh": refresh_token}
-    url = f"https://testserver{api_url_v1}/auth/token/refresh/"
+    url = f"https://testserver{api_url_v1}/auth/token/refresh/"  # noqa: E231
     response = base_client.post(url, data)
 
     assert response.status_code == status.HTTP_200_OK
@@ -156,7 +156,7 @@ def test_refresh_token_preserves_activation_instance_id_uuid(
     _, refresh_token = create_jwt_token(activation_instance_id=activation_id)
 
     data = {"refresh": refresh_token}
-    url = f"https://testserver{api_url_v1}/auth/token/refresh/"
+    url = f"https://testserver{api_url_v1}/auth/token/refresh/"  # noqa: E231
     response = base_client.post(url, data)
 
     assert response.status_code == status.HTTP_200_OK
@@ -181,7 +181,7 @@ def test_refresh_token_without_activation_instance_id_legacy(
     _, refresh_token = create_jwt_token()
 
     data = {"refresh": refresh_token}
-    url = f"https://testserver{api_url_v1}/auth/token/refresh/"
+    url = f"https://testserver{api_url_v1}/auth/token/refresh/"  # noqa: E231
     response = base_client.post(url, data)
 
     assert response.status_code == status.HTTP_200_OK

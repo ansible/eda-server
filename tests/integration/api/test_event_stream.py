@@ -93,7 +93,7 @@ def test_retrieve_event_stream(
     assert response.data["owner"] == "luke.skywalker"
 
     uuid = default_event_streams[0].uuid
-    base_url = f"https://www.example.com/ohlala{api_url_v1}"
+    base_url = f"https://www.example.com/ohlala{api_url_v1}"  # noqa: E231
     expected_url = f"{base_url}/external_event_stream/{uuid}/post/"
     assert response.data["url"] == expected_url
 

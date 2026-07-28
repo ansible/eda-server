@@ -44,7 +44,7 @@ def _get_podman_socket_url() -> str:
     if os.getuid() == 0:
         return "unix:///run/podman/podman.sock"
     xdg_runtime_dir = os.getenv("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
-    return f"unix://{xdg_runtime_dir}/podman/podman.sock"
+    return f"unix://{xdg_runtime_dir}/podman/podman.sock"  # noqa: E231
 
 
 def get_podman_client() -> PodmanClient:

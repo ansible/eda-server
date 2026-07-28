@@ -69,9 +69,9 @@ def test_post_event_stream_with_basic_auth(
     }
     event_stream = create_event_stream(base_client, data_in)
     if bogus_password:
-        user_pass = f"{username}:{bogus_password}"
+        user_pass = f"{username}:{bogus_password}"  # noqa: E231
     else:
-        user_pass = f"{username}:{secret}"
+        user_pass = f"{username}:{secret}"  # noqa: E231
 
     auth_value = f"Basic {base64.b64encode(user_pass.encode()).decode()}"
     data = {"a": 1, "b": 2}
@@ -151,7 +151,7 @@ def test_post_event_stream_with_basic_auth_bad_encoding(
         "test_mode": True,
     }
     event_stream = create_event_stream(admin_client, data_in)
-    user_pass = f"{username}:{secret}"
+    user_pass = f"{username}:{secret}"  # noqa: E231
 
     auth_value = f"Basic {base64.b64encode(user_pass.encode()).decode()}"
     headers = {

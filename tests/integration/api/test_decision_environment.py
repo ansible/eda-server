@@ -257,9 +257,10 @@ def test_create_decision_environment_url(
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
         errors = response.data.get("image_url")
-        assert f"Image url {image_url} is malformed; {unallowed}" in str(
-            errors
+        expected = (
+            f"Image url {image_url} is malformed; {unallowed}"  # noqa: E702
         )
+        assert expected in str(errors)
 
 
 @pytest.mark.parametrize(
@@ -505,9 +506,10 @@ def test_create_decision_environment_with_no_credential(
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
         errors = response.data.get("image_url")
-        assert f"Image url {image_url} is malformed; {unallowed}" in str(
-            errors
+        expected = (
+            f"Image url {image_url} is malformed; {unallowed}"  # noqa: E702
         )
+        assert expected in str(errors)
 
 
 @pytest.mark.parametrize(
@@ -549,9 +551,10 @@ def test_patch_decision_environment_with_no_credential(
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
         errors = response.data.get("image_url")
-        assert f"Image url {image_url} is malformed; {unallowed}" in str(
-            errors
+        expected = (
+            f"Image url {image_url} is malformed; {unallowed}"  # noqa: E702
         )
+        assert expected in str(errors)
 
 
 @pytest.mark.django_db

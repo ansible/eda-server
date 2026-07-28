@@ -221,7 +221,7 @@ def test_validate_schema():
     errors = validate_schema(missing_required_field_schemas)
 
     for field in missing_fields:
-        assert f"required field {field} does not exist" in errors
+        assert f"required field {field} does not exist" in errors  # noqa: E713
 
     required_field_schemas = {
         "fields": [

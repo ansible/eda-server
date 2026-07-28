@@ -403,7 +403,7 @@ def get_proxy_for_display(proxy: str) -> str:
     cred, domain = result.netloc.split("@")
     if ":" in cred:
         user, _ = cred.split(":")
-        domain = f"{user}:{ENCRYPTED_STRING}@{domain}"
+        domain = f"{user}:{ENCRYPTED_STRING}@{domain}"  # noqa: E231
     else:
         domain = f"{ENCRYPTED_STRING}@{domain}"
 

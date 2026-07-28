@@ -318,14 +318,14 @@ def _resolve_existing_queue(
             LOGGER.info(
                 "Scheduling request "
                 f"{request_type} for {process_parent_type} "
-                f"{process_parent_id} to the least busy queue; "
+                f"{process_parent_id} to the least busy queue; "  # noqa: E702
                 "it is not currently associated with a queue.",
             )
         else:
             LOGGER.info(
                 "Scheduling request"
                 f"{request_type} for {process_parent_type} "
-                f"{process_parent_id} to the least busy queue; "
+                f"{process_parent_id} to the least busy queue; "  # noqa: E702
                 f"its associated queue '{queue_name}' is from "
                 "previous configuation settings.",
             )
@@ -415,7 +415,7 @@ def _handle_unhealthy_queue(
     # execute the task.
     LOGGER.warning(
         f"Forcing user restart of {process_parent_type} "
-        f"{process_parent_id} on the least busy queue; "
+        f"{process_parent_id} on the least busy queue; "  # noqa: E702
         "after failing liveness checks of current "
         "associated queue"
     )
