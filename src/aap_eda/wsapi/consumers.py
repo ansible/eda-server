@@ -31,6 +31,8 @@ from aap_eda.core.utils.credentials import (
 )
 from aap_eda.core.utils.strings import extract_variables, substitute_variables
 from aap_eda.middleware.request_log_middleware import assign_log_tracking_id
+from aap_eda.services.auth import parse_jwt_token
+from aap_eda.services.exceptions import InvalidTokenError
 
 from .messages import (
     ActionMessage,
@@ -51,6 +53,7 @@ from .messages import (
 logger = logging.getLogger(__name__)
 
 BINARY_FORMATS = {"binary_base64"}
+WS_CLOSE_TOKEN_AUTH_FAILED = 4003
 
 
 class MessageType(Enum):
@@ -100,35 +103,221 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 
 
 class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._token_payload = None  # Cache parsed token payload
+        self._legacy_token_warning_logged = (
+            False  # Track if warning was logged
+        )
+
+    def _get_token_payload(self) -> dict:
+        """Get and cache the parsed JWT token payload from websocket.
+
+        The token is parsed once and cached for the lifetime of the
+        connection. Note: The token has already been validated by
+        DrfAuthMiddleware during the websocket handshake. This method
+        re-parses it to access the payload.
+
+        Returns:
+            dict: The decoded JWT token payload
+
+        Raises:
+            InvalidTokenError: If token is missing or invalid
+        """
+        if self._token_payload is not None:
+            return self._token_payload
+
+        # Get the authorization header from the scope
+        auth_value = b""
+        for key, value in self.scope.get("headers", []):
+            if key.lower() == b"authorization":
+                auth_value = value
+                break
+        try:
+            auth_header = auth_value.decode()
+        except UnicodeDecodeError as err:
+            raise InvalidTokenError(
+                f"Malformed authorization header: {err}"
+            ) from err
+
+        if not auth_header:
+            raise InvalidTokenError("No authorization header found")
+
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0] != "Bearer":
+            raise InvalidTokenError("Invalid authorization header format")
+
+        token = parts[1]
+        payload = parse_jwt_token(token)
+
+        # Security: Reject refresh tokens - only access tokens allowed
+        token_type = payload.get("token_type")
+        if token_type != "access":
+            raise InvalidTokenError(
+                f"Invalid token type '{token_type}' for WebSocket auth. "
+                "Only access tokens are permitted."
+            )
+
+        # Cache payload only after all validations pass
+        self._token_payload = payload
+        return self._token_payload
+
+    @database_sync_to_async
+    def _get_activation_name(self, activation_id: str | int) -> str:
+        """Get activation name safely for logging.
+
+        Args:
+            activation_id: The activation instance ID
+
+        Returns:
+            The activation name or error string
+        """
+        try:
+            rulebook_process_instance = models.RulebookProcess.objects.get(
+                id=activation_id
+            )
+            activation = rulebook_process_instance.get_parent()
+            return activation.name
+        except Exception as e:
+            return f"<Error: {e}>"
+
+    async def _validate_token_scope(
+        self, activation_instance_id: str | int
+    ) -> None:
+        """Validate JWT token is scoped to given activation instance.
+
+        Legacy tokens without activation_instance_id are allowed but
+        generate a security warning logged once per connection.
+
+        Args:
+            activation_instance_id: The activation instance ID from the
+            message
+
+        Raises:
+            InvalidTokenError: If token scope doesn't match the activation
+            instance
+        """
+        token_dict = self._get_token_payload()
+
+        # Check if token has activation_instance_id scope
+        token_activation_id = token_dict.get("activation_instance_id")
+
+        # If token has activation_instance_id, it must match
+        if token_activation_id is not None:
+            if str(token_activation_id) != str(activation_instance_id):
+                logger.debug(
+                    "Token scope mismatch: token=%s, message=%s",
+                    token_activation_id,
+                    activation_instance_id,
+                )
+                raise InvalidTokenError(
+                    "Token scope does not match the requested "
+                    "activation instance"
+                )
+        # Legacy token without activation_instance_id - allow but warn
+        else:
+            if not self._legacy_token_warning_logged:
+                self._legacy_token_warning_logged = True
+                activation_name = await self._get_activation_name(
+                    activation_instance_id
+                )
+                logger.warning(
+                    f"SECURITY WARNING: Legacy token without "
+                    f"activation_instance_id used for activation "
+                    f"'{activation_name}' (ID: {activation_instance_id}). "
+                    f"RECOMMENDATION: Restart activation to generate new "
+                    f"scoped token."
+                )
+
+    async def _validate_message_token_scope(self, data: dict) -> None:
+        """Validate token scope for incoming message.
+
+        Scoped tokens (with ``activation_instance_id``) require every
+        message to carry ``activation_instance_id`` and the value must
+        match. Legacy tokens (without ``activation_instance_id``) skip
+        validation.
+
+        Args:
+            data: The message data containing activation_instance_id
+
+        Raises:
+            InvalidTokenError: If token scope validation fails
+        """
+        token_dict = self._get_token_payload()
+        token_activation_id = token_dict.get("activation_instance_id")
+
+        if token_activation_id is None:
+            return
+
+        activation_instance_id = data.get("activation_instance_id")
+        if activation_instance_id is None:
+            raise InvalidTokenError(
+                "Message missing activation_instance_id "
+                "required by scoped token"
+            )
+        await self._validate_token_scope(activation_instance_id)
+
+    async def _dispatch_message(
+        self, msg_type: MessageType, data: dict
+    ) -> None:
+        """Dispatch message to appropriate handler based on type.
+
+        Args:
+            msg_type: The message type
+            data: The message data
+        """
+        if msg_type == MessageType.WORKER:
+            await self.handle_workers(WorkerMessage.parse_obj(data))
+        elif msg_type == MessageType.JOB:
+            await self.handle_jobs(JobMessage.parse_obj(data))
+        elif msg_type == MessageType.ANSIBLE_EVENT:
+            await self.handle_events(AnsibleEventMessage.parse_obj(data))
+        elif msg_type == MessageType.ACTION:
+            await self.handle_actions(ActionMessage.parse_obj(data))
+        elif msg_type == MessageType.SHUTDOWN:
+            logger.info("Websocket connection is closed.")
+        elif msg_type == MessageType.SESSION_STATS:
+            await self.handle_heartbeat(HeartbeatMessage.parse_obj(data))
+        else:
+            logger.warning(f"Unsupported message received: {data}")
+
+    def _log_message_error(
+        self, err: Exception, msg_type: MessageType, data: dict
+    ) -> None:
+        """Log message processing errors with context.
+
+        Args:
+            err: The exception that occurred
+            msg_type: The message type
+            data: The message data
+        """
+        activation_id = data.get("activation_id")
+        logger.error(  # NOSONAR
+            f"Failed to parse message (type={msg_type.value}, "
+            f"activation_id={activation_id}) "
+            f"due to {type(err).__name__}: {err}"
+        )
+
     async def receive(self, text_data=None, bytes_data=None):
         data = json.loads(text_data)
-
-        await self._set_log_tracking_id(data)
 
         logger.debug(f"AnsibleRulebookConsumer received: {data}")
         msg_type = MessageType(data.get("type"))
 
         try:
-            if msg_type == MessageType.WORKER:
-                await self.handle_workers(WorkerMessage.parse_obj(data))
-            elif msg_type == MessageType.JOB:
-                await self.handle_jobs(JobMessage.parse_obj(data))
-            # AnsibleEvent messages are no longer sent by ansible-rulebook
-            # TODO: remove later if no need to keep
-            elif msg_type == MessageType.ANSIBLE_EVENT:
-                await self.handle_events(AnsibleEventMessage.parse_obj(data))
-            elif msg_type == MessageType.ACTION:
-                await self.handle_actions(ActionMessage.parse_obj(data))
-            elif msg_type == MessageType.SHUTDOWN:
-                logger.info("Websocket connection is closed.")
-            elif msg_type == MessageType.SESSION_STATS:
-                await self.handle_heartbeat(HeartbeatMessage.parse_obj(data))
-            else:
-                logger.warning(f"Unsupported message received: {data}")
+            await self._validate_message_token_scope(data)
+            await self._set_log_tracking_id(data)
+            await self._dispatch_message(msg_type, data)
         except (DatabaseError, ObjectDoesNotExist) as err:
-            logger.error(f"Failed to parse {data} due to DB error: {err}")
+            self._log_message_error(err, msg_type, data)
         except InvalidEnvKeyError as err:
-            logger.error(f"Failed to parse {data} due to Env error: {err}")
+            self._log_message_error(err, msg_type, data)
+        except InvalidTokenError as err:
+            logger.error(  # NOSONAR
+                f"Token auth failed for message (type={msg_type.value}, "
+                f"activation_id={data.get('activation_id')}): {err}"
+            )
+            await self.close(code=WS_CLOSE_TOKEN_AUTH_FAILED)
 
     async def handle_workers(self, message: WorkerMessage):
         additional_credentials = []

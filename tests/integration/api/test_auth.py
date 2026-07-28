@@ -116,3 +116,79 @@ def test_refresh_token_with_bad_token(base_client: RequestsClient):
     url = f"https://testserver{api_url_v1}/auth/token/refresh/"
     response = base_client.post(url, data)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_refresh_token_preserves_activation_instance_id(
+    base_client: RequestsClient,
+):
+    """Test that refresh token preserves activation_instance_id in new
+    access token.
+    """
+    from aap_eda.services.auth import create_jwt_token, parse_jwt_token
+
+    activation_id = "123"
+    _, refresh_token = create_jwt_token(activation_instance_id=activation_id)
+
+    data = {"refresh": refresh_token}
+    url = f"https://testserver{api_url_v1}/auth/token/refresh/"
+    response = base_client.post(url, data)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert "access" in response.data
+
+    # Parse new access token and verify activation_instance_id is preserved
+    new_access_token = response.data["access"]
+    payload = parse_jwt_token(new_access_token)
+
+    assert payload["activation_instance_id"] == activation_id
+    assert payload["token_type"] == "access"
+
+
+@pytest.mark.django_db
+def test_refresh_token_preserves_activation_instance_id_uuid(
+    base_client: RequestsClient,
+):
+    """Test that refresh token preserves UUID activation_instance_id."""
+    from aap_eda.services.auth import create_jwt_token, parse_jwt_token
+
+    activation_id = "550e8400-e29b-41d4-a716-446655440000"
+    _, refresh_token = create_jwt_token(activation_instance_id=activation_id)
+
+    data = {"refresh": refresh_token}
+    url = f"https://testserver{api_url_v1}/auth/token/refresh/"
+    response = base_client.post(url, data)
+
+    assert response.status_code == status.HTTP_200_OK
+
+    # Verify UUID is preserved
+    new_access_token = response.data["access"]
+    payload = parse_jwt_token(new_access_token)
+
+    assert payload["activation_instance_id"] == activation_id
+
+
+@pytest.mark.django_db
+def test_refresh_token_without_activation_instance_id_legacy(
+    base_client: RequestsClient,
+):
+    """Test that legacy refresh token without activation_instance_id
+    creates legacy access token.
+    """
+    from aap_eda.services.auth import create_jwt_token, parse_jwt_token
+
+    # Create legacy token without activation_instance_id
+    _, refresh_token = create_jwt_token()
+
+    data = {"refresh": refresh_token}
+    url = f"https://testserver{api_url_v1}/auth/token/refresh/"
+    response = base_client.post(url, data)
+
+    assert response.status_code == status.HTTP_200_OK
+
+    # Verify new access token also has no activation_instance_id
+    new_access_token = response.data["access"]
+    payload = parse_jwt_token(new_access_token)
+
+    assert "activation_instance_id" not in payload
+    assert payload["token_type"] == "access"
