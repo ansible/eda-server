@@ -24,9 +24,9 @@ from aap_eda.core.utils.credentials import inputs_to_display
 
 
 @pytest.fixture
-def user_api_client(db, user):
+def user_api_client(db, default_user):
     client = APIClient()
-    client.force_authenticate(user=user)
+    client.force_authenticate(user=default_user)
     return client
 
 
