@@ -863,9 +863,13 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
                 detail=f"Activation Instance with ID={id} does not exist.",
             )
 
+        ordering = request.query_params.get("ordering", "-id")
+        if ordering not in ("id", "-id"):
+            ordering = "-id"
+
         activation_instance_logs = models.RulebookProcessLog.objects.filter(
             activation_instance_id=id
-        ).order_by("-id")
+        ).order_by(ordering)
         activation_instance_logs = self.filter_queryset(
             activation_instance_logs
         )
