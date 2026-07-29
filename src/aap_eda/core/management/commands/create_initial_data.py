@@ -81,6 +81,7 @@ ORG_ROLES = [
         "description": "Users who are a part of the organization",
         "permissions": {
             "organization": ["view", "member"],
+            "team": ["view"],
         },
     },
     {
