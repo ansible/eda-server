@@ -226,6 +226,7 @@ ACTIVATION_DB_HOST: str = "host.containers.internal"
 PG_NOTIFY_TEMPLATE_RULEBOOK: Optional[str] = None
 SAFE_PLUGINS_FOR_PORT_FORWARD: list = [
     "ansible.eda.webhook",
+    "eda.builtin.webhook",
     "ansible.eda.alertmanager",
 ]
 API_PATH_UI_PATH_MAP: dict = {"/api/controller": "/execution", "/": "/#"}
