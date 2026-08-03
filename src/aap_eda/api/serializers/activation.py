@@ -15,7 +15,7 @@ import json
 import logging
 import secrets
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import yaml
@@ -83,7 +83,7 @@ PG_NOTIFY_DSN = (
 
 @dataclass
 class VaultData:
-    password: str = secrets.token_urlsafe()
+    password: str = field(default_factory=secrets.token_urlsafe)
     password_used: bool = False
 
 
@@ -207,16 +207,16 @@ def _normalize_activation_k8s_pod_fields(data: dict) -> None:
         sa = str(sa).strip()
         data["k8s_pod_service_account_name"] = sa or None
 
-    for field in (
+    for key in (
         "k8s_pod_labels",
         "k8s_pod_annotations",
         "k8s_pod_node_selector",
     ):
-        val = data.get(field)
+        val = data.get(key)
         if val is None:
-            data[field] = {}
+            data[key] = {}
         elif isinstance(val, dict):
-            data[field] = _trim_string_dict(val, field)
+            data[key] = _trim_string_dict(val, key)
 
 
 def _extend_extra_vars_from_credentials(
