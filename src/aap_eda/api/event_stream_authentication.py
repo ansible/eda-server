@@ -81,7 +81,9 @@ class HMACAuthentication(EventStreamAuthentication):
             logger.warning(message)
             raise AuthenticationFailed(message)
 
-        if not hmac.compare_digest(expected_signature, self.signature):
+        if not hmac.compare_digest(
+            expected_signature.encode(), self.signature.encode()
+        ):
             message = "Signature mismatch, check your payload and secret"
             logger.warning(message)
             raise AuthenticationFailed(message)
@@ -96,7 +98,9 @@ class TokenAuthentication(EventStreamAuthentication):
 
     def authenticate(self, _body=None):
         """Handle Token authentication."""
-        if self.token != _token_sans_bearer(self.value):
+        if not hmac.compare_digest(
+            self.token.encode(), _token_sans_bearer(self.value).encode()
+        ):
             message = "Token mismatch, check your token"
             logger.warning(message)
             raise AuthenticationFailed(message)
@@ -154,7 +158,7 @@ class BasicAuthentication(EventStreamAuthentication):
 
         user_pass = f"{self.username}:{self.password}"
         b64_value = base64.b64encode(user_pass.encode()).decode()
-        if auth_str != b64_value:
+        if not hmac.compare_digest(auth_str.encode(), b64_value.encode()):
             message = "Credential mismatch"
             logger.warning(message)
             raise AuthenticationFailed(message)

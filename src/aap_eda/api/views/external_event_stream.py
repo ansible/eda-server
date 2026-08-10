@@ -23,6 +23,7 @@ from ansible_base.jwt_consumer.common.util import (
     validate_x_trusted_proxy_header,
 )
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
@@ -49,6 +50,8 @@ from aap_eda.core.models import EventStream
 from aap_eda.core.utils.credentials import get_resolved_secrets
 from aap_eda.services.pg_notify import PGNotify
 
+FAILURE_THRESHOLD = 5
+FAILURE_WINDOW = 60  # seconds
 logger = logging.getLogger(__name__)
 UNSAFE_HEADER_KEYS = {"X-Trusted-Proxy", "X-Forwarded-For", "X-Real-IP"}
 REDACTED_STRING = "********"
@@ -282,6 +285,30 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                 )
             raise
 
+    def _get_client_ip(self, request):
+        if settings.EVENT_STREAM_REQUIRE_TRUSTED_PROXY:
+            x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+            if x_forwarded_for:
+                return x_forwarded_for.split(",")[0].strip()
+        return request.META.get("REMOTE_ADDR")
+
+    def _check_rate_limit(self, request, event_stream_uuid):
+        key = (
+            f"es_auth_fail: {event_stream_uuid}: "
+            f"{self._get_client_ip(request)}"
+        )
+        failures = cache.get(key, 0)
+        if failures >= FAILURE_THRESHOLD:
+            raise AuthenticationFailed("Too many failed attempts")
+
+    def _record_failure(self, request, event_stream_uuid):
+        key = (
+            f"es_auth_fail: {event_stream_uuid}: "
+            f"{self._get_client_ip(request)}"
+        )
+        failures = cache.get(key, 0)
+        cache.set(key, failures + 1, FAILURE_WINDOW)
+
     @extend_schema(exclude=True)
     @action(detail=True, methods=["POST"], rbac_action=None)
     def post(self, request, *_args, **kwargs):
@@ -293,6 +320,7 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
 
         # Validate X-Trusted-Proxy header from Gateway/Envoy
         self._validate_trusted_proxy_header(request)
+        self._check_rate_limit(request, kwargs["pk"])
 
         try:
             inputs = get_resolved_secrets(self.event_stream.eda_credential)
@@ -313,8 +341,11 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                     headers=yaml.dump(event_headers),
                 )
             raise ParseError(message)
-
-        self._handle_auth(request, inputs)
+        try:
+            self._handle_auth(request, inputs)
+        except AuthenticationFailed:
+            self._record_failure(request, kwargs["pk"])
+            raise
 
         body = self._parse_body(
             request.headers.get("Content-Type", ""), request.body
