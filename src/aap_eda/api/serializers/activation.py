@@ -1830,3 +1830,22 @@ def _validate_persistence_credential(data: dict) -> None:
             f"'{settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME}' "
             "could not be found. Contact your system administrator."
         )
+
+
+class LogPurgeRequestSerializer(serializers.Serializer):
+    """Serializer for log purge request body."""
+
+    before_date = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+        help_text="Delete logs older than this date. "
+        "If omitted, all logs are deleted.",
+    )
+
+
+class LogPurgeResponseSerializer(serializers.Serializer):
+    """Serializer for log purge response."""
+
+    deleted = serializers.IntegerField(
+        help_text="Number of log records deleted.",
+    )

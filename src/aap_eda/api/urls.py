@@ -56,6 +56,7 @@ router.register("decision-environments", views.DecisionEnvironmentViewSet)
 router.register("organizations", views.OrganizationViewSet)
 router.register("teams", views.TeamViewSet)
 router.register("event-streams", views.EventStreamViewSet)
+router.register("logs", views.LogPurgeViewSet, basename="logs")
 router.register(
     "external_event_stream",
     views.ExternalEventStreamViewSet,
