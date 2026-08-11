@@ -68,7 +68,17 @@ class ActivationInstanceLogFilter(django_filters.FilterSet):
         lookup_expr="icontains",
         label="Filter by activation instance log.",
     )
+    log_timestamp__gt = django_filters.NumberFilter(
+        field_name="log_timestamp",
+        lookup_expr="gt",
+        label="Filter logs with timestamp greater than value.",
+    )
+    log_timestamp__lt = django_filters.NumberFilter(
+        field_name="log_timestamp",
+        lookup_expr="lt",
+        label="Filter logs with timestamp less than value.",
+    )
 
     class Meta:
         model = models.RulebookProcessLog
-        fields = ["log"]
+        fields = ["log", "log_timestamp__gt", "log_timestamp__lt"]
