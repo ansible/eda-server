@@ -972,3 +972,18 @@ def test_engine_update_logs_with_exception(init_podman_data, podman_engine):
 
     with pytest.raises(ContainerUpdateLogsError, match="Not found"):
         engine.update_logs("100", log_handler)
+
+
+@pytest.mark.django_db
+def test_dblogger_write_sanitizes_sensitive_data(init_podman_data):
+    """Verify that DBLogger.write() redacts sensitive data before storage."""
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+
+    log_handler.write(
+        "connection token=super-secret-value established",
+        flush=True,
+    )
+
+    log_entry = models.RulebookProcessLog.objects.last()
+    assert "super-secret-value" not in log_entry.log
+    assert "token=" in log_entry.log

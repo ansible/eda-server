@@ -13,6 +13,7 @@
 #  limitations under the License.
 import base64
 import hashlib
+import logging
 from datetime import datetime
 
 import pytest
@@ -129,3 +130,57 @@ def test_post_event_stream_with_ecdsa(
         content_type=content_type,
     )
     assert response.status_code == auth_status
+
+
+@pytest.mark.django_db
+def test_ecdsa_auth_does_not_log_sensitive_data(
+    admin_client: APIClient,
+    preseed_credential_types,
+    caplog_factory,
+):
+    """Verify that ECDSA authentication does not leak keys or signatures."""
+    auth_logger = logging.getLogger("aap_eda.api.event_stream_authentication")
+    eda_caplog = caplog_factory(auth_logger, level=logging.DEBUG)
+
+    signature_header_name = "My-Ecdsa-Sig"
+    inputs = {
+        "auth_type": "ecdsa",
+        "public_key": ECDSA_PUBLIC_KEY,
+        "http_header_key": signature_header_name,
+        "signature_encoding": "base64",
+        "hash_algorithm": "sha256",
+    }
+
+    obj = create_event_stream_credential(
+        admin_client, enums.EventStreamCredentialType.ECDSA.value, inputs
+    )
+
+    data_in = {
+        "name": "test-es-log-leak",
+        "eda_credential_id": obj["id"],
+        "event_stream_type": obj["credential_type"]["kind"],
+        "organization_id": get_default_test_org().id,
+        "test_mode": True,
+    }
+    event_stream = create_event_stream(admin_client, data_in)
+
+    data = {"a": 1, "b": 2}
+    data_bytes = JSONRenderer().render(data)
+
+    sk = SigningKey.from_pem(ECDSA_PRIVATE_KEY, hashlib.sha256)
+    signature = sk.sign_deterministic(data_bytes, sigencode=sigencode_der)
+    signature_str = base64.b64encode(signature).decode()
+
+    admin_client.post(
+        event_stream_post_url(event_stream.uuid),
+        headers={
+            signature_header_name: signature_str,
+            "Content-Type": "application/json",
+        },
+        data=data_bytes,
+        content_type="application/json",
+    )
+
+    log_text = eda_caplog.text
+    assert ECDSA_PUBLIC_KEY.strip() not in log_text
+    assert signature_str not in log_text

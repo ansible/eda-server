@@ -60,6 +60,7 @@ from aap_eda.core.utils.rulebook import (
     swap_event_stream_sources,
 )
 from aap_eda.core.utils.strings import substitute_variables
+from aap_eda.utils.log_sanitizer import sanitize_string
 
 logger = logging.getLogger(__name__)
 DE_NEEDED_MSG = "Decision Environment is needed"
@@ -1079,6 +1080,24 @@ class ActivationInstanceLogSerializer(serializers.ModelSerializer):
         model = models.RulebookProcessLog
         fields = "__all__"
         read_only_fields = ["id"]
+
+    def to_representation(self, instance: models.RulebookProcessLog) -> dict:
+        """Sanitize the log field to redact any sensitive data.
+
+        Handles historical log entries that were stored before
+        write-time sanitization was added.
+
+        Args:
+            instance: The RulebookProcessLog model instance.
+
+        Returns:
+            The serialized representation with sensitive values
+            in the log field replaced by a redaction marker.
+        """
+        data = super().to_representation(instance)
+        if "log" in data:
+            data["log"] = sanitize_string(data["log"])
+        return data
 
 
 class ActivationReadSerializer(

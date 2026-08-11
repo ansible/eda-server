@@ -258,9 +258,6 @@ class EcdsaAuthentication(EventStreamAuthentication):
 
     def authenticate(self, body):
         """Handle ECDSA authentication."""
-        logger.debug("Public Key %s", self.public_key)
-        logger.debug("Signature %s", self.signature)
-        logger.debug("Content Prefix %s", self.content_prefix)
         public_key = ecdsa.VerifyingKey.from_pem(self.public_key.encode())
 
         if self.signature_encoding == SignatureEncodingType.HEX:
