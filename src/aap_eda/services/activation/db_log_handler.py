@@ -32,8 +32,13 @@ LOGGER = logging.getLogger(__name__)
 
 
 class DBLogger(LogHandler):
-    def __init__(self, activation_instance_id: int):
+    def __init__(
+        self,
+        activation_instance_id: int,
+        store_debug_logs: bool = False,
+    ):
         self.activation_instance_id = activation_instance_id
+        self.store_debug_logs = store_debug_logs
         self.line_count = 0
         self.activation_instance_log_buffer = []
         if str(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER) == "end":
