@@ -30,11 +30,17 @@ from aap_eda.services.activation.engine.exceptions import (
 from aap_eda.utils.log_sanitizer import sanitize_string
 
 LOGGER = logging.getLogger(__name__)
+LOG_LEVEL_SEARCH_INDEX = 40
 
 
 class DBLogger(LogHandler):
-    def __init__(self, activation_instance_id: int):
+    def __init__(
+        self,
+        activation_instance_id: int,
+        store_debug_logs: bool = False,
+    ):
         self.activation_instance_id = activation_instance_id
+        self.store_debug_logs = store_debug_logs
         self.line_count = 0
         self.activation_instance_log_buffer = []
         if str(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER) == "end":
@@ -80,6 +86,12 @@ class DBLogger(LogHandler):
             self.flush()
 
     def flush(self) -> None:
+        if not self.store_debug_logs:
+            self.activation_instance_log_buffer = [
+                buf
+                for buf in self.activation_instance_log_buffer
+                if "DEBUG" not in buf.log[:LOG_LEVEL_SEARCH_INDEX]
+            ]
         try:
             if self.activation_instance_log_buffer:
                 models.RulebookProcessLog.objects.bulk_create(
