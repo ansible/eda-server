@@ -16,8 +16,8 @@ import logging
 from datetime import datetime, timezone
 
 from aap_eda.services.activation.db_log_handler import (
-    DBLogger,
     LOG_LEVEL_SEARCH_INDEX,
+    DBLogger,
 )
 
 EXCEPTIONS_TO_CATCH = (
