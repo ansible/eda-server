@@ -155,6 +155,72 @@ def test_list_activation_instance_logs_filter_non_existent(
 
 
 @pytest.mark.django_db
+def test_list_activation_instance_logs_filter_timestamp_gt(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}"
+        f"/logs/?log_timestamp__gt=1000"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    results = response.data["results"]
+    assert len(results) == 1
+    assert results[0]["log"] == "activation-instance-log-2"
+
+
+@pytest.mark.django_db
+def test_list_activation_instance_logs_filter_timestamp_lt(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}"
+        f"/logs/?log_timestamp__lt=2000"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    results = response.data["results"]
+    assert len(results) == 1
+    assert results[0]["log"] == "activation-instance-log-1"
+
+
+@pytest.mark.django_db
+def test_list_activation_instance_logs_filter_timestamp_range(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}"
+        f"/logs/?log_timestamp__gt=500&log_timestamp__lt=1500"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    results = response.data["results"]
+    assert len(results) == 1
+    assert results[0]["log"] == "activation-instance-log-1"
+
+
+@pytest.mark.django_db
+def test_list_activation_instance_logs_filter_timestamp_no_results(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}"
+        f"/logs/?log_timestamp__gt=9999"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["results"] == []
+
+
+@pytest.mark.django_db
 def test_logs_page_size_capped_at_max(
     default_activation_instances: List[models.RulebookProcess],
     default_activation_instance_logs: List[models.RulebookProcessLog],
