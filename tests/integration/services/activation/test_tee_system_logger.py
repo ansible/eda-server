@@ -56,7 +56,9 @@ def test_logging(
     """Test that TeeSystemLogger writes to DB and log."""
     eda_log = caplog_factory(LOGGER, level=logging.DEBUG)
 
-    obj = TeeSystemLogger(default_activation_instance.id)
+    obj = TeeSystemLogger(
+        default_activation_instance.id, store_debug_logs=True
+    )
     for line in log_lines:
         obj.write(line)
     obj.flush()
@@ -70,6 +72,77 @@ def test_logging(
     assert RulebookProcessLog.objects.filter(
         activation_instance=default_activation_instance
     ).count() == len(expectations)
+
+
+@pytest.mark.django_db
+def test_debug_lines_excluded_from_db_by_default(
+    caplog_factory, default_activation_instance
+):
+    """With store_debug_logs=False, DEBUG lines go to stdout but not DB."""
+    eda_log = caplog_factory(LOGGER, level=logging.DEBUG)
+
+    obj = TeeSystemLogger(
+        default_activation_instance.id, store_debug_logs=False
+    )
+    obj.write("DEBUG This is a debug message")
+    obj.write("ERROR This is an error message")
+    obj.write("INFO This is an info message")
+    obj.flush()
+
+    assert len(eda_log.records) == 3
+
+    db_logs = RulebookProcessLog.objects.filter(
+        activation_instance=default_activation_instance
+    )
+    assert db_logs.count() == 2
+    log_texts = [log.log for log in db_logs]
+    assert any("ERROR" in t for t in log_texts)
+    assert any("INFO" in t for t in log_texts)
+    assert not any("DEBUG" in t for t in log_texts)
+
+
+@pytest.mark.django_db
+def test_debug_lines_stored_when_opted_in(
+    caplog_factory, default_activation_instance
+):
+    """With store_debug_logs=True, all lines including DEBUG go to DB."""
+    eda_log = caplog_factory(LOGGER, level=logging.DEBUG)
+
+    obj = TeeSystemLogger(
+        default_activation_instance.id, store_debug_logs=True
+    )
+    obj.write("DEBUG This is a debug message")
+    obj.write("ERROR This is an error message")
+    obj.flush()
+
+    assert len(eda_log.records) == 2
+
+    db_logs = RulebookProcessLog.objects.filter(
+        activation_instance=default_activation_instance
+    )
+    assert db_logs.count() == 2
+
+
+@pytest.mark.django_db
+def test_non_debug_lines_always_stored(
+    caplog_factory, default_activation_instance
+):
+    """ERROR/WARNING/INFO always go to DB regardless of toggle."""
+    caplog_factory(LOGGER, level=logging.DEBUG)
+
+    obj = TeeSystemLogger(
+        default_activation_instance.id, store_debug_logs=False
+    )
+    obj.write("ERROR an error")
+    obj.write("WARN a warning")
+    obj.write("INFO an info")
+    obj.write("CRITICAL a critical")
+    obj.flush()
+
+    db_logs = RulebookProcessLog.objects.filter(
+        activation_instance=default_activation_instance
+    )
+    assert db_logs.count() == 4
 
 
 @pytest.mark.django_db
