@@ -106,7 +106,7 @@ def test_list_logs_from_activation_instance(
     response_logs = response.data["results"]
 
     assert len(response_logs) == 2
-    assert response_logs[0]["log"] == "activation-instance-log-2"
+    assert response_logs[0]["log"] == "activation-instance-log-1"
     assert list(response_logs[0]) == [
         "id",
         "log",

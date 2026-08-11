@@ -845,7 +845,7 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
     )
     @action(
         detail=False,
-        queryset=models.RulebookProcessLog.objects.order_by("-id"),
+        queryset=models.RulebookProcessLog.objects.order_by("id"),
         filterset_class=filters.ActivationInstanceLogFilter,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/logs",
@@ -865,7 +865,7 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
 
         activation_instance_logs = models.RulebookProcessLog.objects.filter(
             activation_instance_id=id
-        ).order_by("-id")
+        ).order_by("id")
         activation_instance_logs = self.filter_queryset(
             activation_instance_logs
         )
