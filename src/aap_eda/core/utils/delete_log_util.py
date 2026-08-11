@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 from datetime import datetime
 
 from django.db.models import Q
@@ -19,17 +20,80 @@ from django.utils import timezone
 
 from aap_eda.core import models
 
+logger = logging.getLogger(__name__)
 
-def delete_logs_older_than(cutoff: datetime) -> int:
+BATCH_SIZE = 10_000
+
+
+def delete_logs_older_than(
+    cutoff: datetime,
+    activation_id: int | None = None,
+) -> int:
     """Delete all RulebookProcessLog records older than the cutoff.
+
+    If activation_id is provided, only delete logs for instances
+    belonging to that activation.
 
     Returns the number of records deleted.
     """
     cutoff_ts = int(cutoff.timestamp())
-    deleted, _ = models.RulebookProcessLog.objects.filter(
+    qs = models.RulebookProcessLog.objects.filter(
         log_timestamp__lt=cutoff_ts,
-    ).delete()
-    return deleted
+    )
+    if activation_id is not None:
+        instance_ids = models.RulebookProcess.objects.filter(
+            activation_id=activation_id,
+        ).values_list("id", flat=True)
+        qs = qs.filter(activation_instance_id__in=instance_ids)
+    return _batched_delete(qs)
+
+
+def delete_logs_for_activation(activation_id: int) -> int:
+    """Delete all logs for a given activation's instances.
+
+    Returns the number of records deleted.
+    """
+    instance_ids = models.RulebookProcess.objects.filter(
+        activation_id=activation_id,
+    ).values_list("id", flat=True)
+    qs = models.RulebookProcessLog.objects.filter(
+        activation_instance_id__in=instance_ids,
+    )
+    return _batched_delete(qs)
+
+
+def delete_all_logs(cutoff: datetime | None = None) -> int:
+    """Delete all RulebookProcessLog records.
+
+    If cutoff is provided, only delete logs older than the cutoff.
+
+    Returns the number of records deleted.
+    """
+    qs = models.RulebookProcessLog.objects.all()
+    if cutoff is not None:
+        cutoff_ts = int(cutoff.timestamp())
+        qs = qs.filter(log_timestamp__lt=cutoff_ts)
+    return _batched_delete(qs)
+
+
+def _batched_delete(queryset) -> int:
+    """Delete queryset in batches to avoid long-running queries."""
+    total_deleted = 0
+    upper_id = queryset.order_by("-id").values_list("id", flat=True).first()
+    if upper_id is None:
+        return total_deleted
+    queryset = queryset.filter(id__lte=upper_id)
+
+    while True:
+        batch_ids = list(queryset.values_list("id", flat=True)[:BATCH_SIZE])
+        if not batch_ids:
+            break
+        deleted, _ = models.RulebookProcessLog.objects.filter(
+            id__in=batch_ids,
+        ).delete()
+        total_deleted += deleted
+        logger.info("Purged %d log records (batch)", deleted)
+    return total_deleted
 
 
 def create_audit_trail(
