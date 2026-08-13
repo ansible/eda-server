@@ -1,7 +1,17 @@
 """Shared test configuration for API integration tests."""
 
 import pytest
+from django.core.cache import cache
 from django.test.utils import override_settings
+
+
+@pytest.fixture(autouse=True)
+def disable_blacklisting(settings):
+    """Disable IP blacklisting and clear cache for tests."""
+    cache.clear()
+    settings.EVENT_STREAM_BLACKLIST_THRESHOLD = 0
+    yield
+    cache.clear()
 
 
 @pytest.fixture(autouse=True)
