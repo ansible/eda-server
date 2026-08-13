@@ -23,7 +23,6 @@ from ansible_base.jwt_consumer.common.util import (
     validate_x_trusted_proxy_header,
 )
 from django.conf import settings
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
@@ -35,6 +34,7 @@ from rest_framework.exceptions import AuthenticationFailed, ParseError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from aap_eda.api.blacklist import BlacklistManager
 from aap_eda.api.event_stream_authentication import (
     BasicAuthentication,
     EcdsaAuthentication,
@@ -51,10 +51,9 @@ from aap_eda.core.utils.credentials import get_resolved_secrets
 from aap_eda.services.pg_notify import PGNotify
 from aap_eda.utils.log_sanitizer import REDACTED_STRING
 
-FAILURE_THRESHOLD = 5
-FAILURE_WINDOW = 60  # seconds
 logger = logging.getLogger(__name__)
 UNSAFE_HEADER_KEYS = {"X-Trusted-Proxy", "X-Forwarded-For", "X-Real-IP"}
+blacklist_manager = BlacklistManager()
 
 
 class ExternalEventStreamViewSet(viewsets.GenericViewSet):
@@ -310,41 +309,36 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
             raise
 
     def _get_client_ip(self, request):
+        """Return the client IP from the request.
+
+        Uses the rightmost X-Forwarded-For IP (appended by the
+        trusted proxy) when proxy validation is enabled, otherwise
+        falls back to REMOTE_ADDR.
+        """
         if settings.EVENT_STREAM_REQUIRE_TRUSTED_PROXY:
             x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
             if x_forwarded_for:
-                return x_forwarded_for.split(",")[0].strip()
-        return request.META.get("REMOTE_ADDR")
-
-    def _check_rate_limit(self, request, event_stream_uuid):
-        key = (
-            f"es_auth_fail: {event_stream_uuid}: "
-            f"{self._get_client_ip(request)}"
-        )
-        failures = cache.get(key, 0)
-        if failures >= FAILURE_THRESHOLD:
-            raise AuthenticationFailed("Too many failed attempts")
-
-    def _record_failure(self, request, event_stream_uuid):
-        key = (
-            f"es_auth_fail: {event_stream_uuid}: "
-            f"{self._get_client_ip(request)}"
-        )
-        failures = cache.get(key, 0)
-        cache.set(key, failures + 1, FAILURE_WINDOW)
+                return x_forwarded_for.split(",")[-1].strip()
+        remote_addr = request.META.get("REMOTE_ADDR")
+        if not remote_addr:
+            raise AuthenticationFailed("Unable to determine client IP")
+        return remote_addr
 
     @extend_schema(exclude=True)
     @action(detail=True, methods=["POST"], rbac_action=None)
     def post(self, request, *_args, **kwargs):
         """Handle posts from external vendors."""
+        # Validate X-Trusted-Proxy header from Gateway/Envoy
+        self._validate_trusted_proxy_header(request)
+
+        client_ip = self._get_client_ip(request)
+        blacklist_manager.check_blacklist(client_ip)
+
         try:
             self.event_stream = EventStream.objects.get(uuid=kwargs["pk"])
         except (EventStream.DoesNotExist, ValidationError) as exc:
+            blacklist_manager.record_failure(client_ip)
             raise ParseError("bad uuid specified") from exc
-
-        # Validate X-Trusted-Proxy header from Gateway/Envoy
-        self._validate_trusted_proxy_header(request)
-        self._check_rate_limit(request, kwargs["pk"])
 
         try:
             inputs = get_resolved_secrets(self.event_stream.eda_credential)
@@ -365,10 +359,11 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                     headers=yaml.dump(event_headers),
                 )
             raise ParseError(message)
+
         try:
             self._handle_auth(request, inputs)
         except AuthenticationFailed:
-            self._record_failure(request, kwargs["pk"])
+            blacklist_manager.record_failure(client_ip)
             raise
 
         body = self._parse_body(
