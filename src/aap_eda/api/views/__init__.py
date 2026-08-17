@@ -20,6 +20,7 @@ from .credential_type import CredentialTypeViewSet
 from .decision_environment import DecisionEnvironmentViewSet
 from .eda_credential import EdaCredentialViewSet
 from .event_stream import EventStreamViewSet
+from .event_stream_setting import EventStreamSettingViewSet
 from .external_event_stream import ExternalEventStreamViewSet
 from .organization import OrganizationViewSet
 from .project import ProjectViewSet
@@ -61,6 +62,8 @@ __all__ = (
     "ConfigView",
     # Event stream
     "EventStreamViewSet",
+    # Event stream settings
+    "EventStreamSettingViewSet",
     # External event stream
     "ExternalEventStreamViewSet",
 )

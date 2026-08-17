@@ -20,6 +20,7 @@ from .credential_type import CredentialType
 from .decision_environment import DecisionEnvironment
 from .eda_credential import EdaCredential
 from .event_stream import EventStream
+from .event_stream_setting import EventStreamSetting
 from .job import (
     ActivationInstanceJobInstance,
     Job,
@@ -65,6 +66,7 @@ __all__ = [
     "Organization",
     "Team",
     "EventStream",
+    "EventStreamSetting",
     "Setting",
 ]
 
@@ -77,6 +79,7 @@ permission_registry.register(
     Organization,
     Team,
     EventStream,
+    EventStreamSetting,
     parent_field_name="organization",
 )
 permission_registry.register(

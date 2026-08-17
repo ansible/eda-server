@@ -340,6 +340,9 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
             blacklist_manager.record_failure(client_ip)
             raise ParseError("bad uuid specified") from exc
 
+        org_id = self.event_stream.organization_id
+        blacklist_manager.check_ip_policy(client_ip, org_id)
+
         try:
             inputs = get_resolved_secrets(self.event_stream.eda_credential)
         except CredentialPluginError as err:
@@ -363,7 +366,7 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
         try:
             self._handle_auth(request, inputs)
         except AuthenticationFailed:
-            blacklist_manager.record_failure(client_ip)
+            blacklist_manager.record_failure(client_ip, org_id=org_id)
             raise
 
         body = self._parse_body(
