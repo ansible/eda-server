@@ -55,6 +55,7 @@ from .event_stream import EventStreamInSerializer, EventStreamOutSerializer
 from .event_stream_setting import (
     EventStreamSettingCreateSerializer,
     EventStreamSettingOutSerializer,
+    RemoveBlockedIpsSerializer,
 )
 from .organization import (
     OrganizationCreateSerializer,
@@ -162,4 +163,5 @@ __all__ = (
     # event stream settings
     "EventStreamSettingCreateSerializer",
     "EventStreamSettingOutSerializer",
+    "RemoveBlockedIpsSerializer",
 )

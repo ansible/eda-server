@@ -6,10 +6,9 @@ from django.test.utils import override_settings
 
 
 @pytest.fixture(autouse=True)
-def disable_blacklisting(settings):
-    """Disable IP blacklisting and clear cache for tests."""
+def clear_cache_for_tests():
+    """Clear cache before and after each test."""
     cache.clear()
-    settings.EVENT_STREAM_BLACKLIST_THRESHOLD = 0
     yield
     cache.clear()
 

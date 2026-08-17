@@ -45,6 +45,7 @@ from tests.integration.constants import api_url_v1
                 "/organizations/",
                 "/teams/",
                 "/event-streams/",
+                "/event-stream-settings/",
                 "/credential-input-sources/",
                 "/role_definitions/",
                 "/role_user_assignments/",
@@ -97,6 +98,7 @@ from tests.integration.constants import api_url_v1
                 "/organizations/",
                 "/teams/",
                 "/event-streams/",
+                "/event-stream-settings/",
                 "feature_flags/states/",
                 # To be removed after all components
                 # have migrated away from this endpoint

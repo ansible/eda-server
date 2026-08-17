@@ -12,114 +12,117 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import ipaddress
 import logging
 
-from django.conf import settings
-from django.core.cache import cache
 from rest_framework.exceptions import AuthenticationFailed
 
 logger = logging.getLogger(__name__)
 
+MAX_BLOCKED_IPS = 1000
+
+
+def normalize_ip(ip_str: str) -> str:
+    """Normalize an IP address string.
+
+    Converts IPv4-mapped IPv6 addresses (e.g. ::ffff:10.0.0.1)
+    to their IPv4 form so allowlist lookups match regardless of
+    how the proxy reports the client IP.
+    """
+    try:
+        addr = ipaddress.ip_address(ip_str.strip())
+    except ValueError:
+        return ip_str.strip()
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+        return str(addr.ipv4_mapped)
+    return str(addr)
+
+
+def ip_in_allowlist(client_ip: str, allowed_ips: set) -> bool:
+    """Check if an IP matches any entry in the allowlist.
+
+    Supports both individual IPs and CIDR ranges.
+    """
+    if client_ip in allowed_ips:
+        return True
+    try:
+        addr = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return False
+    for entry in allowed_ips:
+        if "/" in entry:
+            try:
+                if addr in ipaddress.ip_network(entry, strict=False):
+                    return True
+            except ValueError:
+                continue
+    return False
+
 
 class BlacklistManager:
-    """Rate-limit and blacklist IPs that fail event stream authentication.
+    """Allowlist-based IP policy for event streams.
 
-    Supports both global (pre-org-resolution) and per-org modes.
+    When an organization has configured allowed_ips, only those
+    IPs may post events. IPs that are rejected are recorded in
+    blocked_ips for admin visibility — admins can then promote
+    a blocked IP to the allowlist or remove it entirely.
 
-    Global mode uses Dynaconf settings and flat cache keys. Per-org
-    mode reads thresholds from the EventStreamSetting DB model
-    (cached) and uses org-namespaced cache keys for isolation.
+    When no EventStreamSetting row exists for the org, or the
+    allowed_ips list is empty, all IPs are permitted.
     """
 
-    FAILURE_PREFIX = "es_fail"
-    BLACKLIST_PREFIX = "es_blacklist"
-
-    def check_blacklist(self, client_ip: str) -> None:
-        """Global blacklist check (pre-org-resolution).
-
-        Used before the EventStream UUID is resolved, when the
-        organization is unknown. Checks global Dynaconf settings.
-
-        A threshold of 0 disables blacklist checking entirely.
-        """
-        if settings.EVENT_STREAM_BLACKLIST_THRESHOLD == 0:
-            return
-        key = f"{self.BLACKLIST_PREFIX}:{client_ip}"
-        if cache.get(key):
-            raise AuthenticationFailed("Too many failed attempts")
-
     def check_ip_policy(self, client_ip: str, org_id: int) -> None:
-        """Full per-org IP policy check.
+        """Check if the IP is allowed for this organization.
 
-        Order:
-        1. Admin-managed blocked_ips (DB, cached)
-        2. Auto-blacklist from cache
-        3. Allowlist enforcement (if non-empty)
+        Raises AuthenticationFailed if the org has a non-empty
+        allowlist and the IP is not in it.
         """
         from aap_eda.services.event_stream_settings_cache import (
             get_org_settings,
         )
 
         org_settings = get_org_settings(org_id)
-
-        if client_ip in org_settings["blocked_ips"]:
-            raise AuthenticationFailed("IP address is blocked")
-
-        threshold = org_settings["blacklist_threshold"]
-        if threshold > 0:
-            key = f"{self.BLACKLIST_PREFIX}:{org_id}:{client_ip}"
-            if cache.get(key):
-                raise AuthenticationFailed("Too many failed attempts")
-
-        if (
-            org_settings["allowed_ips"]
-            and client_ip not in org_settings["allowed_ips"]
-        ):
-            raise AuthenticationFailed("IP address not in allowlist")
-
-    def record_failure(
-        self, client_ip: str, org_id: int | None = None
-    ) -> None:
-        """Record a failed request from the given IP.
-
-        When org_id is provided, uses per-org settings and
-        org-namespaced cache keys. Otherwise falls back to global
-        Dynaconf settings (for pre-org-resolution failures like
-        bad UUID lookups).
-        """
-        if org_id is not None:
-            from aap_eda.services.event_stream_settings_cache import (
-                get_org_settings,
-            )
-
-            org_settings = get_org_settings(org_id)
-            threshold = org_settings["blacklist_threshold"]
-            window = org_settings["blacklist_window"]
-            duration = org_settings["lockout_duration"]
-            key_suffix = f"{org_id}:{client_ip}"
-        else:
-            threshold = settings.EVENT_STREAM_BLACKLIST_THRESHOLD
-            window = settings.EVENT_STREAM_BLACKLIST_WINDOW
-            duration = settings.EVENT_STREAM_BLACKLIST_DURATION
-            key_suffix = client_ip
-
-        if threshold == 0:
+        if org_settings is None:
             return
 
-        counter_key = f"{self.FAILURE_PREFIX}:{key_suffix}"
-        try:
-            failures = cache.incr(counter_key)
-        except ValueError:
-            cache.set(counter_key, 1, window)
-            failures = 1
+        normalized = normalize_ip(client_ip)
 
-        if failures >= threshold:
-            blacklist_key = f"{self.BLACKLIST_PREFIX}:{key_suffix}"
-            cache.set(blacklist_key, True, duration)
+        if org_settings["allowed_ips"] and not ip_in_allowlist(
+            normalized, org_settings["allowed_ips"]
+        ):
+            self.record_blocked_ip(normalized, org_id)
+            raise AuthenticationFailed("IP address not in allowlist")
+
+    def record_blocked_ip(self, client_ip: str, org_id: int) -> None:
+        """Add an IP to the org's blocked_ips list for visibility.
+
+        Only adds the IP if it is not already tracked. Caps the
+        list at MAX_BLOCKED_IPS to prevent unbounded growth.
+        """
+        from aap_eda.core.models import EventStreamSetting
+
+        normalized = normalize_ip(client_ip)
+
+        try:
+            setting = EventStreamSetting.objects.get(organization_id=org_id)
+        except EventStreamSetting.DoesNotExist:
+            return
+
+        if normalized in setting.blocked_ips:
+            return
+
+        if len(setting.blocked_ips) >= MAX_BLOCKED_IPS:
             logger.warning(
-                "Blacklisted IP %s (org=%s) after %d failures",
-                client_ip,
+                "Blocked IPs cap (%d) reached for org %s",
+                MAX_BLOCKED_IPS,
                 org_id,
-                failures,
             )
-            cache.delete(counter_key)
+            return
+
+        setting.blocked_ips = [*setting.blocked_ips, normalized]
+        setting.save(update_fields=["blocked_ips", "modified_at"])
+        logger.info(
+            "Recorded blocked IP %s for org %s",
+            normalized,
+            org_id,
+        )

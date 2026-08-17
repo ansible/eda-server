@@ -29,6 +29,9 @@ from aap_eda.api.views.mixins import (
 )
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
+from aap_eda.services.event_stream_settings_cache import (
+    invalidate_org_settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +67,7 @@ class EventStreamSettingViewSet(
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.EventStreamSettingOutSerializer,
-                description="Return the event stream settings.",
+                description=("Return the event stream settings."),
             ),
         },
     )
@@ -76,7 +79,7 @@ class EventStreamSettingViewSet(
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.EventStreamSettingOutSerializer(many=True),
-                description="Return a list of event stream settings.",
+                description=("Return a list of event stream settings."),
             ),
         },
     )
@@ -88,7 +91,7 @@ class EventStreamSettingViewSet(
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.EventStreamSettingOutSerializer,
-                description="Return the new event stream settings.",
+                description=("Return the new event stream settings."),
             ),
         },
     )
@@ -100,7 +103,7 @@ class EventStreamSettingViewSet(
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.EventStreamSettingOutSerializer,
-                description="Return the updated event stream settings.",
+                description=("Return the updated event stream settings."),
             ),
         },
     )
@@ -108,50 +111,70 @@ class EventStreamSettingViewSet(
         return super().partial_update(request, *args, **kwargs)
 
     @extend_schema(
-        description=(
-            "Clear blocked IPs for this organization. "
-            "Clears both admin-managed and auto-blacklisted IPs."
-        ),
-        request=None,
+        description=("Remove specific IPs from the blocked list."),
+        request=serializers.RemoveBlockedIpsSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.EventStreamSettingOutSerializer,
-                description="Return the updated event stream settings.",
+                description=("Return the updated event stream settings."),
             ),
         },
     )
-    @action(detail=True, methods=["post"], url_path="clear-blocked")
-    def clear_blocked(self, request, pk=None):
-        """Clear blocked IPs — DB-stored and cache-auto-blacklisted."""
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="remove-blocked",
+    )
+    def remove_blocked(self, request, pk=None):
+        """Remove specific IPs from the blocked list."""
         setting = self.get_object()
-        org_id = setting.organization_id
+        sz = serializers.RemoveBlockedIpsSerializer(data=request.data)
+        sz.is_valid(raise_exception=True)
+        ips_to_remove = set(sz.validated_data["ips"])
 
-        setting.blocked_ips = []
+        setting.blocked_ips = [
+            ip for ip in setting.blocked_ips if ip not in ips_to_remove
+        ]
         setting.save(update_fields=["blocked_ips", "modified_at"])
-
-        _clear_org_blacklist_cache(org_id)
+        invalidate_org_settings(setting.organization_id)
 
         logger.info(
-            "Cleared blocked IPs for org %s (user: %s)",
-            org_id,
-            request.user,
+            "Removed %d IPs from blocked list for org %s",
+            len(ips_to_remove),
+            setting.organization_id,
         )
         return Response(
             serializers.EventStreamSettingOutSerializer(setting).data,
             status=status.HTTP_200_OK,
         )
 
-
-def _clear_org_blacklist_cache(org_id: int) -> None:
-    """Best-effort clear of auto-blacklist cache keys for an org.
-
-    Django's cache API does not support wildcard deletion. We
-    invalidate the org settings cache so the next check re-reads
-    from DB (where blocked_ips is now empty). Auto-blacklist
-    entries in cache will expire naturally via TTL.
-    """
-    from aap_eda.services.event_stream_settings_cache import (
-        invalidate_org_settings,
+    @extend_schema(
+        description="Clear all IPs from the blocked list.",
+        request=None,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.EventStreamSettingOutSerializer,
+                description=("Return the updated event stream settings."),
+            ),
+        },
     )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="clear-blocked",
+    )
+    def clear_blocked(self, request, pk=None):
+        """Clear all blocked IPs."""
+        setting = self.get_object()
+        setting.blocked_ips = []
+        setting.save(update_fields=["blocked_ips", "modified_at"])
+        invalidate_org_settings(setting.organization_id)
 
-    invalidate_org_settings(org_id)
+        logger.info(
+            "Cleared all blocked IPs for org %s",
+            setting.organization_id,
+        )
+        return Response(
+            serializers.EventStreamSettingOutSerializer(setting).data,
+            status=status.HTTP_200_OK,
+        )

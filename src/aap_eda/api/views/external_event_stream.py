@@ -309,20 +309,23 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
             raise
 
     def _get_client_ip(self, request):
-        """Return the client IP from the request.
+        """Return the normalized client IP from the request.
 
         Uses the rightmost X-Forwarded-For IP (appended by the
         trusted proxy) when proxy validation is enabled, otherwise
-        falls back to REMOTE_ADDR.
+        falls back to REMOTE_ADDR. Normalizes IPv4-mapped IPv6
+        addresses to IPv4 form for consistent allowlist matching.
         """
+        from aap_eda.api.blacklist import normalize_ip
+
         if settings.EVENT_STREAM_REQUIRE_TRUSTED_PROXY:
             x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
             if x_forwarded_for:
-                return x_forwarded_for.split(",")[-1].strip()
+                return normalize_ip(x_forwarded_for.split(",")[-1])
         remote_addr = request.META.get("REMOTE_ADDR")
         if not remote_addr:
             raise AuthenticationFailed("Unable to determine client IP")
-        return remote_addr
+        return normalize_ip(remote_addr)
 
     @extend_schema(exclude=True)
     @action(detail=True, methods=["POST"], rbac_action=None)
@@ -332,12 +335,10 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
         self._validate_trusted_proxy_header(request)
 
         client_ip = self._get_client_ip(request)
-        blacklist_manager.check_blacklist(client_ip)
 
         try:
             self.event_stream = EventStream.objects.get(uuid=kwargs["pk"])
         except (EventStream.DoesNotExist, ValidationError) as exc:
-            blacklist_manager.record_failure(client_ip)
             raise ParseError("bad uuid specified") from exc
 
         org_id = self.event_stream.organization_id
@@ -366,7 +367,7 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
         try:
             self._handle_auth(request, inputs)
         except AuthenticationFailed:
-            blacklist_manager.record_failure(client_ip, org_id=org_id)
+            blacklist_manager.record_blocked_ip(client_ip, org_id)
             raise
 
         body = self._parse_body(

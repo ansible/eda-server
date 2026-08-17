@@ -12,15 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Per-organization event stream settings cache with signal-based invalidation.
+"""Per-organization event stream settings cache.
 
-Settings are cached for SETTINGS_CACHE_TTL seconds. A post_save signal
-on EventStreamSetting invalidates the cache so changes propagate
-immediately (within the same cache backend).
+Settings are cached for SETTINGS_CACHE_TTL seconds. A post_save
+signal on EventStreamSetting invalidates the cache so changes
+propagate immediately (within the same cache backend).
 """
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from django.core.cache import cache
 from django.db.models.signals import post_save
@@ -30,21 +30,22 @@ logger = logging.getLogger(__name__)
 
 SETTINGS_CACHE_PREFIX = "es_org_settings"
 SETTINGS_CACHE_TTL = 300
+_CACHE_MISS = object()
 
 
 def _cache_key(org_id: int) -> str:
-    return f"{SETTINGS_CACHE_PREFIX}:{org_id}"
+    return f"{SETTINGS_CACHE_PREFIX}:{org_id}"  # noqa: E231
 
 
-def get_org_settings(org_id: int) -> dict:
+def get_org_settings(org_id: int) -> Optional[dict]:
     """Get per-org event stream settings, from cache or DB.
 
-    Falls back to global Dynaconf defaults if no DB row exists
-    for the given organization.
+    Returns None if no settings row exists for this org
+    (meaning no IP restrictions are configured).
     """
     key = _cache_key(org_id)
-    cached = cache.get(key)
-    if cached is not None:
+    cached = cache.get(key, _CACHE_MISS)
+    if cached is not _CACHE_MISS:
         return cached
 
     from aap_eda.core.models import EventStreamSetting
@@ -54,26 +55,9 @@ def get_org_settings(org_id: int) -> dict:
         data = {
             "allowed_ips": set(setting.allowed_ips),
             "blocked_ips": set(setting.blocked_ips),
-            "blacklist_threshold": setting.blacklist_threshold,
-            "blacklist_window": setting.blacklist_window,
-            "lockout_duration": setting.lockout_duration,
         }
     except EventStreamSetting.DoesNotExist:
-        from django.conf import settings as django_settings
-
-        data = {
-            "allowed_ips": set(),
-            "blocked_ips": set(),
-            "blacklist_threshold": getattr(
-                django_settings, "EVENT_STREAM_BLACKLIST_THRESHOLD", 5
-            ),
-            "blacklist_window": getattr(
-                django_settings, "EVENT_STREAM_BLACKLIST_WINDOW", 60
-            ),
-            "lockout_duration": getattr(
-                django_settings, "EVENT_STREAM_BLACKLIST_DURATION", 3600
-            ),
-        }
+        data = None
 
     cache.set(key, data, SETTINGS_CACHE_TTL)
     return data

@@ -20,14 +20,16 @@ from .base import PrimordialModel
 class EventStreamSetting(PrimordialModel):
     """Per-organization IP security settings for event streams.
 
-    Controls which IPs may post events (allowlist), which are
-    permanently blocked (blocklist), and auto-blacklist behavior
-    (threshold, window, lockout duration).
+    Controls which IPs may post events (allowlist) and tracks
+    IPs that attempted access and were rejected (blocklist).
+    Admins can promote blocked IPs to the allowlist or remove
+    them from the blocklist entirely.
     """
 
     class Meta:
         db_table = "core_event_stream_setting"
         ordering = ("-created_at",)
+        default_permissions = ("add", "change", "view")
 
     organization = models.OneToOneField(
         "Organization",
@@ -38,29 +40,19 @@ class EventStreamSetting(PrimordialModel):
         default=list,
         blank=True,
         help_text=(
-            "IP allowlist. When non-empty, only these IPs may post "
-            "events to any event stream in this organization."
+            "IP allowlist. Accepts individual IPs and CIDR "
+            "ranges (e.g. 192.30.252.0/22). When non-empty, "
+            "only matching IPs may post events. "
+            "Empty means all IPs are allowed."
         ),
     )
     blocked_ips = models.JSONField(
         default=list,
         blank=True,
-        help_text="Admin-managed list of permanently blocked IPs.",
-    )
-    blacklist_threshold = models.PositiveIntegerField(
-        default=5,
         help_text=(
-            "Number of auth failures before an IP is auto-blacklisted. "
-            "Set to 0 to disable auto-blacklisting."
+            "IPs that attempted access and were rejected. "
+            "Auto-populated on failed requests for admin visibility."
         ),
-    )
-    blacklist_window = models.PositiveIntegerField(
-        default=60,
-        help_text="Seconds within which failures are counted.",
-    )
-    lockout_duration = models.PositiveIntegerField(
-        default=3600,
-        help_text="Seconds an auto-blacklisted IP stays blocked.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
