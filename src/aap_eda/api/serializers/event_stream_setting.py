@@ -27,19 +27,35 @@ MAX_IPS_PER_LIST = 255
 def _validate_ip_list(value):
     if len(value) > MAX_IPS_PER_LIST:
         raise serializers.ValidationError(
-            f"Maximum {MAX_IPS_PER_LIST} IP addresses allowed."
+            f"Maximum {MAX_IPS_PER_LIST} entries allowed."
         )
-    for ip in value:
-        try:
-            ipaddress.ip_address(ip.strip())
-        except ValueError:
-            raise serializers.ValidationError(
-                f"'{ip}' is not a valid IPv4 or IPv6 address."
-            )
-    return value
+    from aap_eda.api.blacklist import normalize_ip
+
+    normalized = []
+    for entry in value:
+        entry = entry.strip()
+        if "/" in entry:
+            try:
+                net = ipaddress.ip_network(entry, strict=False)
+                normalized.append(str(net))
+            except ValueError:
+                raise serializers.ValidationError(
+                    f"'{entry}' is not a valid CIDR range."
+                )
+        else:
+            try:
+                ipaddress.ip_address(entry)
+            except ValueError:
+                raise serializers.ValidationError(
+                    f"'{entry}' is not a valid IP address."
+                )
+            normalized.append(normalize_ip(entry))
+    return normalized
 
 
-class EventStreamSettingCreateSerializer(serializers.ModelSerializer):
+class EventStreamSettingCreateSerializer(
+    serializers.ModelSerializer,
+):
     organization_id = serializers.IntegerField(
         required=True,
         allow_null=False,
@@ -63,10 +79,19 @@ class EventStreamSettingCreateSerializer(serializers.ModelSerializer):
             "organization_id",
             "allowed_ips",
             "blocked_ips",
-            "blacklist_threshold",
-            "blacklist_window",
-            "lockout_duration",
         ]
+
+    def validate_organization_id(self, value):
+        if (
+            not self.instance
+            and models.EventStreamSetting.objects.filter(
+                organization_id=value
+            ).exists()
+        ):
+            raise serializers.ValidationError(
+                "Settings already exist for this organization."
+            )
+        return value
 
     def validate_allowed_ips(self, value):
         return _validate_ip_list(value)
@@ -74,8 +99,20 @@ class EventStreamSettingCreateSerializer(serializers.ModelSerializer):
     def validate_blocked_ips(self, value):
         return _validate_ip_list(value)
 
+    def update(self, instance, validated_data):
+        new_allowed = validated_data.get("allowed_ips")
+        if new_allowed is not None:
+            added_ips = set(new_allowed) - set(instance.allowed_ips)
+            if added_ips and instance.blocked_ips:
+                instance.blocked_ips = [
+                    ip for ip in instance.blocked_ips if ip not in added_ips
+                ]
+        return super().update(instance, validated_data)
 
-class EventStreamSettingOutSerializer(serializers.ModelSerializer):
+
+class EventStreamSettingOutSerializer(
+    serializers.ModelSerializer,
+):
     organization = serializers.SerializerMethodField()
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
@@ -91,9 +128,6 @@ class EventStreamSettingOutSerializer(serializers.ModelSerializer):
             "organization",
             "allowed_ips",
             "blocked_ips",
-            "blacklist_threshold",
-            "blacklist_window",
-            "lockout_duration",
             "created_by",
             "modified_by",
             *read_only_fields,
@@ -111,3 +145,14 @@ class EventStreamSettingOutSerializer(serializers.ModelSerializer):
         result["created_by"] = BasicUserSerializer(instance.created_by).data
         result["modified_by"] = BasicUserSerializer(instance.modified_by).data
         return result
+
+
+class RemoveBlockedIpsSerializer(serializers.Serializer):
+    ips = serializers.ListField(
+        child=serializers.CharField(max_length=45),
+        required=True,
+        help_text="IPs to remove from the blocked list.",
+    )
+
+    def validate_ips(self, value):
+        return _validate_ip_list(value)

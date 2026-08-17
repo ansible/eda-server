@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
                         editable=False,
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
-                        related_name="%(class)s_created+",
+                        related_name="%s(class)s_created+",
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
                         editable=False,
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
-                        related_name="%(class)s_modified+",
+                        related_name="%s(class)s_modified+",
                         to=settings.AUTH_USER_MODEL,
                     ),
                 ),
@@ -60,9 +60,11 @@ class Migration(migrations.Migration):
                         blank=True,
                         default=list,
                         help_text=(
-                            "IP allowlist. When non-empty, only these IPs "
-                            "may post events to any event stream in this "
-                            "organization."
+                            "IP allowlist. Accepts individual IPs "
+                            "and CIDR ranges (e.g. 192.30.252.0/22). "
+                            "When non-empty, only matching IPs may "
+                            "post events. Empty means all IPs are "
+                            "allowed."
                         ),
                     ),
                 ),
@@ -72,36 +74,9 @@ class Migration(migrations.Migration):
                         blank=True,
                         default=list,
                         help_text=(
-                            "Admin-managed list of permanently blocked IPs."
-                        ),
-                    ),
-                ),
-                (
-                    "blacklist_threshold",
-                    models.PositiveIntegerField(
-                        default=5,
-                        help_text=(
-                            "Number of auth failures before an IP is "
-                            "auto-blacklisted. Set to 0 to disable "
-                            "auto-blacklisting."
-                        ),
-                    ),
-                ),
-                (
-                    "blacklist_window",
-                    models.PositiveIntegerField(
-                        default=60,
-                        help_text=(
-                            "Seconds within which failures are counted."
-                        ),
-                    ),
-                ),
-                (
-                    "lockout_duration",
-                    models.PositiveIntegerField(
-                        default=3600,
-                        help_text=(
-                            "Seconds an auto-blacklisted IP stays blocked."
+                            "IPs that attempted access and were "
+                            "rejected. Auto-populated on failed "
+                            "requests for admin visibility."
                         ),
                     ),
                 ),
@@ -117,6 +92,7 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "core_event_stream_setting",
                 "ordering": ("-created_at",),
+                "default_permissions": ("add", "change", "view"),
             },
         ),
     ]

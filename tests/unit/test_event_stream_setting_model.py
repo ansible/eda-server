@@ -36,16 +36,13 @@ class TestGetOrgSettings:
             organization=default_organization,
             allowed_ips=["10.0.0.1", "10.0.0.2"],
             blocked_ips=["192.168.1.100"],
-            blacklist_threshold=3,
-            blacklist_window=30,
-            lockout_duration=1800,
         )
         result = get_org_settings(default_organization.id)
-        assert result["allowed_ips"] == {"10.0.0.1", "10.0.0.2"}
+        assert result["allowed_ips"] == {
+            "10.0.0.1",
+            "10.0.0.2",
+        }
         assert result["blocked_ips"] == {"192.168.1.100"}
-        assert result["blacklist_threshold"] == 3
-        assert result["blacklist_window"] == 30
-        assert result["lockout_duration"] == 1800
 
     def test_caches_result(self, default_organization):
         models.EventStreamSetting.objects.create(
@@ -59,16 +56,9 @@ class TestGetOrgSettings:
         result2 = get_org_settings(default_organization.id)
         assert result1["allowed_ips"] == result2["allowed_ips"]
 
-    def test_fallback_to_global_defaults(self, default_organization, settings):
-        settings.EVENT_STREAM_BLACKLIST_THRESHOLD = 7
-        settings.EVENT_STREAM_BLACKLIST_WINDOW = 120
-        settings.EVENT_STREAM_BLACKLIST_DURATION = 7200
+    def test_no_row_returns_none(self, default_organization):
         result = get_org_settings(default_organization.id)
-        assert result["allowed_ips"] == set()
-        assert result["blocked_ips"] == set()
-        assert result["blacklist_threshold"] == 7
-        assert result["blacklist_window"] == 120
-        assert result["lockout_duration"] == 7200
+        assert result is None
 
     def test_invalidate_clears_cache(self, default_organization):
         models.EventStreamSetting.objects.create(

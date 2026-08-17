@@ -239,17 +239,6 @@ EVENT_STREAM_MTLS_BASE_URL: UrlSlash = None
 #   export EDA_EVENT_STREAM_REQUIRE_TRUSTED_PROXY=False
 EVENT_STREAM_REQUIRE_TRUSTED_PROXY: bool = True
 
-# IP blacklisting for event stream abuse prevention
-# Set threshold to 0 to disable blacklisting entirely
-# Note: blacklisting requires a shared cache backend (Redis,
-# Memcached) to work across multiple workers. The default
-# LocMemCache is per-process and will not share state.
-# For test deployments: export EDA_EVENT_STREAM_BLACKLIST_THRESHOLD=0
-# or set EDA_MODE=testing (loads testing_defaults.py)
-EVENT_STREAM_BLACKLIST_THRESHOLD: int = 5
-EVENT_STREAM_BLACKLIST_WINDOW: int = 60  # seconds
-EVENT_STREAM_BLACKLIST_DURATION: int = 3600  # seconds (1 hour)
-
 MAX_PG_NOTIFY_MESSAGE_SIZE: int = 6144
 
 # Database credentials for the event streams user

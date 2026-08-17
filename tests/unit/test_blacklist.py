@@ -17,6 +17,7 @@ from django.core.cache import cache
 from rest_framework.exceptions import AuthenticationFailed
 
 from aap_eda.api.blacklist import BlacklistManager
+from aap_eda.core import models
 
 
 @pytest.fixture(autouse=True)
@@ -31,55 +32,79 @@ def manager():
     return BlacklistManager()
 
 
-@pytest.fixture
-def blacklist_settings(settings):
-    settings.EVENT_STREAM_BLACKLIST_THRESHOLD = 5
-    settings.EVENT_STREAM_BLACKLIST_WINDOW = 60
-    settings.EVENT_STREAM_BLACKLIST_DURATION = 3600
-    return settings
+@pytest.mark.django_db
+class TestCheckIpPolicy:
+    def test_no_settings_allows_all(self, manager, default_organization):
+        manager.check_ip_policy("10.0.0.1", default_organization.id)
 
+    def test_empty_allowlist_allows_all(self, manager, default_organization):
+        models.EventStreamSetting.objects.create(
+            organization=default_organization,
+            allowed_ips=[],
+        )
+        manager.check_ip_policy("10.0.0.1", default_organization.id)
 
-class TestBlacklisting:
-    def test_single_failure_not_blacklisted(self, manager, blacklist_settings):
-        manager.record_failure("10.0.0.1")
-        manager.check_blacklist("10.0.0.1")
-
-    def test_threshold_triggers_blacklist(self, manager, blacklist_settings):
-        blacklist_settings.EVENT_STREAM_BLACKLIST_THRESHOLD = 3
-
-        for _ in range(3):
-            manager.record_failure("10.0.0.1")
-
-        with pytest.raises(AuthenticationFailed):
-            manager.check_blacklist("10.0.0.1")
-
-    def test_below_threshold_not_blacklisted(
-        self, manager, blacklist_settings
+    def test_allowlist_rejects_unlisted_ip(
+        self, manager, default_organization
     ):
-        for _ in range(4):
-            manager.record_failure("10.0.0.1")
+        models.EventStreamSetting.objects.create(
+            organization=default_organization,
+            allowed_ips=["10.0.0.1"],
+        )
+        with pytest.raises(AuthenticationFailed, match="allowlist"):
+            manager.check_ip_policy("10.0.0.99", default_organization.id)
 
-        manager.check_blacklist("10.0.0.1")
+    def test_allowlist_passes_listed_ip(self, manager, default_organization):
+        models.EventStreamSetting.objects.create(
+            organization=default_organization,
+            allowed_ips=["10.0.0.1"],
+        )
+        manager.check_ip_policy("10.0.0.1", default_organization.id)
 
-    def test_per_ip_isolation(self, manager, blacklist_settings):
-        blacklist_settings.EVENT_STREAM_BLACKLIST_THRESHOLD = 3
+    def test_cidr_allows_ip_in_range(self, manager, default_organization):
+        models.EventStreamSetting.objects.create(
+            organization=default_organization,
+            allowed_ips=["192.30.252.0/22"],
+        )
+        manager.check_ip_policy("192.30.253.5", default_organization.id)
 
-        for _ in range(3):
-            manager.record_failure("10.0.0.1")
-
-        manager.check_blacklist("10.0.0.2")
-
-    def test_clean_ip_passes(self, manager):
-        manager.check_blacklist("10.0.0.1")
-
-
-class TestDisabledBlacklisting:
-    def test_zero_threshold_disables_blacklisting(
-        self, manager, blacklist_settings
+    def test_cidr_rejects_ip_outside_range(
+        self, manager, default_organization
     ):
-        blacklist_settings.EVENT_STREAM_BLACKLIST_THRESHOLD = 0
+        models.EventStreamSetting.objects.create(
+            organization=default_organization,
+            allowed_ips=["192.30.252.0/22"],
+        )
+        with pytest.raises(AuthenticationFailed, match="allowlist"):
+            manager.check_ip_policy("10.0.0.1", default_organization.id)
 
-        for _ in range(10):
-            manager.record_failure("10.0.0.1")
+    def test_mixed_ips_and_cidrs(self, manager, default_organization):
+        models.EventStreamSetting.objects.create(
+            organization=default_organization,
+            allowed_ips=["10.0.0.1", "192.30.252.0/22"],
+        )
+        manager.check_ip_policy("10.0.0.1", default_organization.id)
+        manager.check_ip_policy("192.30.255.100", default_organization.id)
 
-        manager.check_blacklist("10.0.0.1")
+
+@pytest.mark.django_db
+class TestRecordBlockedIp:
+    def test_records_rejected_ip(self, manager, default_organization):
+        setting = models.EventStreamSetting.objects.create(
+            organization=default_organization,
+        )
+        manager.record_blocked_ip("10.0.0.1", default_organization.id)
+        setting.refresh_from_db()
+        assert "10.0.0.1" in setting.blocked_ips
+
+    def test_does_not_duplicate(self, manager, default_organization):
+        setting = models.EventStreamSetting.objects.create(
+            organization=default_organization,
+            blocked_ips=["10.0.0.1"],
+        )
+        manager.record_blocked_ip("10.0.0.1", default_organization.id)
+        setting.refresh_from_db()
+        assert setting.blocked_ips.count("10.0.0.1") == 1
+
+    def test_no_settings_row_is_noop(self, manager, default_organization):
+        manager.record_blocked_ip("10.0.0.1", default_organization.id)

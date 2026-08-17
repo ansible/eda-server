@@ -54,6 +54,8 @@ def test_create_with_default_org(
 
     if model._meta.model_name == "team":
         pytest.skip("Team model requires an organization")
+    if model._meta.model_name == "eventstreamsetting":
+        pytest.skip("Singleton per-org model tested separately")
 
     try:
         url = reverse(f"{model._meta.model_name}-list")
@@ -115,6 +117,9 @@ def test_create_with_custom_org(
     assert "organization_id" in post_data  # sanity
     # factory returns data with default org so we have to change it here
     post_data["organization_id"] = new_organization.id
+
+    if model._meta.model_name == "eventstreamsetting":
+        pytest.skip("Singleton per-org model tested separately")
 
     try:
         url = reverse(f"{model._meta.model_name}-list")
