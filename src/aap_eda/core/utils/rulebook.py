@@ -18,6 +18,7 @@ import logging
 import yaml
 
 from aap_eda.core.exceptions import ParseError
+from aap_eda.core import models
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_SOURCE_NAME_PREFIX = "__SOURCE_"
@@ -145,3 +146,50 @@ def _updated_event_stream_source(
         updated_source["filters"] = source["filters"]
     LOGGER.info("Source %s updated with Event Stream Source", name)
     return updated_source
+
+
+def update_event_stream_sources_from_mappings(
+    rulebook_rulesets: str, source_mappings_yaml: str, pg_notify_dsn: str
+) -> str:
+    """
+    Load source mappings (YAML string), resolve EventStream objects in DB,
+    build event stream sources dict and substitute them into the rulebook
+    rulesets via swap_event_stream_sources.
+
+    Args:
+        rulebook_rulesets: YAML/string rulesets content
+        source_mappings_yaml: YAML string (user-provided source mappings)
+        pg_notify_dsn: DSN template string to use for pg_listener sources
+
+    Returns:
+        Updated rulesets YAML string (returned by swap_event_stream_sources)
+
+    Raises:
+        ParseError: on invalid mappings, missing event stream, or other failures
+    """
+    try:
+        source_mappings = yaml.safe_load(source_mappings_yaml)
+        sources_info = {}
+        for source_map in source_mappings:
+            event_stream_id = source_map.get("event_stream_id")
+            try:
+                obj = models.EventStream.objects.get(id=event_stream_id)
+            except models.EventStream.DoesNotExist as exc:
+                raise ParseError(f"Event stream id {event_stream_id} not found") from exc
+
+            sources_info[obj.name] = {
+                "ansible.eda.pg_listener": {
+                    "dsn": pg_notify_dsn,
+                    "channels": [obj.channel_name],
+                },
+            }
+
+        return swap_event_stream_sources(rulebook_rulesets, sources_info, source_mappings)
+    except yaml.MarkedYAMLError as ex:
+        LOGGER.error("Invalid source mappings YAML: %s", str(ex))
+        raise ParseError("Failed to parse source mappings") from ex
+    except ParseError:
+        raise
+    except Exception as ex:
+        LOGGER.exception("Failed to update event stream sources: %s", str(ex))
+        raise ParseError("Failed to update event stream sources") from ex
