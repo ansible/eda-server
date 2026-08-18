@@ -292,6 +292,40 @@ async def test_handle_events(
     assert (await get_job_instance_event_count()) == 1
 
 
+@pytest.mark.parametrize(
+    "created_timestamp",
+    [
+        pytest.param("2023-03-29T15:00:17.260803", id="naive"),
+        pytest.param("2023-03-29T15:00:17.260803Z", id="utc_z_suffix"),
+        pytest.param("2023-03-29T15:00:17.260803+00:00", id="utc_offset"),
+        pytest.param("2023-03-29T15:00:17.260803+05:30", id="positive_offset"),
+        pytest.param("2023-03-29T15:00:17.260803-04:00", id="negative_offset"),
+    ],
+)
+@pytest.mark.django_db(transaction=True)
+async def test_handle_events_with_timezone_in_created(
+    ws_communicator: WebsocketCommunicator,
+    created_timestamp: str,
+):
+    job_instance = await _prepare_job_instance()
+
+    initial_count = await get_job_instance_event_count()
+    payload = {
+        "type": "AnsibleEvent",
+        "event": {
+            "event": "verbose",
+            "job_id": job_instance.uuid,
+            "counter": 1,
+            "stdout": "the playbook is completed",
+            "created": created_timestamp,
+        },
+    }
+    await ws_communicator.send_json_to(payload)
+    await ws_communicator.wait()
+
+    assert (await get_job_instance_event_count()) == initial_count + 1
+
+
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions_multiple_firing(
     default_organization: models.Organization,
