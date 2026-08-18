@@ -1,7 +1,16 @@
 """Shared test configuration for API integration tests."""
 
 import pytest
+from django.core.cache import cache
 from django.test.utils import override_settings
+
+
+@pytest.fixture(autouse=True)
+def clear_cache_for_tests():
+    """Clear cache before and after each test."""
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture(autouse=True)
