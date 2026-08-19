@@ -83,6 +83,10 @@ class TeeSystemLogger(DBLogger):
                 extra=extra,
             )
         finally:
-            # This will call the DBLoggers flush which will
-            # write to the Database and clear the log buffer
+            if not self.store_debug_logs:
+                self.activation_instance_log_buffer = [
+                    buf
+                    for buf in self.activation_instance_log_buffer
+                    if "DEBUG" not in buf.log[:LOG_LEVEL_SEARCH_INDEX]
+                ]
             super().flush()

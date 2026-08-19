@@ -32,8 +32,13 @@ LOGGER = logging.getLogger(__name__)
 
 
 class DBLogger(LogHandler):
-    def __init__(self, activation_instance_id: int):
+    def __init__(
+        self,
+        activation_instance_id: int,
+        store_debug_logs: bool = False,
+    ):
         self.activation_instance_id = activation_instance_id
+        self.store_debug_logs = store_debug_logs
         self.line_count = 0
         self.activation_instance_log_buffer = []
         if str(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER) == "end":
@@ -90,6 +95,39 @@ class DBLogger(LogHandler):
             raise ContainerUpdateLogsError(message)
 
         self.activation_instance_log_buffer = []
+        self._enforce_max_log_lines()
+
+    def _enforce_max_log_lines(self) -> None:
+        max_lines = int(settings.EDA_MAX_LOG_LINES_PER_INSTANCE)
+        if max_lines <= 0:
+            return
+        if self.line_count % 1000 != 0:
+            return
+
+        count = self.num_of_log_lines()
+        if count <= max_lines:
+            return
+
+        excess = count - max_lines
+        oldest_ids = list(
+            models.RulebookProcessLog.objects.filter(
+                activation_instance_id=self.activation_instance_id,
+            )
+            .order_by("id")
+            .values_list("id", flat=True)[:excess]
+        )
+        if oldest_ids:
+            models.RulebookProcessLog.objects.filter(
+                id__in=oldest_ids,
+            ).delete()
+            LOGGER.warning(
+                "Instance %s: trimmed %d oldest log lines "
+                "(cap: %d, was: %d)",
+                self.activation_instance_id,
+                len(oldest_ids),
+                max_lines,
+                count,
+            )
 
     def get_log_read_at(self) -> Optional[datetime]:
         try:
