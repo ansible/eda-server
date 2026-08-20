@@ -51,6 +51,8 @@ spec:
       value: "{{pull_request_number}}"
     - name: aap-dev-component-source-name
       value: "eda"
+    - name: aap-dev-revision
+      value: "fix/tsd-image-registry-url"
 
   workspaces:
     - name: workspace
