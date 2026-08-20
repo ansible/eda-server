@@ -52,7 +52,7 @@ spec:
     - name: aap-dev-component-source-name
       value: "eda"
     - name: aap-dev-revision
-      value: "fix/tsd-image-registry-url"
+      value: "bw/fix/tsd-image-registry-url"
 
   workspaces:
     - name: workspace
