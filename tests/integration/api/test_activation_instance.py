@@ -19,6 +19,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
+from aap_eda.utils.log_sanitizer import REDACTED_STRING
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -167,6 +168,28 @@ def test_logs_page_size_capped_at_max(
     )
     assert response.status_code == status.HTTP_200_OK
     assert response.data["page_size"] == 5000
+
+
+@pytest.mark.django_db
+def test_activation_instance_logs_redact_sensitive_data(
+    default_activation_instances: List[models.RulebookProcess],
+    admin_client: APIClient,
+):
+    """Verify the logs API redacts sensitive data in stored log entries."""
+    instance = default_activation_instances[0]
+    models.RulebookProcessLog.objects.create(
+        log="connected with token=super-secret-value",
+        activation_instance=instance,
+    )
+
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}/logs/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    log_entry = response.data["results"][-1]
+    assert "super-secret-value" not in log_entry["log"]
+    assert REDACTED_STRING in log_entry["log"]
 
 
 def assert_activation_instance_data(

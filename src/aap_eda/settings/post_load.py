@@ -198,6 +198,9 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
             "activation_id_filter": {
                 "()": "aap_eda.utils.log_tracking_id_filter.LogTrackingIdFilter",  # noqa: E501
             },
+            "sensitive_data_filter": {
+                "()": "aap_eda.utils.log_sanitizer.SensitiveDataFilter",
+            },
         },
         "formatters": {
             "simple": {
@@ -231,27 +234,27 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
             "console": {
                 "class": STREAM_HANDLER,
                 "formatter": "simple",
-                "filters": ["activation_id_filter"],
+                "filters": ["activation_id_filter", "sensitive_data_filter"],
             },
             "request_handler": {
                 "class": STREAM_HANDLER,
                 "formatter": "simple_with_request",
-                "filters": ["activation_id_filter"],
+                "filters": ["activation_id_filter", "sensitive_data_filter"],
             },
             "tracking_handler": {
                 "class": STREAM_HANDLER,
                 "formatter": "simple_with_tracking",
-                "filters": ["activation_id_filter"],
+                "filters": ["activation_id_filter", "sensitive_data_filter"],
             },
             "verbose_handler": {
                 "class": STREAM_HANDLER,
                 "formatter": "verbose",
-                "filters": ["activation_id_filter"],
+                "filters": ["activation_id_filter", "sensitive_data_filter"],
             },
             "ansible_rulebook_handler": {
                 "class": STREAM_HANDLER,
                 "formatter": "ansible_rulebook",
-                "filters": ["activation_id_filter"],
+                "filters": ["activation_id_filter", "sensitive_data_filter"],
             },
         },
         "root": {"handlers": ["console"], "level": "WARNING"},

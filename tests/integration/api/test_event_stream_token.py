@@ -19,11 +19,9 @@ import yaml
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.api.views.external_event_stream import (
-    REDACTED_STRING,
-    UNSAFE_HEADER_KEYS,
-)
+from aap_eda.api.views.external_event_stream import UNSAFE_HEADER_KEYS
 from aap_eda.core import enums
+from aap_eda.utils.log_sanitizer import REDACTED_STRING
 from tests.integration.api.test_event_stream import (
     create_event_stream,
     create_event_stream_credential,
@@ -182,9 +180,75 @@ BASE_HEADERS = {
                     "X-Gitlab-Instance",
                     "X-Gitlab-Event",
                 ],
-                "redacted": False,
+                "redacted": True,
                 "key_remap": {},
-                "test_name": "single data header with exposed auth_header",
+                "test_name": "single data header with auth_header redacted",
+            }
+        ),
+        (
+            {
+                "auth_header": "X-Gitlab-Token",
+                "additional_data_headers": "X-Gitlab-Token, X-Gitlab-Event",
+                "headers": BASE_HEADERS,
+                "required_header_keys": [
+                    "X-Gitlab-Token",
+                    "X-Gitlab-Event",
+                ],
+                "keys_should_not_exist": list(UNSAFE_HEADER_KEYS)
+                + [
+                    "X-Envoy-abc",
+                    "X-Gitlab-Event-Uuid",
+                    "X-Gitlab-Uuid",
+                    "X-Gitlab-Instance",
+                ],
+                "redacted": True,
+                "key_remap": {},
+                "test_name": "auth_header redacted but data header exposed",
+            }
+        ),
+        (
+            {
+                "auth_header": "X-Gitlab-Token",
+                "additional_data_headers": (
+                    "X-Gitlab-Token, X-Gitlab-Event, X-Missing-Header"
+                ),
+                "headers": BASE_HEADERS,
+                "required_header_keys": [
+                    "X-Gitlab-Token",
+                    "X-Gitlab-Event",
+                ],
+                "keys_should_not_exist": list(UNSAFE_HEADER_KEYS)
+                + [
+                    "X-Envoy-abc",
+                    "X-Gitlab-Event-Uuid",
+                    "X-Gitlab-Uuid",
+                    "X-Gitlab-Instance",
+                    "X-Missing-Header",
+                ],
+                "redacted": True,
+                "key_remap": {},
+                "test_name": "missing header in list is skipped",
+            }
+        ),
+        (
+            {
+                "auth_header": "X-Gitlab-Token",
+                "additional_data_headers": "x-gitlab-token, X-Gitlab-Event",
+                "headers": BASE_HEADERS,
+                "required_header_keys": [
+                    "x-gitlab-token",
+                    "X-Gitlab-Event",
+                ],
+                "keys_should_not_exist": list(UNSAFE_HEADER_KEYS)
+                + [
+                    "X-Envoy-abc",
+                    "X-Gitlab-Event-Uuid",
+                    "X-Gitlab-Uuid",
+                    "X-Gitlab-Instance",
+                ],
+                "redacted": True,
+                "key_remap": {},
+                "test_name": "case-insensitive auth_header redaction",
             }
         ),
         (
@@ -250,7 +314,7 @@ def test_post_event_stream_with_test_mode_extra_headers(
     test_headers = yaml.safe_load(event_stream.test_headers)
 
     for key in test_args["required_header_keys"]:
-        if key == auth_header and test_args["redacted"]:
+        if key.lower() == auth_header.lower() and test_args["redacted"]:
             assert test_headers[key] == REDACTED_STRING
         else:
             assert (

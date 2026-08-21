@@ -27,6 +27,7 @@ from aap_eda.services.activation.engine.common import LogHandler
 from aap_eda.services.activation.engine.exceptions import (
     ContainerUpdateLogsError,
 )
+from aap_eda.utils.log_sanitizer import sanitize_string
 
 LOGGER = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ class DBLogger(LogHandler):
 
         for line in lines:
             dt, message = extract_datetime_and_message_from_log_entry(line)
+            message = sanitize_string(message)
 
             self.activation_instance_log_buffer.append(
                 models.RulebookProcessLog(
