@@ -19,8 +19,11 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+import yaml
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.utils.rulebook import get_rulebook_hash
 from aap_eda.services.project import ProjectImportService
 from aap_eda.services.project.scm import ScmRepository
 
@@ -377,3 +380,385 @@ def test_sync_recovery_after_failure_reprocesses(
     assert project.git_hash == "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
     assert project.import_state == models.Project.ImportState.COMPLETED
     assert project.rulebook_set.count() > 0
+
+
+@pytest.mark.django_db
+def test_sync_updates_source_mappings_hash(
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    """When a project sync changes only rulebook rules, the rulebook_hash
+    embedded in each activation's source_mappings must be updated, and
+    rulebook_rulesets must be rebuilt with the new rules but the
+    previously swapped pg_listener sources preserved."""
+    git_mock_v1 = _mock_git_clone(
+        "project-02", "aaa111aaa111aaa111aaa111aaa111aaa111aaa1"
+    )
+    project = models.Project.objects.create(
+        name="test-source-mappings",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+    )
+    service = ProjectImportService(scm_cls=git_mock_v1)
+    service.import_project(project)
+    project.refresh_from_db()
+
+    rulebook = project.rulebook_set.order_by("name").first()
+    old_hash = get_rulebook_hash(rulebook.rulesets)
+
+    event_stream = models.EventStream.objects.create(
+        name="Test Stream",
+        organization=default_organization,
+    )
+
+    source_mappings = yaml.dump(
+        [
+            {
+                "event_stream_id": event_stream.id,
+                "event_stream_name": event_stream.name,
+                "rulebook_hash": old_hash,
+                "source_name": "__SOURCE_1",
+            }
+        ],
+        default_flow_style=False,
+    )
+
+    activation = models.Activation.objects.create(
+        name="test-mapped-activation",
+        project=project,
+        organization=default_organization,
+        rulebook=rulebook,
+        rulebook_name=rulebook.name,
+        rulebook_rulesets=rulebook.rulesets,
+        rulebook_rulesets_sha256=old_hash,
+        source_mappings=source_mappings,
+        is_enabled=True,
+        restart_on_project_update=False,
+    )
+
+    git_mock_v2 = _mock_git_clone(
+        "project-07", "bbb222bbb222bbb222bbb222bbb222bbb222bbb2"
+    )
+    service_v2 = ProjectImportService(scm_cls=git_mock_v2)
+    service_v2.sync_project(project)
+    project.refresh_from_db()
+
+    rulebook.refresh_from_db()
+    new_hash = get_rulebook_hash(rulebook.rulesets)
+    assert new_hash != old_hash
+
+    activation.refresh_from_db()
+    assert activation.status != ActivationStatus.ERROR
+    updated_mappings = yaml.safe_load(activation.source_mappings)
+    assert updated_mappings[0]["rulebook_hash"] == new_hash
+
+    rebuilt = yaml.safe_load(activation.rulebook_rulesets)
+    assert rebuilt[0]["rules"][0]["name"] == "Say Hello Updated"
+    source = rebuilt[0]["sources"][0]
+    assert "ansible.eda.pg_listener" in source
+    assert source["ansible.eda.pg_listener"]["channels"] == [
+        event_stream.channel_name
+    ]
+    assert activation.rulebook_rulesets_sha256 == old_hash
+
+
+@pytest.mark.django_db
+def test_sync_preserves_source_mappings_hash_when_sources_change(
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    """When a project sync changes rulebook sources, source_mappings
+    rulebook_hash must be left unchanged so users are prompted to re-map."""
+    git_mock_v1 = _mock_git_clone(
+        "project-02", "aaa111aaa111aaa111aaa111aaa111aaa111aaa1"
+    )
+    project = models.Project.objects.create(
+        name="test-source-change",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+    )
+    service = ProjectImportService(scm_cls=git_mock_v1)
+    service.import_project(project)
+    project.refresh_from_db()
+
+    rulebook = project.rulebook_set.order_by("name").first()
+    old_hash = get_rulebook_hash(rulebook.rulesets)
+
+    source_mappings = yaml.dump(
+        [
+            {
+                "event_stream_id": 1,
+                "event_stream_name": "Test Stream",
+                "rulebook_hash": old_hash,
+                "source_name": "__SOURCE_1",
+            }
+        ],
+        default_flow_style=False,
+    )
+
+    activation = models.Activation.objects.create(
+        name="test-mapped-activation-sources-changed",
+        project=project,
+        organization=default_organization,
+        rulebook=rulebook,
+        rulebook_name=rulebook.name,
+        rulebook_rulesets=rulebook.rulesets,
+        rulebook_rulesets_sha256=old_hash,
+        source_mappings=source_mappings,
+        is_enabled=True,
+        restart_on_project_update=False,
+    )
+
+    git_mock_v2 = _mock_git_clone(
+        "project-08", "ccc333ccc333ccc333ccc333ccc333ccc333ccc3"
+    )
+    service_v2 = ProjectImportService(scm_cls=git_mock_v2)
+    service_v2.sync_project(project)
+
+    rulebook.refresh_from_db()
+    new_hash = get_rulebook_hash(rulebook.rulesets)
+    assert new_hash != old_hash
+
+    activation.refresh_from_db()
+    assert activation.status != ActivationStatus.ERROR
+    updated_mappings = yaml.safe_load(activation.source_mappings)
+    assert updated_mappings[0]["rulebook_hash"] == old_hash
+
+
+@pytest.mark.django_db
+def test_sync_updates_source_name_in_mappings_on_rename(
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    """When a source gets an explicit name added, source_mappings
+    source_name must be updated automatically alongside the hash."""
+    git_mock_v1 = _mock_git_clone(
+        "project-02", "aaa111aaa111aaa111aaa111aaa111aaa111aaa1"
+    )
+    project = models.Project.objects.create(
+        name="test-source-rename",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+    )
+    service = ProjectImportService(scm_cls=git_mock_v1)
+    service.import_project(project)
+    project.refresh_from_db()
+
+    rulebook = project.rulebook_set.order_by("name").first()
+    old_hash = get_rulebook_hash(rulebook.rulesets)
+
+    event_stream = models.EventStream.objects.create(
+        name="Rename Stream",
+        organization=default_organization,
+    )
+
+    source_mappings = yaml.dump(
+        [
+            {
+                "event_stream_id": event_stream.id,
+                "event_stream_name": event_stream.name,
+                "rulebook_hash": old_hash,
+                "source_name": "__SOURCE_1",
+            }
+        ],
+        default_flow_style=False,
+    )
+
+    activation = models.Activation.objects.create(
+        name="test-mapped-activation-rename",
+        project=project,
+        organization=default_organization,
+        rulebook=rulebook,
+        rulebook_name=rulebook.name,
+        rulebook_rulesets=rulebook.rulesets,
+        rulebook_rulesets_sha256=old_hash,
+        source_mappings=source_mappings,
+        is_enabled=True,
+        restart_on_project_update=False,
+    )
+
+    git_mock_v2 = _mock_git_clone(
+        "project-09", "ddd444ddd444ddd444ddd444ddd444ddd444ddd4"
+    )
+    service_v2 = ProjectImportService(scm_cls=git_mock_v2)
+    service_v2.sync_project(project)
+
+    rulebook.refresh_from_db()
+    new_hash = get_rulebook_hash(rulebook.rulesets)
+    assert new_hash != old_hash
+
+    activation.refresh_from_db()
+    assert activation.status != ActivationStatus.ERROR
+    updated_mappings = yaml.safe_load(activation.source_mappings)
+    assert updated_mappings[0]["rulebook_hash"] == new_hash
+    assert updated_mappings[0]["source_name"] == "my_range_source"
+
+    rebuilt = yaml.safe_load(activation.rulebook_rulesets)
+    source = rebuilt[0]["sources"][0]
+    assert "ansible.eda.pg_listener" in source
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "source_mappings",
+    [
+        "{{{ not valid yaml",
+        yaml.dump([1], default_flow_style=False),
+    ],
+    ids=["unparseable-yaml", "non-dict-entry"],
+)
+def test_sync_marks_error_on_invalid_source_mappings_when_sources_change(
+    source_mappings: str,
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    """Invalid source_mappings are marked ERROR even when rulebook sources
+    change during sync and hash update is skipped."""
+    git_mock_v1 = _mock_git_clone(
+        "project-02", "aaa111aaa111aaa111aaa111aaa111aaa111aaa1"
+    )
+    project = models.Project.objects.create(
+        name="test-bad-mappings-source-change",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+    )
+    service = ProjectImportService(scm_cls=git_mock_v1)
+    service.import_project(project)
+    project.refresh_from_db()
+
+    rulebook = project.rulebook_set.order_by("name").first()
+
+    activation = models.Activation.objects.create(
+        name="bad-mappings-source-change-activation",
+        project=project,
+        organization=default_organization,
+        rulebook=rulebook,
+        rulebook_name=rulebook.name,
+        rulebook_rulesets=rulebook.rulesets,
+        rulebook_rulesets_sha256=get_rulebook_hash(rulebook.rulesets),
+        source_mappings=source_mappings,
+        is_enabled=True,
+        restart_on_project_update=False,
+    )
+
+    git_mock_v2 = _mock_git_clone(
+        "project-08", "ccc333ccc333ccc333ccc333ccc333ccc333ccc3"
+    )
+    service_v2 = ProjectImportService(scm_cls=git_mock_v2)
+    service_v2.sync_project(project)
+
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.ERROR
+    assert "source_mappings could not be updated" in (
+        activation.status_message or ""
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "source_mappings",
+    [
+        "{{{ not valid yaml",
+        yaml.dump([1], default_flow_style=False),
+    ],
+    ids=["unparseable-yaml", "non-dict-entry"],
+)
+def test_sync_marks_error_on_invalid_source_mappings(
+    source_mappings: str,
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    """Invalid source_mappings are marked with ActivationStatus.ERROR
+    after a content-changing sync."""
+    git_mock_v1 = _mock_git_clone(
+        "project-02", "aaa111aaa111aaa111aaa111aaa111aaa111aaa1"
+    )
+    project = models.Project.objects.create(
+        name="test-bad-mappings",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+    )
+    service = ProjectImportService(scm_cls=git_mock_v1)
+    service.import_project(project)
+    project.refresh_from_db()
+
+    rulebook = project.rulebook_set.order_by("name").first()
+
+    activation = models.Activation.objects.create(
+        name="bad-mappings-activation",
+        project=project,
+        organization=default_organization,
+        rulebook=rulebook,
+        rulebook_name=rulebook.name,
+        rulebook_rulesets=rulebook.rulesets,
+        rulebook_rulesets_sha256=get_rulebook_hash(rulebook.rulesets),
+        source_mappings=source_mappings,
+        is_enabled=True,
+        restart_on_project_update=False,
+    )
+
+    git_mock_v2 = _mock_git_clone(
+        "project-07", "bbb222bbb222bbb222bbb222bbb222bbb222bbb2"
+    )
+    service_v2 = ProjectImportService(scm_cls=git_mock_v2)
+    service_v2.sync_project(project)
+
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.ERROR
+    assert "source_mappings could not be updated" in (
+        activation.status_message or ""
+    )
+
+
+@pytest.mark.django_db
+def test_sync_skips_auto_restart_activation_without_mappings(
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    """An activation with restart_on_project_update=True and no
+    source_mappings should not be touched by _update_activations_for_rulebook
+    (it is handled by the auto-restart task instead)."""
+    git_mock_v1 = _mock_git_clone(
+        "project-02", "aaa111aaa111aaa111aaa111aaa111aaa111aaa1"
+    )
+    project = models.Project.objects.create(
+        name="test-skip-auto-restart",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+    )
+    service = ProjectImportService(scm_cls=git_mock_v1)
+    service.import_project(project)
+    project.refresh_from_db()
+
+    rulebook = project.rulebook_set.order_by("name").first()
+    old_hash = get_rulebook_hash(rulebook.rulesets)
+    old_rulesets = rulebook.rulesets
+
+    activation = models.Activation.objects.create(
+        name="auto-restart-no-mappings",
+        project=project,
+        organization=default_organization,
+        rulebook=rulebook,
+        rulebook_name=rulebook.name,
+        rulebook_rulesets=rulebook.rulesets,
+        rulebook_rulesets_sha256=old_hash,
+        source_mappings="",
+        is_enabled=True,
+        restart_on_project_update=True,
+    )
+
+    git_mock_v2 = _mock_git_clone(
+        "project-07", "bbb222bbb222bbb222bbb222bbb222bbb222bbb2"
+    )
+    service_v2 = ProjectImportService(scm_cls=git_mock_v2)
+    service_v2.sync_project(project)
+
+    activation.refresh_from_db()
+    assert activation.rulebook_rulesets == old_rulesets
+    assert activation.rulebook_rulesets_sha256 == old_hash
