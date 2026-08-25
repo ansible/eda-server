@@ -48,10 +48,10 @@ from aap_eda.core.exceptions import CredentialPluginError, PGNotifyError
 from aap_eda.core.models import EventStream
 from aap_eda.core.utils.credentials import get_resolved_secrets
 from aap_eda.services.pg_notify import PGNotify
+from aap_eda.utils.log_sanitizer import REDACTED_STRING
 
 logger = logging.getLogger(__name__)
 UNSAFE_HEADER_KEYS = {"X-Trusted-Proxy", "X-Forwarded-For", "X-Real-IP"}
-REDACTED_STRING = "********"
 
 
 class ExternalEventStreamViewSet(viewsets.GenericViewSet):
@@ -157,26 +157,50 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
     def _redacted_headers(
         self, headers: HttpHeaders, header_key: str
     ) -> dict[str, Any]:
+        additional = self.event_stream.additional_data_headers
+        if not additional:
+            return {}
+
+        header_key_lower = header_key.lower()
+
+        if additional == "*":
+            return self._redact_wildcard_headers(headers, header_key_lower)
+
+        return self._redact_listed_headers(
+            headers, header_key_lower, additional
+        )
+
+    def _redact_wildcard_headers(
+        self, headers: HttpHeaders, header_key_lower: str
+    ) -> dict[str, Any]:
+        event_headers = {
+            key: (
+                REDACTED_STRING if key.lower() == header_key_lower else value
+            )
+            for key, value in headers.items()
+        }
+        return {
+            key: value
+            for key, value in event_headers.items()
+            if not key.startswith("X-Envoy") and key not in UNSAFE_HEADER_KEYS
+        }
+
+    def _redact_listed_headers(
+        self,
+        headers: HttpHeaders,
+        header_key_lower: str,
+        additional: str,
+    ) -> dict[str, Any]:
         event_headers = {}
-        if self.event_stream.additional_data_headers:
-            if self.event_stream.additional_data_headers == "*":
-                event_headers = dict(headers)
-                if header_key in event_headers:
-                    event_headers[header_key] = REDACTED_STRING
-                event_headers = {
-                    key: value
-                    for key, value in event_headers.items()
-                    if not key.startswith("X-Envoy")
-                    and key not in UNSAFE_HEADER_KEYS
-                }
+        for key in additional.split(","):
+            key = key.strip()
+            value = headers.get(key)
+            if not value:
+                continue
+            if key.lower() == header_key_lower:
+                event_headers[key] = REDACTED_STRING
             else:
-                for key in self.event_stream.additional_data_headers.split(
-                    ","
-                ):
-                    key = key.strip()
-                    value = headers.get(key)
-                    if value:
-                        event_headers[key] = value
+                event_headers[key] = value
         return event_headers
 
     def _create_payload(
