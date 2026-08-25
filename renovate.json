@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "enabledManagers": ["tekton"],
+  "enabledManagers": ["tekton", "poetry"],
   "tekton": {
     "enabled": true,
     "automerge": true,
@@ -8,5 +8,19 @@
     "postUpgradeTasks": {
       "commands": []
     }
-  }
+  },
+  "poetry": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "matchPackageNames": ["django-ansible-base"],
+      "matchManagers": ["poetry"],
+      "versioning": "loose",
+      "schedule": ["before 9am on monday"],
+      "commitMessagePrefix": "chore(deps):",
+      "labels": ["dependencies", "run-e2e"],
+      "automerge": false
+    }
+  ]
 }
