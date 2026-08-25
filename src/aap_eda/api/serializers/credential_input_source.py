@@ -12,6 +12,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -46,8 +47,14 @@ class CredentialInputSourceReferenceField(serializers.JSONField):
     pass
 
 
-class CredentialInputSourceSerializer(serializers.ModelSerializer):
+class CredentialInputSourceSerializer(
+    CleanTextMixin, serializers.ModelSerializer
+):
     """Serializer used during a GET."""
+
+    # metadata holds credential input values and is populated
+    # programmatically, so it is excluded from free-text checks.
+    excluded_fields = frozenset({"metadata"})
 
     organization = OrganizationRefSerializer()
     references = EdaCredentialReferenceField(required=False, allow_null=True)
@@ -99,8 +106,14 @@ class CredentialInputSourceSerializer(serializers.ModelSerializer):
         }
 
 
-class CredentialInputSourceCreateSerializer(serializers.ModelSerializer):
+class CredentialInputSourceCreateSerializer(
+    CleanTextMixin, serializers.ModelSerializer
+):
     """Serializer used during the Create process of the instance."""
+
+    # metadata holds credential input values and is populated
+    # programmatically, so it is excluded from free-text checks.
+    excluded_fields = frozenset({"metadata"})
 
     target_credential = serializers.PrimaryKeyRelatedField(
         queryset=models.EdaCredential.objects.all(),
@@ -149,7 +162,7 @@ class CredentialInputSourceCreateSerializer(serializers.ModelSerializer):
             attrs.get("input_field_name"),
         )
 
-        return attrs
+        return super().validate(attrs)
 
     class Meta:
         model = models.CredentialInputSource
@@ -163,8 +176,14 @@ class CredentialInputSourceCreateSerializer(serializers.ModelSerializer):
         ]
 
 
-class CredentialInputSourceUpdateSerializer(serializers.ModelSerializer):
+class CredentialInputSourceUpdateSerializer(
+    CleanTextMixin, serializers.ModelSerializer
+):
     """Serializer used during update of the instance."""
+
+    # metadata holds credential input values and is populated
+    # programmatically, so it is excluded from free-text checks.
+    excluded_fields = frozenset({"metadata"})
 
     organization_id = serializers.IntegerField(
         required=True,
@@ -185,7 +204,7 @@ class CredentialInputSourceUpdateSerializer(serializers.ModelSerializer):
             if bool(errors):
                 raise serializers.ValidationError(errors)
 
-        return attrs
+        return super().validate(attrs)
 
     class Meta:
         model = models.CredentialInputSource

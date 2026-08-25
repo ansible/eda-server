@@ -12,13 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from rest_framework import serializers
 
 from aap_eda.core import models, validators
 from aap_eda.core.utils.credentials import validate_injectors
 
 
-class CredentialTypeSerializer(serializers.ModelSerializer):
+class CredentialTypeSerializer(CleanTextMixin, serializers.ModelSerializer):
+    # injectors commonly contain Jinja2 template syntax, so it is excluded
+    # from free-text checks.
+    excluded_fields = frozenset({"injectors"})
+
     class Meta:
         model = models.CredentialType
         read_only_fields = [
@@ -38,7 +43,13 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
         ]
 
 
-class CredentialTypeCreateSerializer(serializers.ModelSerializer):
+class CredentialTypeCreateSerializer(
+    CleanTextMixin, serializers.ModelSerializer
+):
+    # injectors commonly contain Jinja2 template syntax, so it is excluded
+    # from free-text checks.
+    excluded_fields = frozenset({"injectors"})
+
     inputs = serializers.JSONField(
         required=False,
         default=dict,
@@ -63,7 +74,7 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
             if bool(errors):
                 raise serializers.ValidationError(errors)
 
-        return data
+        return super().validate(data)
 
     class Meta:
         model = models.CredentialType

@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import yaml
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
@@ -366,8 +367,12 @@ def replace_vault_data(extra_var):
     return yaml.safe_dump(data)
 
 
-class ActivationSerializer(serializers.ModelSerializer):
+class ActivationSerializer(CleanTextMixin, serializers.ModelSerializer):
     """Serializer for the Activation model."""
+
+    # extra_var may legitimately contain Jinja2 template syntax
+    # (e.g. credential injectors), so it is excluded from free-text checks.
+    excluded_fields = frozenset({"extra_var"})
 
     eda_credentials = serializers.ListField(
         required=False,
@@ -577,8 +582,13 @@ class ActivationCreateSerializer(
     _K8sPodMetadataWriteFields,
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
+    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
     """Serializer for creating the Activation."""
+
+    # extra_var may legitimately contain Jinja2 template syntax
+    # (e.g. credential injectors), so it is excluded from free-text checks.
+    excluded_fields = frozenset({"extra_var"})
 
     class Meta:
         model = models.Activation
@@ -665,7 +675,7 @@ class ActivationCreateSerializer(
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
         _normalize_activation_k8s_pod_fields(data)
-        return data
+        return super().validate(data)
 
     def create(self, validated_data):
         rulebook_id = validated_data["rulebook_id"]
@@ -708,7 +718,7 @@ class ActivationCreateSerializer(
         return super().create(validated_data)
 
 
-class ActivationCopySerializer(serializers.ModelSerializer):
+class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
     name = serializers.CharField(
         required=True, validators=[validators.check_if_activation_name_used]
     )
@@ -785,8 +795,13 @@ class ActivationUpdateSerializer(
     _K8sPodMetadataWriteFields,
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
+    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
     """Serializer for updating the Activation."""
+
+    # extra_var may legitimately contain Jinja2 template syntax
+    # (e.g. credential injectors), so it is excluded from free-text checks.
+    excluded_fields = frozenset({"extra_var"})
 
     class Meta:
         model = models.Activation
@@ -897,7 +912,7 @@ class ActivationUpdateSerializer(
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
         _normalize_activation_k8s_pod_fields(data)
-        return data
+        return super().validate(data)
 
     def prepare_update(self, activation: models.Activation):
         rulebook_id = self.validated_data.get("rulebook_id")
