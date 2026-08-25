@@ -14,6 +14,7 @@
 
 from urllib.parse import urlparse, urlunparse
 
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -39,7 +40,9 @@ class ProxyFieldMixin:
         return get_proxy_for_display(url)
 
 
-class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
+class ProjectSerializer(
+    CleanTextMixin, serializers.ModelSerializer, ProxyFieldMixin
+):
     eda_credential_id = serializers.IntegerField(
         required=False, allow_null=True
     )
@@ -86,7 +89,7 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
 
 
 class ProjectCreateRequestSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
     eda_credential_id = serializers.IntegerField(
         required=False,
@@ -158,7 +161,7 @@ class ProjectCreateRequestSerializer(
 
 
 class ProjectUpdateRequestSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
     name = serializers.CharField(
         required=False,
@@ -279,7 +282,7 @@ class ProjectUpdateRequestSerializer(
                 raise serializers.ValidationError(
                     "The password in the proxy field should be unencrypted"
                 )
-        return data
+        return super().validate(data)
 
     def to_representation(self, instance):
         result = super().to_representation(instance)
