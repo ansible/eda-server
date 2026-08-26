@@ -214,8 +214,7 @@ def _handle_post_sync_activations(project: models.Project):
         _resume_waiting_activations(project)
     except Exception as e:
         logger.error(
-            f"Resume waiting activations failed for "
-            f"project {project.id}: {e}",
+            f"Resume waiting activations failed for project {project.id}: {e}",
             exc_info=True,
         )
 
@@ -223,10 +222,12 @@ def _handle_post_sync_activations(project: models.Project):
 def _auto_restart_activations(project: models.Project):
     """Auto-restart enabled activations when rulebook content changes.
 
+    Source-mapped activations have their rulesets already updated
+    during project import via _update_activations_for_rulebook(),
+    so content update is skipped here to avoid overwriting
+    pg_listener source swaps.
     Excludes activations with awaiting_project_sync=True since
     those will be handled by _resume_waiting_activations.
-    Skips activations with source_mappings when content changes,
-    as those require manual source mapping updates.
     """
     activations = models.Activation.objects.filter(
         project=project,
@@ -243,8 +244,7 @@ def _auto_restart_activations(project: models.Project):
             restart_count += _check_and_restart_activation(activation, project)
         except ObjectDoesNotExist:
             logger.warning(
-                f"Rulebook for activation "
-                f"'{activation.name}' no longer exists"
+                f"Rulebook for activation '{activation.name}' no longer exists"
             )
         except Exception as e:
             logger.error(
@@ -276,25 +276,14 @@ def _check_and_restart_activation(
     content_changed = activation.rulebook_rulesets_sha256 != current_sha256
     hash_changed = activation.git_hash != current_git_hash
 
-    if content_changed and activation.source_mappings:
-        logger.warning(
-            f"Skipping auto-restart for activation "
-            f"'{activation.name}' - has event stream "
-            f"source mappings that need manual update"
-        )
-        return 0
-
     if content_changed or hash_changed:
-        activation.rulebook_rulesets = current_rulebook.rulesets or ""
-        activation.rulebook_rulesets_sha256 = current_sha256
+        update_fields = ["git_hash", "rulebook_rulesets_sha256"]
         activation.git_hash = current_git_hash
-        activation.save(
-            update_fields=[
-                "rulebook_rulesets",
-                "rulebook_rulesets_sha256",
-                "git_hash",
-            ]
-        )
+        activation.rulebook_rulesets_sha256 = current_sha256
+        if not activation.source_mappings:
+            activation.rulebook_rulesets = current_rulebook.rulesets or ""
+            update_fields.append("rulebook_rulesets")
+        activation.save(update_fields=update_fields)
 
     activation_failed = activation.status in (
         ActivationStatus.FAILED,
@@ -310,9 +299,7 @@ def _check_and_restart_activation(
         else "Recovering failed activation"
     )
     logger.info(
-        f"{reason} for activation "
-        f"'{activation.name}', "
-        f"triggering auto-restart"
+        f"{reason} for activation '{activation.name}', triggering auto-restart"
     )
     restarted = _restart_activation(activation)
     if activation_failed and restarted:
@@ -363,8 +350,31 @@ def _update_activation_content(
     """Update activation's cached rulebook content, hash, and git hash."""
     try:
         rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
-        activation.rulebook_rulesets = rulebook.rulesets or ""
-        if not activation.source_mappings:
+        if activation.source_mappings:
+            from aap_eda.core.utils.rulebook import (
+                build_rulebook_with_event_streams,
+            )
+
+            try:
+                activation.rulebook_rulesets = (
+                    build_rulebook_with_event_streams(
+                        {
+                            "source_mappings": activation.source_mappings,
+                            "rulebook_rulesets": rulebook.rulesets,
+                        }
+                    )
+                )
+                activation.rulebook_rulesets_sha256 = rulebook.rulesets_sha256
+            except Exception:
+                logger.warning(
+                    "Failed to rebuild rulebook_rulesets for "
+                    "activation '%s' with event streams; "
+                    "keeping existing",
+                    activation.name,
+                    exc_info=True,
+                )
+        else:
+            activation.rulebook_rulesets = rulebook.rulesets or ""
             activation.rulebook_rulesets_sha256 = rulebook.rulesets_sha256
     except ObjectDoesNotExist:
         logger.warning(
