@@ -18,6 +18,7 @@ from datetime import timedelta
 from unittest.mock import Mock, patch
 
 import pytest
+import yaml
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import DatabaseError
 from django.utils import timezone
@@ -765,7 +766,7 @@ def test_recover_stuck_projects_deleted_during_recovery(
 
     # Simulate deletion between queryset iteration and select_for_update
     with patch(
-        "aap_eda.tasks.project.models.Project.objects" ".select_for_update"
+        "aap_eda.tasks.project.models.Project.objects.select_for_update"
     ) as mock_select:
         mock_qs = Mock()
         mock_select.return_value = mock_qs
@@ -796,7 +797,7 @@ def test_recover_stuck_projects_database_error(
     models.Project.objects.filter(id=project.id).update(modified_at=old_time)
 
     with patch(
-        "aap_eda.tasks.project.models.Project.objects" ".select_for_update"
+        "aap_eda.tasks.project.models.Project.objects.select_for_update"
     ) as mock_select:
         mock_qs = Mock()
         mock_select.return_value = mock_qs
@@ -846,7 +847,7 @@ def test_handle_project_error_recovery_database_error(
     )
 
     with patch(
-        "aap_eda.tasks.project.models.Project.objects" ".select_for_update"
+        "aap_eda.tasks.project.models.Project.objects.select_for_update"
     ) as mock_select:
         mock_qs = Mock()
         mock_select.return_value = mock_qs
@@ -936,11 +937,12 @@ def test_auto_restart_activations_content_changed(
 
 @pytest.mark.django_db
 @patch("aap_eda.tasks.project.restart_rulebook_process")
-def test_auto_restart_skips_activation_with_source_mappings(
+def test_auto_restart_restarts_source_mapped_without_overwrite(
     mock_restart,
     default_organization,
 ):
-    """Auto-restart skips activations with source_mappings."""
+    """Auto-restart restarts source-mapped activations without
+    overwriting their pg_listener-swapped rulesets."""
     project = models.Project.objects.create(
         name="Test Project",
         url="https://github.com/example/repo",
@@ -966,13 +968,57 @@ def test_auto_restart_skips_activation_with_source_mappings(
     _auto_restart_activations(project)
 
     activation.refresh_from_db()
-    # Content and SHA256 should remain frozen
     assert activation.rulebook_rulesets == "old-content"
     assert activation.rulebook_rulesets_sha256 == get_rulebook_hash(
-        "old-content"
+        "new-content"
     )
-    assert activation.git_hash == "old-hash"
-    mock_restart.assert_not_called()
+    assert activation.git_hash == "abc123"
+    mock_restart.assert_called_once()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_source_mapped_no_spurious_restart_on_second_sync(
+    mock_restart,
+    default_organization,
+):
+    """After a content-changing sync, a second identical sync must not
+    trigger another restart for source-mapped activations."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="hash-v2",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content-v2",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="source-mapped",
+        restart_on_project_update=True,
+        rulebook_rulesets="swapped-content-v1",
+        git_hash="hash-v1",
+        source_mappings="[{source: src1, event_stream: es1}]",
+    )
+
+    # First sync: content changed, should restart
+    _auto_restart_activations(project)
+    assert mock_restart.call_count == 1
+
+    activation.refresh_from_db()
+    assert activation.rulebook_rulesets_sha256 == get_rulebook_hash(
+        "content-v2"
+    )
+
+    # Second sync: nothing changed, should NOT restart
+    mock_restart.reset_mock()
+    _auto_restart_activations(project)
+    assert mock_restart.call_count == 0
 
 
 @pytest.mark.django_db
@@ -1017,7 +1063,8 @@ def test_auto_restart_mixed_source_mappings_activations(
     mock_restart,
     default_organization,
 ):
-    """Skip only applies to source_mappings activation in loop."""
+    """Both mapped and unmapped activations restart; only unmapped
+    gets rulesets overwritten."""
     project = models.Project.objects.create(
         name="Test Project",
         url="https://github.com/example/repo",
@@ -1053,24 +1100,57 @@ def test_auto_restart_mixed_source_mappings_activations(
 
     mapped.refresh_from_db()
     assert mapped.rulebook_rulesets == "old-content"
-    assert mapped.git_hash == "old-hash"
+    assert mapped.git_hash == "abc123"
 
     unmapped.refresh_from_db()
     assert unmapped.rulebook_rulesets == "new-content"
     assert unmapped.git_hash == "abc123"
 
-    mock_restart.assert_called_once()
+    assert mock_restart.call_count == 2
 
 
 @pytest.mark.django_db
 def test_sync_rulebook_preserves_sha256_for_source_mapped_activations(
     default_organization,
 ):
-    """_sync_rulebook preserves SHA256 for source-mapped activations."""
+    """_sync_rulebook updates source_mappings hash and re-swaps
+    rulebook_rulesets with new rules via swap_event_stream_sources
+    when sources are structurally unchanged."""
+    import yaml as _yaml
+
     from aap_eda.services.project.imports import (
         ProjectImportService,
         RulebookInfo,
     )
+
+    old_rulesets = """---
+- name: Test Ruleset
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        port: 8000
+  rules:
+    - name: Rule1
+      condition: event
+      action:
+        debug:
+          msg: old
+...
+"""
+    new_rulesets = """---
+- name: Test Ruleset
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        port: 8000
+  rules:
+    - name: Rule1
+      condition: event
+      action:
+        debug:
+          msg: new
+...
+"""
 
     project = models.Project.objects.create(
         name="Test Project",
@@ -1081,31 +1161,346 @@ def test_sync_rulebook_preserves_sha256_for_source_mapped_activations(
     rulebook = _create_test_rulebook(
         project,
         default_organization,
-        rulesets="old-content",
+        rulesets=old_rulesets,
     )
-    old_sha256 = get_rulebook_hash("old-content")
+    old_sha256 = get_rulebook_hash(old_rulesets)
+    new_sha256 = get_rulebook_hash(new_rulesets)
+
+    event_stream = models.EventStream.objects.create(
+        name="es1",
+        organization=default_organization,
+    )
+
     activation = _create_test_activation(
         project,
         default_organization,
         rulebook,
         name="source-mapped-activation",
         restart_on_project_update=False,
-        rulebook_rulesets="old-content",
-        source_mappings="[{source: src1, event_stream: es1}]",
+        rulebook_rulesets=old_rulesets,
+        source_mappings=_yaml.dump(
+            [
+                {
+                    "event_stream_id": event_stream.id,
+                    "event_stream_name": event_stream.name,
+                    "rulebook_hash": old_sha256,
+                    "source_name": "__SOURCE_1",
+                }
+            ],
+            default_flow_style=False,
+        ),
     )
 
     service = ProjectImportService()
     rulebook_info = RulebookInfo(
         relpath="test-rulebook",
-        raw_content="new-content",
+        raw_content=new_rulesets,
         content=None,
     )
     service._sync_rulebook(rulebook, rulebook_info, "new-hash")
 
     activation.refresh_from_db()
-    assert activation.rulebook_rulesets == "new-content"
+    updated_mappings = _yaml.safe_load(activation.source_mappings)
+    assert updated_mappings[0]["rulebook_hash"] == new_sha256
     assert activation.rulebook_rulesets_sha256 == old_sha256
     assert activation.git_hash == "new-hash"
+
+    rebuilt = _yaml.safe_load(activation.rulebook_rulesets)
+    assert rebuilt[0]["rules"][0]["action"]["debug"]["msg"] == "new"
+    source = rebuilt[0]["sources"][0]
+    assert "ansible.eda.pg_listener" in source
+    assert source["ansible.eda.pg_listener"]["channels"] == [
+        event_stream.channel_name
+    ]
+
+
+@pytest.mark.django_db
+def test_sync_rulebook_reswap_failure_keeps_existing_rulesets(
+    default_organization,
+):
+    """When build_rulebook_with_event_streams fails during sync
+    (e.g. deleted EventStream), the activation keeps its existing
+    rulesets and is not marked ERROR."""
+    import yaml as _yaml
+
+    from aap_eda.services.project.imports import (
+        ProjectImportService,
+        RulebookInfo,
+    )
+
+    old_rulesets = """---
+- name: Test Ruleset
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        port: 8000
+  rules:
+    - name: Rule1
+      condition: event
+      action:
+        debug:
+          msg: old
+...
+"""
+    new_rulesets = """---
+- name: Test Ruleset
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        port: 8000
+  rules:
+    - name: Rule1
+      condition: event
+      action:
+        debug:
+          msg: new
+...
+"""
+
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="old-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets=old_rulesets,
+    )
+    old_sha256 = get_rulebook_hash(old_rulesets)
+
+    event_stream = models.EventStream.objects.create(
+        name="es-deleted",
+        organization=default_organization,
+    )
+    es_id = event_stream.id
+
+    swapped_rulesets = "already-swapped-with-pg_listener"
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="source-mapped-deleted-es",
+        restart_on_project_update=False,
+        rulebook_rulesets=swapped_rulesets,
+        source_mappings=_yaml.dump(
+            [
+                {
+                    "event_stream_id": es_id,
+                    "event_stream_name": "es-deleted",
+                    "rulebook_hash": old_sha256,
+                    "source_name": "__SOURCE_1",
+                }
+            ],
+            default_flow_style=False,
+        ),
+    )
+
+    event_stream.delete()
+
+    service = ProjectImportService()
+    rulebook_info = RulebookInfo(
+        relpath="test-rulebook",
+        raw_content=new_rulesets,
+        content=None,
+    )
+    service._sync_rulebook(rulebook, rulebook_info, "new-hash")
+
+    activation.refresh_from_db()
+    assert activation.rulebook_rulesets == swapped_rulesets
+    assert activation.status != ActivationStatus.ERROR
+    assert activation.git_hash == "new-hash"
+
+
+@pytest.mark.django_db
+def test_sync_rulebook_preserves_source_mappings_hash_when_sources_change(
+    default_organization,
+):
+    """_sync_rulebook leaves source_mappings rulebook_hash unchanged when
+    the source plugin type changes during sync."""
+    import yaml as _yaml
+
+    from aap_eda.services.project.imports import (
+        ProjectImportService,
+        RulebookInfo,
+    )
+
+    old_rulesets = """---
+- name: Test Ruleset
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        port: 8000
+  rules:
+    - name: Rule1
+      condition: event
+      action:
+        debug:
+          msg: old
+...
+"""
+    new_rulesets = """---
+- name: Test Ruleset
+  hosts: all
+  sources:
+    - ansible.eda.kafka:
+        topic: events
+  rules:
+    - name: Rule1
+      condition: event
+      action:
+        debug:
+          msg: old
+...
+"""
+
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="old-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets=old_rulesets,
+    )
+    old_sha256 = get_rulebook_hash(old_rulesets)
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="source-mapped-activation",
+        restart_on_project_update=False,
+        rulebook_rulesets=old_rulesets,
+        source_mappings=_yaml.dump(
+            [
+                {
+                    "source": "src1",
+                    "event_stream": "es1",
+                    "rulebook_hash": old_sha256,
+                }
+            ],
+            default_flow_style=False,
+        ),
+    )
+
+    service = ProjectImportService()
+    rulebook_info = RulebookInfo(
+        relpath="test-rulebook",
+        raw_content=new_rulesets,
+        content=None,
+    )
+    service._sync_rulebook(rulebook, rulebook_info, "new-hash")
+
+    activation.refresh_from_db()
+    updated_mappings = _yaml.safe_load(activation.source_mappings)
+    assert updated_mappings[0]["rulebook_hash"] == old_sha256
+    assert activation.git_hash == "new-hash"
+
+
+@pytest.mark.django_db
+def test_sync_rulebook_updates_source_name_on_rename(
+    default_organization,
+):
+    """_sync_rulebook auto-updates source_name in source_mappings when
+    a source gets an explicit name added."""
+    import yaml as _yaml
+
+    from aap_eda.services.project.imports import (
+        ProjectImportService,
+        RulebookInfo,
+    )
+
+    old_rulesets = """---
+- name: Test Ruleset
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        port: 8000
+  rules:
+    - name: Rule1
+      condition: event
+      action:
+        debug:
+          msg: old
+...
+"""
+    new_rulesets = """---
+- name: Test Ruleset
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        port: 8000
+      name: my_webhook
+  rules:
+    - name: Rule1
+      condition: event
+      action:
+        debug:
+          msg: old
+...
+"""
+
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="old-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets=old_rulesets,
+    )
+    old_sha256 = get_rulebook_hash(old_rulesets)
+    new_sha256 = get_rulebook_hash(new_rulesets)
+
+    event_stream = models.EventStream.objects.create(
+        name="es1",
+        organization=default_organization,
+    )
+
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="rename-activation",
+        restart_on_project_update=False,
+        rulebook_rulesets=old_rulesets,
+        source_mappings=_yaml.dump(
+            [
+                {
+                    "event_stream_id": event_stream.id,
+                    "event_stream_name": event_stream.name,
+                    "rulebook_hash": old_sha256,
+                    "source_name": "__SOURCE_1",
+                }
+            ],
+            default_flow_style=False,
+        ),
+    )
+
+    service = ProjectImportService()
+    rulebook_info = RulebookInfo(
+        relpath="test-rulebook",
+        raw_content=new_rulesets,
+        content=None,
+    )
+    service._sync_rulebook(rulebook, rulebook_info, "new-hash")
+
+    activation.refresh_from_db()
+    updated_mappings = _yaml.safe_load(activation.source_mappings)
+    assert updated_mappings[0]["rulebook_hash"] == new_sha256
+    assert updated_mappings[0]["source_name"] == "my_webhook"
+
+    rebuilt = _yaml.safe_load(activation.rulebook_rulesets)
+    source = rebuilt[0]["sources"][0]
+    assert "ansible.eda.pg_listener" in source
+    assert source["ansible.eda.pg_listener"]["channels"] == [
+        event_stream.channel_name
+    ]
 
 
 @pytest.mark.django_db
@@ -1154,10 +1549,10 @@ def test_sync_rulebook_updates_sha256_for_non_source_mapped_activations(
 
 
 @pytest.mark.django_db
-def test_update_activation_content_preserves_sha256_for_source_mapped(
+def test_update_activation_content_preserves_on_rebuild_failure(
     default_organization,
 ):
-    """_update_activation_content preserves SHA256 for source-mapped."""
+    """On rebuild failure, existing rulesets and SHA256 are preserved."""
     project = models.Project.objects.create(
         name="Test Project",
         url="https://github.com/example/repo",
@@ -1182,8 +1577,74 @@ def test_update_activation_content_preserves_sha256_for_source_mapped(
 
     _update_activation_content(activation, project)
 
-    assert activation.rulebook_rulesets == "new-content"
+    assert activation.rulebook_rulesets == "old-content"
     assert activation.rulebook_rulesets_sha256 == old_sha256
+    assert activation.git_hash == "new-hash"
+
+
+@pytest.mark.django_db
+def test_update_activation_content_rebuilds_for_source_mapped(
+    default_organization,
+):
+    """Source-mapped activations get rulesets rebuilt with event streams."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="new-hash",
+    )
+    rulesets_yaml = yaml.dump(
+        [
+            {
+                "name": "Test Rule Set",
+                "hosts": "all",
+                "sources": [
+                    {"name": "webhook", "ansible.eda.webhook": {"port": 5000}}
+                ],
+                "rules": [
+                    {
+                        "name": "rule1",
+                        "condition": "event.payload is defined",
+                        "action": {"debug": {}},
+                    }
+                ],
+            }
+        ]
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets=rulesets_yaml,
+    )
+    event_stream = models.EventStream.objects.create(
+        name="Test Stream",
+        organization=default_organization,
+    )
+    source_mappings = yaml.dump(
+        [
+            {
+                "event_stream_id": event_stream.id,
+                "event_stream_name": event_stream.name,
+                "rulebook_hash": get_rulebook_hash("old-rulesets"),
+                "source_name": "webhook",
+            }
+        ]
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="source-mapped-activation",
+        rulebook_rulesets="old-swapped-content",
+        git_hash="old-hash",
+        source_mappings=source_mappings,
+    )
+
+    _update_activation_content(activation, project)
+
+    assert "pg_listener" in activation.rulebook_rulesets
+    assert event_stream.channel_name in activation.rulebook_rulesets
+    assert activation.rulebook_rulesets_sha256 == rulebook.rulesets_sha256
     assert activation.git_hash == "new-hash"
 
 
