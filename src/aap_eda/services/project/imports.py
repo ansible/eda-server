@@ -26,8 +26,14 @@ from django.conf import settings
 from django.core import exceptions
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 from aap_eda.core.types import StrPath
-from aap_eda.core.utils.rulebook import get_rulebook_hash
+from aap_eda.core.utils.rulebook import (
+    build_rulebook_with_event_streams,
+    build_source_name_updates,
+    get_rulebook_hash,
+    rulebook_sources_unchanged,
+)
 from aap_eda.services.project.scm import ScmRepository
 
 logger = logging.getLogger(__name__)
@@ -56,7 +62,7 @@ class MalformedError(Exception):
 
 
 def _project_import_wrapper(
-    func: Callable[[ProjectImportService, models.Project], None]
+    func: Callable[[ProjectImportService, models.Project], None],
 ):
     @wraps(func)
     def wrapper(self: ProjectImportService, project: models.Project):
@@ -203,28 +209,215 @@ class ProjectImportService:
                 git_hash=git_hash
             )
             return
+        old_rulesets = rulebook.rulesets
         rulebook.rulesets = rulebook_info.raw_content
         rulebook.rulesets_sha256 = new_sha256
         rulebook.save(update_fields=["rulesets", "rulesets_sha256"])
-        # Update activations without auto-restart. Those with
-        # restart_on_project_update=True are handled by
-        # _auto_restart_activations which needs to detect
-        # the change via SHA256 comparison.
-        base_qs = models.Activation.objects.filter(
+        rulebook.refresh_from_db()
+        self._update_activations_for_rulebook(
+            rulebook, old_rulesets, new_sha256, git_hash
+        )
+
+    def _update_activations_for_rulebook(
+        self,
+        rulebook: models.Rulebook,
+        old_rulesets: str,
+        new_sha256: str,
+        git_hash: str,
+    ):
+        """Update activations after a rulebook content change.
+
+        For activations without auto-restart and without source_mappings,
+        update the cached rulesets and hash immediately (bulk).
+
+        For activations with source_mappings, when the rulebook sources
+        are structurally unchanged (same count and plugin types):
+          * Update ``rulebook_hash`` inside each source_mappings entry
+          * Auto-fix ``source_name`` if a source was renamed
+          * Rebuild ``rulebook_rulesets`` by merging new rules with the
+            previously swapped sources (preserving ``pg_listener`` config
+            while picking up rule/condition/filter changes)
+
+        When sources change structurally (type or count), the activation
+        is left untouched so the user is prompted to re-map.
+
+        Activations with restart_on_project_update=True and no
+        source_mappings are handled entirely by
+        _auto_restart_activations() and are not touched here.
+        """
+        models.Activation.objects.filter(
             rulebook=rulebook,
             restart_on_project_update=False,
-        )
-        base_qs.filter(source_mappings="").update(
+            source_mappings="",
+        ).update(
             rulebook_rulesets=rulebook.rulesets,
             rulebook_rulesets_sha256=new_sha256,
             git_hash=git_hash,
         )
-        # Source-mapped activations: preserve SHA256 for stale
-        # warning detection (AAP-72873).
-        base_qs.exclude(source_mappings="").update(
-            rulebook_rulesets=rulebook.rulesets,
-            git_hash=git_hash,
+
+        mapped_activations = models.Activation.objects.filter(
+            rulebook=rulebook,
+        ).exclude(source_mappings="")
+
+        sources_unchanged = rulebook_sources_unchanged(
+            old_rulesets, rulebook.rulesets
         )
+        name_updates = (
+            build_source_name_updates(old_rulesets, rulebook.rulesets)
+            if sources_unchanged
+            else {}
+        )
+
+        for activation in mapped_activations:
+            self._update_mapped_activation(
+                activation,
+                sources_unchanged,
+                new_sha256,
+                name_updates,
+                rulebook.rulesets,
+                git_hash,
+            )
+
+    def _update_mapped_activation(
+        self,
+        activation: models.Activation,
+        sources_unchanged: bool,
+        new_sha256: str,
+        name_updates: dict[str, str],
+        new_rulesets: str,
+        git_hash: str,
+    ) -> None:
+        if self._parse_source_mappings(activation.source_mappings) is None:
+            self._mark_activation_source_mappings_error(activation)
+            return
+
+        if not sources_unchanged:
+            logger.info(
+                "Skipping source_mappings hash update for activation "
+                "%s (id=%s): rulebook sources changed during sync",
+                activation.name,
+                activation.id,
+            )
+            activation.git_hash = git_hash
+            activation.save(update_fields=["git_hash", "modified_at"])
+            return
+
+        updated = self._update_source_mappings_hash(
+            activation.source_mappings, new_sha256, name_updates
+        )
+        if updated is None:
+            self._mark_activation_source_mappings_error(activation)
+            return
+
+        activation.source_mappings = updated
+        activation.git_hash = git_hash
+        swapped = self._reswap_rulesets(activation, new_rulesets)
+        if swapped is not None:
+            activation.rulebook_rulesets = swapped
+        activation.save(
+            update_fields=[
+                "source_mappings",
+                "rulebook_rulesets",
+                "git_hash",
+                "modified_at",
+            ]
+        )
+
+    @staticmethod
+    def _reswap_rulesets(
+        activation: models.Activation, new_rulesets: str
+    ) -> str | None:
+        """Re-run the source swap on new rulebook content.
+
+        Uses ``build_rulebook_with_event_streams`` (the same utility
+        used at activation creation time) to query EventStream objects
+        and produce the swapped rulesets.
+
+        Returns the swapped YAML string, or None if the swap fails
+        (the activation keeps its old rulebook_rulesets).
+        """
+        try:
+            return build_rulebook_with_event_streams(
+                {
+                    "source_mappings": activation.source_mappings,
+                    "rulebook_rulesets": new_rulesets,
+                }
+            )
+        except Exception:
+            logger.warning(
+                "Failed to re-swap rulesets for activation %s (id=%s); "
+                "keeping previous rulebook_rulesets",
+                activation.name,
+                activation.id,
+                exc_info=True,
+            )
+            return None
+
+    def _mark_activation_source_mappings_error(
+        self, activation: models.Activation
+    ) -> None:
+        logger.error(
+            "Activation %s (id=%s) has unparseable "
+            "source_mappings; marking as error",
+            activation.name,
+            activation.id,
+        )
+        activation.status = ActivationStatus.ERROR
+        activation.status_message = (
+            "source_mappings could not be updated after "
+            "project sync. Please reattach event streams."
+        )
+        activation.save(update_fields=["status", "status_message"])
+
+    @staticmethod
+    def _parse_source_mappings(source_mappings: str) -> list[dict] | None:
+        """Parse and validate source_mappings YAML structure."""
+        try:
+            mappings = yaml.safe_load(source_mappings)
+        except yaml.YAMLError:
+            logger.warning("Failed to parse source_mappings for hash update")
+            return None
+
+        if not isinstance(mappings, list):
+            return None
+
+        for mapping in mappings:
+            if not isinstance(mapping, dict):
+                logger.warning(
+                    "source_mappings contains non-dict entry: %s",
+                    type(mapping),
+                )
+                return None
+
+        return mappings
+
+    @staticmethod
+    def _update_source_mappings_hash(
+        source_mappings: str,
+        new_hash: str,
+        name_updates: dict[str, str] | None = None,
+    ) -> str | None:
+        """Rewrite rulebook_hash (and optionally source_name) in each entry.
+
+        When *name_updates* is provided, any ``source_name`` that appears
+        as a key is replaced with the corresponding new name.  This keeps
+        source_mappings in sync after a source rename without requiring
+        the user to re-map manually.
+
+        Returns the updated YAML string, or None if parsing failed.
+        """
+        mappings = ProjectImportService._parse_source_mappings(source_mappings)
+        if mappings is None:
+            return None
+
+        for mapping in mappings:
+            mapping["rulebook_hash"] = new_hash
+            if name_updates:
+                old_name = mapping.get("source_name")
+                if old_name in name_updates:
+                    mapping["source_name"] = name_updates[old_name]
+
+        return yaml.dump(mappings, default_flow_style=False)
 
     def _find_rulebooks(self, repo: StrPath) -> Iterator[RulebookInfo]:
         rulebooks_dir = self._locate_rulebooks_dir(repo)

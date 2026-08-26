@@ -55,9 +55,9 @@ from aap_eda.core.utils.credentials import (
 )
 from aap_eda.core.utils.k8s_service_name import create_k8s_service_name
 from aap_eda.core.utils.rulebook import (
+    build_rulebook_with_event_streams,
     build_source_list,
     get_rulebook_hash,
-    swap_event_stream_sources,
 )
 from aap_eda.core.utils.strings import substitute_variables
 from aap_eda.utils.log_sanitizer import sanitize_string
@@ -71,16 +71,6 @@ REQUIRED_KEYS = [
     "rulebook_hash",
 ]
 
-PG_NOTIFY_DSN = (
-    "host={{postgres_db_host}} port={{postgres_db_port}} "
-    "dbname={{postgres_db_name}} user={{postgres_db_user}} "
-    "password={{postgres_db_password}} sslmode={{postgres_sslmode}} "
-    "sslcert={{eda.filename.postgres_sslcert|default(None)}} "
-    "sslkey={{eda.filename.postgres_sslkey|default(None)}} "
-    "sslpassword={{postgres_sslpassword|default(None)}} "
-    "sslrootcert={{eda.filename.postgres_sslrootcert|default(None)}}"
-)
-
 
 @dataclass
 class VaultData:
@@ -90,23 +80,7 @@ class VaultData:
 
 def _update_event_stream_source(validated_data: dict) -> str:
     try:
-        source_mappings = yaml.safe_load(validated_data["source_mappings"])
-        sources_info = {}
-        for source_map in source_mappings:
-            event_stream_id = source_map.get("event_stream_id")
-            obj = models.EventStream.objects.get(id=event_stream_id)
-
-            sources_info[obj.name] = {
-                "ansible.eda.pg_listener": {
-                    "dsn": PG_NOTIFY_DSN,
-                    "channels": [obj.channel_name],
-                },
-            }
-
-        return swap_event_stream_sources(
-            validated_data["rulebook_rulesets"], sources_info, source_mappings
-        )
-        # TODO: Can we catch a better exception
+        return build_rulebook_with_event_streams(validated_data)
     except Exception as e:
         logger.error(
             "Failed to update event stream source in rulesets: %s", str(e)
