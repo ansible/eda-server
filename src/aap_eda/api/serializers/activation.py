@@ -579,10 +579,10 @@ class ActivationListSerializer(
 
 
 class ActivationCreateSerializer(
+    CleanTextMixin,
     _K8sPodMetadataWriteFields,
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
-    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
     """Serializer for creating the Activation."""
 
@@ -792,10 +792,10 @@ class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
 
 
 class ActivationUpdateSerializer(
+    CleanTextMixin,
     _K8sPodMetadataWriteFields,
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
-    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
     """Serializer for updating the Activation."""
 
