@@ -103,6 +103,7 @@ class UserListSerializer(serializers.Serializer):
 
 
 class UserUpdateSerializerBase(
+    CleanTextMixin,
     serializers.ModelSerializer,
     SharedResourceSerializerMixin,
 ):
@@ -128,6 +129,7 @@ class UserUpdateSerializerBase(
         return value
 
     def validate(self, data):
+        data = super().validate(data)
         self.validate_shared_resource()
         return data
 
