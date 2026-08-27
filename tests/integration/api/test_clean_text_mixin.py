@@ -244,9 +244,7 @@ class TestUserCleanText:
         assert response.status_code == status.HTTP_201_CREATED
         user_id = response.data["id"]
 
-        models.User.objects.filter(pk=user_id).update(
-            username="user;invalid"
-        )
+        models.User.objects.filter(pk=user_id).update(username="user;invalid")
         response = admin_client.patch(
             f"{api_url_v1}/users/{user_id}/",
             data={"username": "user;invalid", "first_name": "Updated"},
@@ -655,9 +653,9 @@ class TestEventStreamCleanText:
     def test_grandfather_unchanged_name_on_update(
         self, default_event_stream: models.EventStream
     ):
-        models.EventStream.objects.filter(
-            pk=default_event_stream.pk
-        ).update(name="es<invalid>")
+        models.EventStream.objects.filter(pk=default_event_stream.pk).update(
+            name="es<invalid>"
+        )
         default_event_stream.refresh_from_db()
 
         serializer = EventStreamInSerializer(

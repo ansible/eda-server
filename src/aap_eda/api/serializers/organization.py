@@ -68,9 +68,7 @@ class OrganizationRefSerializer(NamedCommonModelSerializer):
         ]
 
 
-class OrganizationCreateSerializer(
-    CleanTextMixin, NamedCommonModelSerializer
-):
+class OrganizationCreateSerializer(CleanTextMixin, NamedCommonModelSerializer):
     class Meta:
         model = Organization
         fields = [

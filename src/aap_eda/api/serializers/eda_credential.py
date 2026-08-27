@@ -125,9 +125,7 @@ class EdaCredentialSerializer(CleanTextMixin, serializers.ModelSerializer):
         }
 
 
-class EdaCredentialCopySerializer(
-    CleanTextMixin, serializers.ModelSerializer
-):
+class EdaCredentialCopySerializer(CleanTextMixin, serializers.ModelSerializer):
     name = serializers.CharField(
         required=True,
         validators=[validators.check_if_credential_name_used],
