@@ -51,13 +51,13 @@ runs:
 
     # Verify coverage.xml exists and has content
     - name: Verify coverage.xml
-      if: inputs.python-version == '3.11'
+      if: inputs.python-version == '3.12'
       shell: bash
       run: |
         pwd
         ls -lh coverage.xml
         head -3 coverage.xml
-    
+
     # Add PR number to coverage file for SonarCloud analysis
     - name: Inject PR number into coverage file
       if: github.event_name == 'pull_request'
@@ -65,10 +65,10 @@ runs:
       run: |
         sed -i '2i <!-- PR ${{ github.event.number }} -->' coverage.xml
         echo "PR Number: ${{ github.event.number }} injected into coverage file"
-    
-    # Upload coverage artifact to Github for SonarCloud (only from Python 3.11)
+
+    # Upload coverage artifact to Github for SonarCloud
     - name: Upload coverage as artifact
-      if: inputs.python-version == '3.11'
+      if: inputs.python-version == '3.12'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: coverage
