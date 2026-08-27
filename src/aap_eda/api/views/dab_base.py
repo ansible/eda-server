@@ -28,8 +28,6 @@ def convert_to_create_serializer(cls):
     https://github.com/OpenAPITools/openapi-generator/issues/14280
     #issuecomment-1435960939
     """
-    global registry
-
     create_serializer_name = (
         cls.__name__.replace("Serializer", "") + "CreateSerializer"
     )
