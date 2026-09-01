@@ -718,6 +718,25 @@ class ActivationCreateSerializer(
         return super().create(validated_data)
 
 
+class _ActivationCopyTextCheckSerializer(
+    CleanTextMixin, serializers.ModelSerializer
+):
+    """Internal-only: re-validate copied free-text fields as new content.
+
+    ActivationCopySerializer.is_valid() only ever validates "name",
+    since it's constructed with instance=<source activation>, which
+    would make CleanTextMixin grandfather "description" as unchanged.
+    This serializer is never exposed to clients; it's only used from
+    copy() to re-check the copied description with no instance to
+    grandfather against, the same way EdaCredentialCreateSerializer
+    re-validates a copied credential's description.
+    """
+
+    class Meta:
+        model = models.Activation
+        fields = ["description"]
+
+
 class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
     name = serializers.CharField(
         required=True, validators=[validators.check_if_activation_name_used]
@@ -729,6 +748,13 @@ class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
 
     def copy(self) -> dict:
         activation: models.Activation = self.instance
+
+        text_check = _ActivationCopyTextCheckSerializer(
+            data={"description": activation.description}
+        )
+        text_check.is_valid(raise_exception=True)
+        description = text_check.validated_data["description"]
+
         pod_metadata = _activation_k8s_pod_metadata_payload(activation)
         _normalize_activation_k8s_pod_fields(pod_metadata)
         validators.check_if_k8s_pod_service_account_name_valid(
@@ -750,7 +776,7 @@ class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
 
         copied_data = {
             "name": self.validated_data["name"],
-            "description": activation.description,
+            "description": description,
             "is_enabled": False,
             "decision_environment": activation.decision_environment,
             "rulebook": activation.rulebook,
