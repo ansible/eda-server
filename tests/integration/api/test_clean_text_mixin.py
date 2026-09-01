@@ -760,3 +760,91 @@ class TestAwxTokenCleanText:
         )
         assert not serializer.is_valid()
         assert "description" in serializer.errors
+
+
+@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
+@pytest.mark.django_db
+class TestExcludedFieldsCleanText:
+    """Test that fields listed in a serializer's excluded_fields bypass
+    CleanTextMixin validation.
+
+    Each field below legitimately carries content (Jinja templates,
+    secrets, opaque tokens) that would otherwise trip the free-text
+    checks, so it must be accepted even when it contains characters
+    that are rejected on non-excluded fields like name/description.
+    """
+
+    @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+    @patch(
+        "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+        return_value=True,
+    )
+    def test_activation_extra_var_excluded(
+        self,
+        mock_health_check,
+        admin_awx_token: models.AwxToken,
+        activation_payload: dict,
+        admin_client: APIClient,
+    ):
+        activation_payload["extra_var"] = f"dangerous: '{DANGEROUS_TEXT}'"
+        response = admin_client.post(
+            f"{api_url_v1}/activations/", data=activation_payload
+        )
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+
+    def test_credential_type_injectors_excluded(self):
+        serializer = CredentialTypeCreateSerializer(
+            data={
+                "name": VALID_NAME,
+                "inputs": {
+                    "fields": [
+                        {
+                            "id": "password",
+                            "label": "Password",
+                            "type": "string",
+                        },
+                    ]
+                },
+                "injectors": {"extra_vars": {"password": DANGEROUS_TEXT}},
+            }
+        )
+        assert serializer.is_valid(), serializer.errors
+
+    def test_eda_credential_inputs_excluded(
+        self,
+        default_organization: models.Organization,
+        preseed_credential_types,
+    ):
+        registry_type = models.CredentialType.objects.get(
+            name=enums.DefaultCredentialType.REGISTRY
+        )
+        serializer = EdaCredentialCreateSerializer(
+            data={
+                "name": VALID_NAME,
+                "credential_type_id": registry_type.id,
+                "inputs": {
+                    "username": "dummy-user",
+                    "password": DANGEROUS_TEXT,
+                },
+                "organization_id": default_organization.id,
+            }
+        )
+        assert serializer.is_valid(), serializer.errors
+
+    def test_awx_token_excluded(self, default_user: models.User):
+        serializer = AwxTokenCreateSerializer(
+            data={"name": VALID_NAME, "token": DANGEROUS_TEXT},
+            context={"request": SimpleNamespace(user=default_user)},
+        )
+        assert serializer.is_valid(), serializer.errors
+
+    def test_credential_input_source_metadata_excluded(
+        self,
+        default_credential_input_source: models.CredentialInputSource,
+    ):
+        serializer = CredentialInputSourceUpdateSerializer(
+            instance=default_credential_input_source,
+            data={"metadata": {"secret_path": DANGEROUS_TEXT}},
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors

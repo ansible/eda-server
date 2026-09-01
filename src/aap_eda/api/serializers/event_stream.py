@@ -96,7 +96,9 @@ class EventStreamInSerializer(CleanTextMixin, serializers.ModelSerializer):
         ]
 
 
-class EventStreamOutSerializer(CleanTextMixin, serializers.ModelSerializer):
+class EventStreamOutSerializer(serializers.ModelSerializer):
+    """Serializer used during a GET."""
+
     owner = serializers.SerializerMethodField()
     organization = serializers.SerializerMethodField()
     eda_credential = EdaCredentialRefSerializer(
