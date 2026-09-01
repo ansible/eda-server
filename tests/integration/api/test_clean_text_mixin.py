@@ -362,6 +362,67 @@ class TestActivationCleanText:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "description" in response.data
 
+    @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+    @patch(
+        "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+        return_value=True,
+    )
+    def test_copy_propagates_valid_description(
+        self,
+        mock_health_check,
+        admin_awx_token: models.AwxToken,
+        activation_payload: dict,
+        admin_client: APIClient,
+    ):
+        response = admin_client.post(
+            f"{api_url_v1}/activations/", data=activation_payload
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        activation_id = response.data["id"]
+
+        response = admin_client.post(
+            f"{api_url_v1}/activations/{activation_id}/copy/",
+            data={"name": "copied-activation"},
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        copied = models.Activation.objects.get(name="copied-activation")
+        assert copied.description == activation_payload["description"]
+
+    @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+    @patch(
+        "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+        return_value=True,
+    )
+    def test_rejects_copy_of_grandfathered_invalid_description(
+        self,
+        mock_health_check,
+        admin_awx_token: models.AwxToken,
+        activation_payload: dict,
+        admin_client: APIClient,
+    ):
+        """A /copy/ must not propagate blocklisted text into a new row,
+        even when the source activation's description was grandfathered
+        in (e.g. it predates ENHANCED_INPUT_VALIDATION_ENABLED).
+        """
+        response = admin_client.post(
+            f"{api_url_v1}/activations/", data=activation_payload
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        activation_id = response.data["id"]
+
+        models.Activation.objects.filter(pk=activation_id).update(
+            description=DANGEROUS_TEXT
+        )
+
+        response = admin_client.post(
+            f"{api_url_v1}/activations/{activation_id}/copy/",
+            data={"name": "copied-activation"},
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert not models.Activation.objects.filter(
+            name="copied-activation"
+        ).exists()
+
 
 @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
