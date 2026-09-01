@@ -4,7 +4,7 @@
   "tekton": {
     "enabled": true,
     "automerge": true,
-    "schedule": ["* */12 * * 1-5"],
+    "schedule": ["* 8,17 * * 5"],
     "postUpgradeTasks": {
       "commands": []
     }
