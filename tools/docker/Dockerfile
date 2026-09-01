@@ -3,7 +3,7 @@ FROM quay.io/centos/centos:stream9
 ARG USER_ID=${USER_ID:-1001}
 ARG STATIC_ROOT=/var/lib/eda/static
 
-# python3.11 and python3.12 supported
+# python3.12 supported
 ARG PYTHON_BIN="python3.12"
 ARG ANSIBLE_CORE_VER=2.16
 

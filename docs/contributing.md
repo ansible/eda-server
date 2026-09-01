@@ -27,7 +27,7 @@ If you are proposing a feature:
 Before you submit a pull request, check that it meets these guidelines:
 
 1. The pull request should include tests.
-2. The pull request should work for Python 3.11
+2. The pull request should work for Python 3.12
 3. The pull request should pass all tests, linters and CI checks. You can run
    each of these locally in your [development environment](development.md)
 
