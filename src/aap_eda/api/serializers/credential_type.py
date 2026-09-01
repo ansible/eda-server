@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.lib.metadata import get_tier2_pattern, validation_enabled
 from ansible_base.lib.serializers.mixins import CleanTextMixin
 from rest_framework import serializers
 
@@ -38,6 +39,39 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
             *read_only_fields,
         ]
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        inputs = data.get("inputs")
+        if validation_enabled() and isinstance(inputs, dict):
+            data["inputs"] = _with_field_patterns(inputs)
+        return data
+
+
+def _with_field_patterns(inputs: dict) -> dict:
+    """Return a copy of the inputs schema with patterns for string fields.
+
+    Only non-secret "string" sub-fields get a pattern, since those are the
+    only ones CleanTextMixin's JSON sub-key validation enforces free-text
+    rules on; secret and boolean fields are left untouched.
+    """
+    fields = inputs.get("fields")
+    if not isinstance(fields, list):
+        return inputs
+
+    pattern = get_tier2_pattern()
+    new_fields = [
+        {
+            **field,
+            "pattern": pattern["pattern"],
+            "pattern_description": pattern["description"],
+        }
+        if isinstance(field, dict)
+        and field.get("type") == "string"
+        and not field.get("secret")
+        else field
+        for field in fields
+    ]
+    return {**inputs, "fields": new_fields}
 
 class CredentialTypeCreateSerializer(
     CleanTextMixin, serializers.ModelSerializer
