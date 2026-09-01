@@ -47,14 +47,8 @@ class CredentialInputSourceReferenceField(serializers.JSONField):
     pass
 
 
-class CredentialInputSourceSerializer(
-    CleanTextMixin, serializers.ModelSerializer
-):
+class CredentialInputSourceSerializer(serializers.ModelSerializer):
     """Serializer used during a GET."""
-
-    # metadata holds credential input values and is populated
-    # programmatically, so it is excluded from free-text checks.
-    excluded_fields = frozenset({"metadata"})
 
     organization = OrganizationRefSerializer()
     references = EdaCredentialReferenceField(required=False, allow_null=True)

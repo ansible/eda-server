@@ -129,9 +129,8 @@ class UserUpdateSerializerBase(
         return value
 
     def validate(self, data):
-        data = super().validate(data)
         self.validate_shared_resource()
-        return data
+        return super().validate(data)
 
 
 class UserCreateUpdateSerializer(UserUpdateSerializerBase):

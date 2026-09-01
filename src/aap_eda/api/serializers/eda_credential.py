@@ -55,10 +55,8 @@ class EdaCredentialReferenceField(serializers.JSONField):
     pass
 
 
-class EdaCredentialSerializer(CleanTextMixin, serializers.ModelSerializer):
-    # inputs holds arbitrary secret credential values, so it is excluded
-    # from free-text checks.
-    excluded_fields = frozenset({"inputs"})
+class EdaCredentialSerializer(serializers.ModelSerializer):
+    """Serializer used during a GET."""
 
     inputs = serializers.SerializerMethodField()
     credential_type = CredentialTypeRefSerializer(
