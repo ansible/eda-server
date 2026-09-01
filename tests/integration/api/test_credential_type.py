@@ -1315,3 +1315,36 @@ class TestCredentialTypeValidationPatterns:
         for field in response.data["inputs"]["fields"]:
             assert "pattern" not in field
             assert "pattern_description" not in field
+
+
+@pytest.mark.django_db
+class TestCredentialTypeOptionsValidationPatterns:
+    """EDAMetadata wires DAB's top-level OPTIONS pattern injection.
+
+    EDA overrides DEFAULT_METADATA_CLASS with its own EDAMetadata, so DAB's
+    CleanTextMetadata never runs; EDAMetadata.get_field_info() must call
+    inject_clean_text_patterns() itself for CleanTextMixin serializers to
+    advertise a pattern on OPTIONS, same as any other DAB consumer.
+    """
+
+    @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
+    def test_options_includes_pattern_when_toggle_on(
+        self, superuser_client: APIClient
+    ):
+        response = superuser_client.options(f"{api_url_v1}/credential-types/")
+        assert response.status_code == status.HTTP_200_OK
+
+        description_field = response.data["actions"]["POST"]["description"]
+        assert "pattern" in description_field
+        assert "patternDescription" in description_field
+
+    @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=False)
+    def test_options_excludes_pattern_when_toggle_off(
+        self, superuser_client: APIClient
+    ):
+        response = superuser_client.options(f"{api_url_v1}/credential-types/")
+        assert response.status_code == status.HTTP_200_OK
+
+        description_field = response.data["actions"]["POST"]["description"]
+        assert "pattern" not in description_field
+        assert "patternDescription" not in description_field
