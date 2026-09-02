@@ -931,10 +931,10 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2026.8.27.0.dev60+g9ebb22266"
+version = "2026.8.2.0.dev39+gafad8d27b"
 description = "A Django app used by ansible services"
 optional = false
-python-versions = ">=3.12"
+python-versions = ">=3.11"
 groups = ["main"]
 files = []
 develop = false
@@ -943,7 +943,7 @@ develop = false
 asgiref = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 channels = {version = "*", optional = true, markers = "extra == \"channel-auth\""}
 cryptography = "*"
-Django = ">=5,<6.0"
+Django = ">=4.2.26,<6.0"
 django-crum = "*"
 django-flags = {version = "*", optional = true, markers = "extra == \"feature-flags\""}
 djangorestframework = "<3.16"
@@ -955,7 +955,7 @@ sqlparse = ">=0.5.2"
 urllib3 = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 
 [package.extras]
-all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular (<1.0)", "jwcrypto (>=1.5.7)", "ldap-filter", "lxml (==5.3.0)", "opentelemetry-api", "opentelemetry-exporter-otlp-proto-grpc", "opentelemetry-instrumentation-django", "opentelemetry-instrumentation-grpc", "opentelemetry-instrumentation-logging", "opentelemetry-instrumentation-psycopg", "opentelemetry-instrumentation-psycopg2", "opentelemetry-instrumentation-requests", "opentelemetry-sdk", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis (>=7.4.0)", "referencing (<0.37.0)", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
+all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular (<1.0)", "jwcrypto (>=1.5.7)", "ldap-filter", "lxml (==5.3.0)", "opentelemetry-api", "opentelemetry-exporter-otlp-proto-grpc", "opentelemetry-instrumentation-django", "opentelemetry-instrumentation-grpc", "opentelemetry-instrumentation-logging", "opentelemetry-instrumentation-psycopg", "opentelemetry-instrumentation-psycopg2", "opentelemetry-instrumentation-requests", "opentelemetry-sdk", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis (>=7.4.0,<8.0.0)", "referencing (<0.37.0)", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
 api-documentation = ["drf-spectacular (<1.0)", "referencing (<0.37.0)"]
 authentication = ["django-auth-ldap", "ldap-filter", "lxml (==5.3.0)", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
@@ -963,7 +963,7 @@ feature-flags = ["django-flags"]
 jwt-consumer = ["pyjwt", "requests"]
 oauth2-provider = ["django-oauth-toolkit (<2.4.0)", "jwcrypto (>=1.5.7)"]
 observability = ["opentelemetry-api", "opentelemetry-exporter-otlp-proto-grpc", "opentelemetry-instrumentation-django", "opentelemetry-instrumentation-grpc", "opentelemetry-instrumentation-logging", "opentelemetry-instrumentation-psycopg", "opentelemetry-instrumentation-psycopg2", "opentelemetry-instrumentation-requests", "opentelemetry-sdk"]
-redis-client = ["django-redis", "redis (>=7.4.0)"]
+redis-client = ["django-redis", "redis (>=7.4.0,<8.0.0)"]
 resource-registry = ["asgiref", "pyjwt", "requests", "urllib3"]
 testing = ["cryptography", "pytest", "pytest-django"]
 
@@ -971,7 +971,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "9ebb22266e8cd4da1c339d1195877c3f7139909d"
+resolved_reference = "39b5225d52aec58a617f1d4ed0fd071b0d77fd02"
 
 [[package]]
 name = "django-crum"
