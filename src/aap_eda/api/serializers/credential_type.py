@@ -19,11 +19,7 @@ from aap_eda.core import models, validators
 from aap_eda.core.utils.credentials import validate_injectors
 
 
-class CredentialTypeSerializer(CleanTextMixin, serializers.ModelSerializer):
-    # injectors commonly contain Jinja2 template syntax, so it is excluded
-    # from free-text checks.
-    excluded_fields = frozenset({"injectors"})
-
+class CredentialTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.CredentialType
         read_only_fields = [

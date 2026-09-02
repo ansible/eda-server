@@ -23,7 +23,7 @@ from .fields.ansible_resource import AnsibleResourceFieldSerializer
 from .mixins import SharedResourceSerializerMixin
 
 
-class TeamSerializer(CleanTextMixin, serializers.ModelSerializer):
+class TeamSerializer(serializers.ModelSerializer):
     resource = AnsibleResourceFieldSerializer(read_only=True)
 
     class Meta:

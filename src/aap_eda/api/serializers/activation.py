@@ -367,12 +367,8 @@ def replace_vault_data(extra_var):
     return yaml.safe_dump(data)
 
 
-class ActivationSerializer(CleanTextMixin, serializers.ModelSerializer):
+class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
-
-    # extra_var may legitimately contain Jinja2 template syntax
-    # (e.g. credential injectors), so it is excluded from free-text checks.
-    excluded_fields = frozenset({"extra_var"})
 
     eda_credentials = serializers.ListField(
         required=False,
