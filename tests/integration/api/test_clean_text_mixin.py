@@ -49,7 +49,10 @@ from aap_eda.api.serializers.project import (
     ProjectCreateRequestSerializer,
     ProjectUpdateRequestSerializer,
 )
-from aap_eda.api.serializers.user import AwxTokenCreateSerializer
+from aap_eda.api.serializers.user import (
+    AwxTokenCreateSerializer,
+    UserCreateUpdateSerializer,
+)
 from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
@@ -907,5 +910,28 @@ class TestExcludedFieldsCleanText:
             instance=default_credential_input_source,
             data={"metadata": {"secret_path": DANGEROUS_TEXT}},
             partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+
+    def test_project_proxy_excluded(
+        self, default_organization: models.Organization
+    ):
+        serializer = ProjectCreateRequestSerializer(
+            data={
+                "name": VALID_NAME,
+                "url": "https://git.example.com/acme/project-01",
+                "proxy": DANGEROUS_TEXT,
+                "organization_id": default_organization.id,
+            }
+        )
+        assert serializer.is_valid(), serializer.errors
+
+    def test_user_password_excluded(self, default_user: models.User):
+        serializer = UserCreateUpdateSerializer(
+            data={
+                "username": VALID_USERNAME,
+                "password": DANGEROUS_TEXT,
+            },
+            context={"request": SimpleNamespace(user=default_user)},
         )
         assert serializer.is_valid(), serializer.errors
