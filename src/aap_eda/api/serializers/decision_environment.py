@@ -23,9 +23,7 @@ from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
 
 
-class DecisionEnvironmentSerializer(
-    CleanTextMixin, serializers.ModelSerializer
-):
+class DecisionEnvironmentSerializer(serializers.ModelSerializer):
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
 

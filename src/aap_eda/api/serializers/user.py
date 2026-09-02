@@ -26,7 +26,7 @@ from .mixins import SharedResourceSerializerMixin
 USERNAME_HELP = "The user's log in name."
 
 
-class UserSerializer(CleanTextMixin, serializers.ModelSerializer):
+class UserSerializer(serializers.ModelSerializer):
     resource = AnsibleResourceFieldSerializer(read_only=True)
 
     class Meta:

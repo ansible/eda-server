@@ -40,9 +40,7 @@ class ProxyFieldMixin:
         return get_proxy_for_display(url)
 
 
-class ProjectSerializer(
-    CleanTextMixin, serializers.ModelSerializer, ProxyFieldMixin
-):
+class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
     eda_credential_id = serializers.IntegerField(
         required=False, allow_null=True
     )
