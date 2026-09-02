@@ -18,16 +18,14 @@ These tests verify that the CleanTextMixin validation (two-tier text
 validation with grandfathering) works correctly on all EDA serializers
 that were updated in AAP-78702.
 
-The validation is gated behind ENHANCED_INPUT_VALIDATION_ENABLED, so all
-test classes use @override_settings to enable it.
+The validation is gated behind ENHANCED_INPUT_VALIDATION_ENABLED, so a
+module-level autouse fixture (enable_input_validation) enables it for
+every test in this module.
 """
 from types import SimpleNamespace
-from unittest import mock
 from unittest.mock import patch
 
 import pytest
-from django.conf import settings
-from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -62,7 +60,12 @@ VALID_NAME = "Valid Resource Name"
 VALID_USERNAME = "valid.user123"
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
+@pytest.fixture(autouse=True)
+def enable_input_validation(settings):
+    settings.ENHANCED_INPUT_VALIDATION_ENABLED = True
+    settings.RULEBOOK_WORKER_QUEUES = []
+
+
 @pytest.mark.django_db
 class TestOrganizationCleanText:
     """Test CleanTextMixin integration with OrganizationSerializer."""
@@ -127,7 +130,6 @@ class TestOrganizationCleanText:
         assert "name" in response.data
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestTeamCleanText:
     """Test CleanTextMixin integration with TeamSerializer."""
@@ -193,7 +195,6 @@ class TestTeamCleanText:
         assert response.status_code == status.HTTP_200_OK
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestUserCleanText:
     """Test CleanTextMixin integration with UserSerializer /
@@ -268,14 +269,12 @@ class TestUserCleanText:
         assert "username" in response.data
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestActivationCleanText:
     """Test CleanTextMixin integration with ActivationCreateSerializer /
     ActivationUpdateSerializer.
     """
 
-    @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
     @patch(
         "aap_eda.api.views.activation.check_dispatcherd_workers_health",
         return_value=True,
@@ -294,7 +293,6 @@ class TestActivationCleanText:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "name" in response.data
 
-    @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
     @patch(
         "aap_eda.api.views.activation.check_dispatcherd_workers_health",
         return_value=True,
@@ -311,7 +309,6 @@ class TestActivationCleanText:
         )
         assert response.status_code == status.HTTP_201_CREATED
 
-    @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
     @patch(
         "aap_eda.api.views.activation.check_dispatcherd_workers_health",
         return_value=True,
@@ -339,7 +336,6 @@ class TestActivationCleanText:
         )
         assert response.status_code == status.HTTP_200_OK
 
-    @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
     @patch(
         "aap_eda.api.views.activation.check_dispatcherd_workers_health",
         return_value=True,
@@ -365,7 +361,6 @@ class TestActivationCleanText:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "description" in response.data
 
-    @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
     @patch(
         "aap_eda.api.views.activation.check_dispatcherd_workers_health",
         return_value=True,
@@ -391,7 +386,6 @@ class TestActivationCleanText:
         copied = models.Activation.objects.get(name="copied-activation")
         assert copied.description == activation_payload["description"]
 
-    @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
     @patch(
         "aap_eda.api.views.activation.check_dispatcherd_workers_health",
         return_value=True,
@@ -427,7 +421,6 @@ class TestActivationCleanText:
         ).exists()
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestProjectCleanText:
     """Test CleanTextMixin integration with ProjectCreateRequestSerializer /
@@ -501,7 +494,6 @@ class TestProjectCleanText:
         assert "name" in serializer.errors
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestDecisionEnvironmentCleanText:
     """Test CleanTextMixin integration with
@@ -560,7 +552,6 @@ class TestDecisionEnvironmentCleanText:
         assert "name" in serializer.errors
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestCredentialTypeCleanText:
     """Test CleanTextMixin integration with CredentialTypeCreateSerializer."""
@@ -599,7 +590,6 @@ class TestCredentialTypeCleanText:
         assert serializer.is_valid(), serializer.errors
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestEdaCredentialCleanText:
     """Test CleanTextMixin integration with EdaCredentialCreateSerializer /
@@ -676,7 +666,6 @@ class TestEdaCredentialCleanText:
         assert "name" in serializer.errors
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestEventStreamCleanText:
     """Test CleanTextMixin integration with EventStreamInSerializer."""
@@ -741,7 +730,6 @@ class TestEventStreamCleanText:
         assert "name" in serializer.errors
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestCredentialInputSourceCleanText:
     """Test CleanTextMixin integration with
@@ -791,7 +779,6 @@ class TestCredentialInputSourceCleanText:
         assert serializer.is_valid(), serializer.errors
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestAwxTokenCleanText:
     """Test CleanTextMixin integration with AwxTokenCreateSerializer."""
@@ -826,7 +813,6 @@ class TestAwxTokenCleanText:
         assert "description" in serializer.errors
 
 
-@override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
 @pytest.mark.django_db
 class TestExcludedFieldsCleanText:
     """Test that fields listed in a serializer's excluded_fields bypass
@@ -838,7 +824,6 @@ class TestExcludedFieldsCleanText:
     that are rejected on non-excluded fields like name/description.
     """
 
-    @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
     @patch(
         "aap_eda.api.views.activation.check_dispatcherd_workers_health",
         return_value=True,
