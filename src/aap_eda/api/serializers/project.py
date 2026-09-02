@@ -91,6 +91,8 @@ class ProjectSerializer(
 class ProjectCreateRequestSerializer(
     CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
+    excluded_fields = frozenset({"proxy"})
+
     eda_credential_id = serializers.IntegerField(
         required=False,
         allow_null=True,
@@ -163,6 +165,8 @@ class ProjectCreateRequestSerializer(
 class ProjectUpdateRequestSerializer(
     CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
+    excluded_fields = frozenset({"proxy"})
+
     name = serializers.CharField(
         required=False,
         allow_blank=False,

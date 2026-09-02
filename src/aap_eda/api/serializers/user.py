@@ -107,6 +107,8 @@ class UserUpdateSerializerBase(
     serializers.ModelSerializer,
     SharedResourceSerializerMixin,
 ):
+    excluded_fields = frozenset({"password"})
+
     username = serializers.CharField(
         help_text=USERNAME_HELP,
     )
