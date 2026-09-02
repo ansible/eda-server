@@ -734,7 +734,7 @@ class _ActivationCopyTextCheckSerializer(
 
     class Meta:
         model = models.Activation
-        fields = ["description"]
+        fields = ["description", "k8s_service_name", "source_mappings"]
 
 
 class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
@@ -750,10 +750,16 @@ class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
         activation: models.Activation = self.instance
 
         text_check = _ActivationCopyTextCheckSerializer(
-            data={"description": activation.description}
+            data={
+                "description": activation.description,
+                "k8s_service_name": activation.k8s_service_name,
+                "source_mappings": activation.source_mappings,
+            }
         )
         text_check.is_valid(raise_exception=True)
         description = text_check.validated_data["description"]
+        k8s_service_name = text_check.validated_data["k8s_service_name"]
+        source_mappings = text_check.validated_data["source_mappings"]
 
         pod_metadata = _activation_k8s_pod_metadata_payload(activation)
         _normalize_activation_k8s_pod_fields(pod_metadata)
@@ -787,8 +793,8 @@ class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
             "awx_token_id": activation.awx_token,
             "log_level": activation.log_level,
             "eda_credentials": activation.eda_credentials.all(),
-            "k8s_service_name": activation.k8s_service_name,
-            "source_mappings": activation.source_mappings,
+            "k8s_service_name": k8s_service_name,
+            "source_mappings": source_mappings,
             "event_streams": activation.event_streams.all(),
             "skip_audit_events": activation.skip_audit_events,
             "rulebook_name": activation.rulebook.name,
