@@ -3,7 +3,6 @@
 __pycache__/
 # Packaging / distribution
 /dist/
-.venv/
 
 # temp dirs
 /tools/deploy/temp/
@@ -17,6 +16,13 @@ __pycache__/
 .env
 ./coverage.xml
 ./htmlcov/
+venv/
+.venv/
+.coverage*
+coverage.xml
+test-results.xml
+.DS_Store
+.obsidian/
 
 # Task
 .task/
@@ -24,17 +30,12 @@ Taskfile.yml
 Taskfile.yaml
 /tools/deploy/environment.properties
 
-venv/
-.coverage*
-coverage.xml
-test-results.xml
-.obsidian/
-
 # Dispatcherd development
 dispatcherd/
 
 # OpenAPI
 openapi.json
 
-.DS_Store
+# AI Development
 .claude/
+.codegraph/
