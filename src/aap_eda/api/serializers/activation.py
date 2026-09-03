@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import yaml
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
@@ -574,11 +575,16 @@ class ActivationListSerializer(
 
 
 class ActivationCreateSerializer(
+    CleanTextMixin,
     _K8sPodMetadataWriteFields,
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
 ):
     """Serializer for creating the Activation."""
+
+    # extra_var may legitimately contain Jinja2 template syntax
+    # (e.g. credential injectors), so it is excluded from free-text checks.
+    excluded_fields = frozenset({"extra_var"})
 
     class Meta:
         model = models.Activation
@@ -665,7 +671,7 @@ class ActivationCreateSerializer(
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
         _normalize_activation_k8s_pod_fields(data)
-        return data
+        return super().validate(data)
 
     def create(self, validated_data):
         rulebook_id = validated_data["rulebook_id"]
@@ -708,7 +714,26 @@ class ActivationCreateSerializer(
         return super().create(validated_data)
 
 
-class ActivationCopySerializer(serializers.ModelSerializer):
+class _ActivationCopyTextCheckSerializer(
+    CleanTextMixin, serializers.ModelSerializer
+):
+    """Internal-only: re-validate copied free-text fields as new content.
+
+    ActivationCopySerializer.is_valid() only ever validates "name",
+    since it's constructed with instance=<source activation>, which
+    would make CleanTextMixin grandfather "description" as unchanged.
+    This serializer is never exposed to clients; it's only used from
+    copy() to re-check the copied description with no instance to
+    grandfather against, the same way EdaCredentialCreateSerializer
+    re-validates a copied credential's description.
+    """
+
+    class Meta:
+        model = models.Activation
+        fields = ["description", "k8s_service_name", "source_mappings"]
+
+
+class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
     name = serializers.CharField(
         required=True, validators=[validators.check_if_activation_name_used]
     )
@@ -719,6 +744,19 @@ class ActivationCopySerializer(serializers.ModelSerializer):
 
     def copy(self) -> dict:
         activation: models.Activation = self.instance
+
+        text_check = _ActivationCopyTextCheckSerializer(
+            data={
+                "description": activation.description,
+                "k8s_service_name": activation.k8s_service_name,
+                "source_mappings": activation.source_mappings,
+            }
+        )
+        text_check.is_valid(raise_exception=True)
+        description = text_check.validated_data["description"]
+        k8s_service_name = text_check.validated_data["k8s_service_name"]
+        source_mappings = text_check.validated_data["source_mappings"]
+
         pod_metadata = _activation_k8s_pod_metadata_payload(activation)
         _normalize_activation_k8s_pod_fields(pod_metadata)
         validators.check_if_k8s_pod_service_account_name_valid(
@@ -740,7 +778,7 @@ class ActivationCopySerializer(serializers.ModelSerializer):
 
         copied_data = {
             "name": self.validated_data["name"],
-            "description": activation.description,
+            "description": description,
             "is_enabled": False,
             "decision_environment": activation.decision_environment,
             "rulebook": activation.rulebook,
@@ -751,8 +789,8 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             "awx_token_id": activation.awx_token,
             "log_level": activation.log_level,
             "eda_credentials": activation.eda_credentials.all(),
-            "k8s_service_name": activation.k8s_service_name,
-            "source_mappings": activation.source_mappings,
+            "k8s_service_name": k8s_service_name,
+            "source_mappings": source_mappings,
             "event_streams": activation.event_streams.all(),
             "skip_audit_events": activation.skip_audit_events,
             "rulebook_name": activation.rulebook.name,
@@ -782,11 +820,16 @@ class ActivationCopySerializer(serializers.ModelSerializer):
 
 
 class ActivationUpdateSerializer(
+    CleanTextMixin,
     _K8sPodMetadataWriteFields,
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
 ):
     """Serializer for updating the Activation."""
+
+    # extra_var may legitimately contain Jinja2 template syntax
+    # (e.g. credential injectors), so it is excluded from free-text checks.
+    excluded_fields = frozenset({"extra_var"})
 
     class Meta:
         model = models.Activation
@@ -897,7 +940,7 @@ class ActivationUpdateSerializer(
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
         _normalize_activation_k8s_pod_fields(data)
-        return data
+        return super().validate(data)
 
     def prepare_update(self, activation: models.Activation):
         rulebook_id = self.validated_data.get("rulebook_id")

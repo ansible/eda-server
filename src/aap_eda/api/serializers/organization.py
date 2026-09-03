@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from ansible_base.lib.serializers.common import NamedCommonModelSerializer
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from django.conf import settings
 
 from aap_eda.api import exceptions as api_exc
@@ -23,6 +24,7 @@ from .mixins import SharedResourceSerializerMixin
 
 
 class OrganizationSerializer(
+    CleanTextMixin,
     NamedCommonModelSerializer,
     SharedResourceSerializerMixin,
 ):
@@ -53,7 +55,7 @@ class OrganizationSerializer(
             raise api_exc.Conflict(
                 "The default organization cannot be modified."
             )
-        return data
+        return super().validate(data)
 
 
 class OrganizationRefSerializer(NamedCommonModelSerializer):
@@ -66,7 +68,7 @@ class OrganizationRefSerializer(NamedCommonModelSerializer):
         ]
 
 
-class OrganizationCreateSerializer(NamedCommonModelSerializer):
+class OrganizationCreateSerializer(CleanTextMixin, NamedCommonModelSerializer):
     class Meta:
         model = Organization
         fields = [
