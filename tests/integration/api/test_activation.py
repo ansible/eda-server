@@ -1039,6 +1039,32 @@ def test_is_activation_valid(
 
 
 @pytest.mark.django_db
+def test_is_activation_valid_with_k8s_pod_affinity(
+    default_activation: models.Activation, preseed_credential_types
+):
+    default_activation.k8s_pod_affinity = {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": "eda-lab/zone",
+                                "operator": "In",
+                                "values": ["a"],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+    valid, error = is_activation_valid(default_activation)
+    assert valid is True
+    assert error == "{}"  # noqa P103
+
+
+@pytest.mark.django_db
 @patch(
     "aap_eda.api.views.activation.check_dispatcherd_workers_health",
     return_value=True,
