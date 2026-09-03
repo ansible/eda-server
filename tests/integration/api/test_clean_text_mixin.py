@@ -684,9 +684,7 @@ class TestEventStreamCleanText:
                 "eda_credential_id": default_hmac_credential.id,
                 "organization_id": default_organization.id,
             },
-            context={
-                "request": SimpleNamespace(user=default_user, META={})
-            },
+            context={"request": SimpleNamespace(user=default_user, META={})},
         )
         assert not serializer.is_valid()
         assert "name" in serializer.errors
@@ -704,9 +702,7 @@ class TestEventStreamCleanText:
                 "eda_credential_id": default_hmac_credential.id,
                 "organization_id": default_organization.id,
             },
-            context={
-                "request": SimpleNamespace(user=default_user, META={})
-            },
+            context={"request": SimpleNamespace(user=default_user, META={})},
         )
         assert serializer.is_valid(), serializer.errors
 
@@ -793,9 +789,7 @@ class TestAwxTokenCleanText:
     def test_rejects_invalid_name_on_create(self, default_user: models.User):
         serializer = AwxTokenCreateSerializer(
             data={"name": DANGEROUS_NAME, "token": "sometoken"},
-            context={
-                "request": SimpleNamespace(user=default_user, META={})
-            },
+            context={"request": SimpleNamespace(user=default_user, META={})},
         )
         assert not serializer.is_valid()
         assert "name" in serializer.errors
@@ -803,9 +797,7 @@ class TestAwxTokenCleanText:
     def test_accepts_valid_name_on_create(self, default_user: models.User):
         serializer = AwxTokenCreateSerializer(
             data={"name": VALID_NAME, "token": "sometoken"},
-            context={
-                "request": SimpleNamespace(user=default_user, META={})
-            },
+            context={"request": SimpleNamespace(user=default_user, META={})},
         )
         assert serializer.is_valid(), serializer.errors
 
@@ -818,9 +810,7 @@ class TestAwxTokenCleanText:
                 "token": "sometoken",
                 "description": DANGEROUS_TEXT,
             },
-            context={
-                "request": SimpleNamespace(user=default_user, META={})
-            },
+            context={"request": SimpleNamespace(user=default_user, META={})},
         )
         assert not serializer.is_valid()
         assert "description" in serializer.errors
@@ -896,9 +886,7 @@ class TestExcludedFieldsCleanText:
     def test_awx_token_excluded(self, default_user: models.User):
         serializer = AwxTokenCreateSerializer(
             data={"name": VALID_NAME, "token": DANGEROUS_TEXT},
-            context={
-                "request": SimpleNamespace(user=default_user, META={})
-            },
+            context={"request": SimpleNamespace(user=default_user, META={})},
         )
         assert serializer.is_valid(), serializer.errors
 
@@ -937,8 +925,6 @@ class TestExcludedFieldsCleanText:
                 "username": VALID_USERNAME,
                 "password": DANGEROUS_TEXT,
             },
-            context={
-                "request": SimpleNamespace(user=default_user, META={})
-            },
+            context={"request": SimpleNamespace(user=default_user, META={})},
         )
         assert serializer.is_valid(), serializer.errors
