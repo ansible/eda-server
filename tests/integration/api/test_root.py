@@ -46,6 +46,7 @@ from tests.integration.constants import api_url_v1
                 "/teams/",
                 "/event-streams/",
                 "/credential-input-sources/",
+                "/logs/",
                 "/role_definitions/",
                 "/role_user_assignments/",
                 "/role_team_assignments/",
@@ -102,6 +103,7 @@ from tests.integration.constants import api_url_v1
                 # have migrated away from this endpoint
                 "/feature_flags_state/",
                 "/credential-input-sources/",
+                "/logs/",
             ],
             False,
             id="no_shared_resource",
