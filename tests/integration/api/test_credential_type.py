@@ -15,6 +15,7 @@ from typing import Optional
 from unittest.mock import patch
 
 import pytest
+from django.test import override_settings
 from pytest_lazyfixture import lazy_fixture
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -1267,3 +1268,83 @@ def test_eda_rule_engine_credential_validates_required_fields(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "postgres_db_name" in str(response.data)
+
+
+@pytest.mark.django_db
+class TestCredentialTypeValidationPatterns:
+    """AAP-87587: pattern/pattern_description injection for JSON sub-keys."""
+
+    @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
+    def test_patterns_present_when_toggle_on(
+        self,
+        superuser_client: APIClient,
+        credential_type: models.CredentialType,
+    ):
+        from ansible_base.lib.metadata import get_tier2_pattern
+
+        response = superuser_client.get(
+            f"{api_url_v1}/credential-types/{credential_type.id}/"
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        pattern = get_tier2_pattern()
+        fields_by_id = {
+            field["id"]: field for field in response.data["inputs"]["fields"]
+        }
+
+        username_field = fields_by_id["username"]
+        assert username_field["pattern"] == pattern["pattern"]
+        assert username_field["pattern_description"] == pattern["description"]
+
+        # secret fields are excluded even though they are also type "string"
+        password_field = fields_by_id["password"]
+        assert "pattern" not in password_field
+        assert "pattern_description" not in password_field
+
+    @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=False)
+    def test_patterns_absent_when_toggle_off(
+        self,
+        superuser_client: APIClient,
+        credential_type: models.CredentialType,
+    ):
+        response = superuser_client.get(
+            f"{api_url_v1}/credential-types/{credential_type.id}/"
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        for field in response.data["inputs"]["fields"]:
+            assert "pattern" not in field
+            assert "pattern_description" not in field
+
+
+@pytest.mark.django_db
+class TestCredentialTypeOptionsValidationPatterns:
+    """EDAMetadata wires DAB's top-level OPTIONS pattern injection.
+
+    EDA overrides DEFAULT_METADATA_CLASS with its own EDAMetadata, so DAB's
+    CleanTextMetadata never runs; EDAMetadata.get_field_info() must call
+    inject_clean_text_patterns() itself for CleanTextMixin serializers to
+    advertise a pattern on OPTIONS, same as any other DAB consumer.
+    """
+
+    @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
+    def test_options_includes_pattern_when_toggle_on(
+        self, superuser_client: APIClient
+    ):
+        response = superuser_client.options(f"{api_url_v1}/credential-types/")
+        assert response.status_code == status.HTTP_200_OK
+
+        description_field = response.data["actions"]["POST"]["description"]
+        assert "pattern" in description_field
+        assert "patternDescription" in description_field
+
+    @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=False)
+    def test_options_excludes_pattern_when_toggle_off(
+        self, superuser_client: APIClient
+    ):
+        response = superuser_client.options(f"{api_url_v1}/credential-types/")
+        assert response.status_code == status.HTTP_200_OK
+
+        description_field = response.data["actions"]["POST"]["description"]
+        assert "pattern" not in description_field
+        assert "patternDescription" not in description_field

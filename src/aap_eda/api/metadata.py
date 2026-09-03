@@ -1,3 +1,4 @@
+from ansible_base.lib.metadata import inject_clean_text_patterns
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.utils.encoding import force_str
@@ -23,6 +24,7 @@ class EDAMetadata(metadata.SimpleMetadata):
 
     def get_field_info(self, field):
         field_info = super().get_field_info(field)
+        field_info = inject_clean_text_patterns(field, field_info)
 
         for attr in ADDITIONAL_ATTRS:
             value = getattr(field, attr, None)
