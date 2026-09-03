@@ -936,6 +936,96 @@ def test_engine_start_no_tolerations_by_default(
             assert pod_spec.tolerations is None
 
 
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@pytest.mark.django_db
+def test_engine_start_applies_k8s_pod_affinity(
+    mock_watch,
+    init_kubernetes_data,
+    kubernetes_engine,
+    default_organization,
+):
+    engine = kubernetes_engine
+    affinity = {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": "eda-lab/zone",
+                                "operator": "In",
+                                "values": ["a"],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+    request = get_request(
+        init_kubernetes_data,
+        "test-user",
+        default_organization,
+        k8s_pod_affinity=affinity,
+    )
+    log_handler = mock.MagicMock(spec=LogHandler)
+    mock_watch.return_value.stream.return_value = iter(
+        [
+            {
+                "object": get_pod("Running"),
+                "type": "MODIFIED",
+            }
+        ]
+    )
+    with mock.patch.object(engine.client, "batch_api") as batch_api:
+        with mock.patch.object(engine.client, "core_api") as core_api:
+            svc_mock = core_api.list_namespaced_service
+            svc_mock.return_value.items = None
+            engine.start(request, log_handler)
+            call_kwargs = batch_api.create_namespaced_job.call_args
+            job_body = call_kwargs.kwargs.get(
+                "body", call_kwargs[1].get("body")
+            )
+            pod_spec = job_body.spec.template.spec
+            assert pod_spec.affinity == affinity
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@pytest.mark.django_db
+def test_engine_start_no_affinity_by_default(
+    mock_watch,
+    init_kubernetes_data,
+    kubernetes_engine,
+    default_organization,
+):
+    engine = kubernetes_engine
+    request = get_request(
+        init_kubernetes_data,
+        "test-user",
+        default_organization,
+    )
+    log_handler = mock.MagicMock(spec=LogHandler)
+    mock_watch.return_value.stream.return_value = iter(
+        [
+            {
+                "object": get_pod("Running"),
+                "type": "MODIFIED",
+            }
+        ]
+    )
+    with mock.patch.object(engine.client, "batch_api") as batch_api:
+        with mock.patch.object(engine.client, "core_api") as core_api:
+            svc_mock = core_api.list_namespaced_service
+            svc_mock.return_value.items = None
+            engine.start(request, log_handler)
+            call_kwargs = batch_api.create_namespaced_job.call_args
+            job_body = call_kwargs.kwargs.get(
+                "body", call_kwargs[1].get("body")
+            )
+            pod_spec = job_body.spec.template.spec
+            assert pod_spec.affinity is None
+
+
 @pytest.mark.django_db
 def test_get_job_pod_returns_pod_on_success(kubernetes_engine):
     """_get_job_pod returns the first pod when the API call succeeds."""
