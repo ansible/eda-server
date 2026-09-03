@@ -21,24 +21,28 @@ from aap_eda.core.validators import check_if_k8s_pod_affinity_valid
 
 @patch("aap_eda.core.validators.settings")
 def test_affinity_skips_non_k8s(mock_settings):
+    """Test that validation is skipped when DEPLOYMENT_TYPE is not k8s."""
     mock_settings.DEPLOYMENT_TYPE = "podman"
     check_if_k8s_pod_affinity_valid({"bogus": "value"})
 
 
 @patch("aap_eda.core.validators.settings")
 def test_affinity_none_noop(mock_settings):
+    """Test that None is accepted as a no-op value."""
     mock_settings.DEPLOYMENT_TYPE = "k8s"
     check_if_k8s_pod_affinity_valid(None)
 
 
 @patch("aap_eda.core.validators.settings")
 def test_affinity_empty_dict_noop(mock_settings):
+    """Test that an empty dict is accepted as a no-op value."""
     mock_settings.DEPLOYMENT_TYPE = "k8s"
     check_if_k8s_pod_affinity_valid({})
 
 
 @patch("aap_eda.core.validators.settings")
 def test_affinity_valid_node_affinity(mock_settings):
+    """Test that a valid nodeAffinity dict passes validation."""
     mock_settings.DEPLOYMENT_TYPE = "k8s"
     check_if_k8s_pod_affinity_valid(
         {
@@ -63,6 +67,7 @@ def test_affinity_valid_node_affinity(mock_settings):
 
 @patch("aap_eda.core.validators.settings")
 def test_affinity_valid_multiple_top_level_keys(mock_settings):
+    """Test that multiple valid top-level affinity keys pass validation."""
     mock_settings.DEPLOYMENT_TYPE = "k8s"
     check_if_k8s_pod_affinity_valid(
         {
@@ -81,6 +86,7 @@ def test_affinity_valid_multiple_top_level_keys(mock_settings):
 
 @patch("aap_eda.core.validators.settings")
 def test_affinity_not_a_dict(mock_settings):
+    """Test that a non-dict value is rejected."""
     mock_settings.DEPLOYMENT_TYPE = "k8s"
     with pytest.raises(serializers.ValidationError, match="JSON object"):
         check_if_k8s_pod_affinity_valid(["not-a-dict"])
@@ -88,6 +94,7 @@ def test_affinity_not_a_dict(mock_settings):
 
 @patch("aap_eda.core.validators.settings")
 def test_affinity_unknown_top_level_key(mock_settings):
+    """Test that an unknown top-level key is rejected."""
     mock_settings.DEPLOYMENT_TYPE = "k8s"
     with pytest.raises(
         serializers.ValidationError, match="unknown top-level keys"
@@ -97,6 +104,7 @@ def test_affinity_unknown_top_level_key(mock_settings):
 
 @patch("aap_eda.core.validators.settings")
 def test_affinity_sub_value_not_a_dict(mock_settings):
+    """Test that a non-dict sub-value is rejected."""
     mock_settings.DEPLOYMENT_TYPE = "k8s"
     with pytest.raises(serializers.ValidationError, match="JSON object"):
         check_if_k8s_pod_affinity_valid({"nodeAffinity": "not-a-dict"})

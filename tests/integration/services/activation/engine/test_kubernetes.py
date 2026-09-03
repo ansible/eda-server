@@ -944,6 +944,7 @@ def test_engine_start_applies_k8s_pod_affinity(
     kubernetes_engine,
     default_organization,
 ):
+    """Test that k8s_pod_affinity is applied to the pod spec."""
     engine = kubernetes_engine
     affinity = {
         "nodeAffinity": {
@@ -998,6 +999,7 @@ def test_engine_start_no_affinity_by_default(
     kubernetes_engine,
     default_organization,
 ):
+    """Test that no affinity is applied to the pod spec by default."""
     engine = kubernetes_engine
     request = get_request(
         init_kubernetes_data,
