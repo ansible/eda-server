@@ -825,6 +825,7 @@ class ActivationUpdateSerializer(
             "k8s_pod_annotations",
             "k8s_pod_node_selector",
             "k8s_pod_tolerations",
+            "k8s_pod_affinity",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -869,6 +870,11 @@ class ActivationUpdateSerializer(
         required=False,
         default=list,
         validators=[validators.validate_k8s_pod_tolerations],
+    )
+    k8s_pod_affinity = serializers.JSONField(
+        required=False,
+        default=dict,
+        validators=[validators.check_if_k8s_pod_affinity_valid],
     )
 
     def refill_needed_data(
@@ -1030,6 +1036,7 @@ class ActivationUpdateSerializer(
             "enable_persistence": activation.enable_persistence,
             "rule_engine_credential_id": activation.rule_engine_credential_id,
             "k8s_pod_tolerations": activation.k8s_pod_tolerations,
+            "k8s_pod_affinity": activation.k8s_pod_affinity,
         }
 
 
@@ -1328,6 +1335,7 @@ class ActivationReadSerializer(
             "rule_engine_credential_id": activation.rule_engine_credential_id,
             "rule_engine_credential": rule_engine_credential,
             "k8s_pod_tolerations": activation.k8s_pod_tolerations,
+            "k8s_pod_affinity": activation.k8s_pod_affinity,
         }
 
 
