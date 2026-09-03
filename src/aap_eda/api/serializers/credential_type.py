@@ -47,12 +47,15 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
         return data
 
 
+python
 def _with_field_patterns(inputs: dict) -> dict:
     """Return a copy of the inputs schema with patterns for string fields.
 
-    Only non-secret "string" sub-fields get a pattern, since those are the
-    only ones CleanTextMixin's JSON sub-key validation enforces free-text
-    rules on; secret and boolean fields are left untouched.
+    CleanTextMixin (from DAB) enforces free-text validation rules on
+    serializer string fields at write time (when the ENHANCED_INPUT_VALIDATION_ENABLED setting is turned on).  Only non-secret "string"
+    sub-fields get a pattern here, since those are the only ones its
+    JSON sub-key validation applies to; secret and boolean fields are
+    left untouched.
     """
     fields = inputs.get("fields")
     if not isinstance(fields, list):
