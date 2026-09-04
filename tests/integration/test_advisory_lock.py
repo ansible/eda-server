@@ -108,4 +108,17 @@ def test_job_uniqueness(module_data):
         ]
         wait(futures, timeout=3)
 
+    errors = []
+    for i, f in enumerate(futures):
+        if f.done() and f.exception():
+            errors.append(f"Thread {i}: {f.exception()}")
+        elif not f.done():
+            errors.append(f"Thread {i}: timed out (not done after 3s)")
+
+    if errors:
+        pytest.fail(
+            f"Thread errors (call_log={call_log}):\n"
+            + "\n".join(errors)
+        )
+
     assert len(call_log) == 1
