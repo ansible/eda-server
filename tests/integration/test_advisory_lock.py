@@ -117,8 +117,7 @@ def test_job_uniqueness(module_data):
 
     if errors:
         pytest.fail(
-            f"Thread errors (call_log={call_log}):\n"
-            + "\n".join(errors)
+            f"Thread errors (call_log={call_log}):\n" + "\n".join(errors)
         )
 
     assert len(call_log) == 1
