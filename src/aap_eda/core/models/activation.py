@@ -197,6 +197,16 @@ class Activation(
             "so they can be scheduled onto tainted nodes."
         ),
     )
+    k8s_pod_affinity = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Kubernetes affinity rules (nodeAffinity, podAffinity, "
+            "podAntiAffinity) applied to activation job pods for "
+            "scheduling constraints."
+        ),
+    )
+
     event_streams = models.ManyToManyField(
         EventStream, related_name="activations", default=None
     )

@@ -141,6 +141,39 @@ def test_get_container_request(activation):
 
 
 @pytest.mark.django_db
+def test_get_container_request_with_k8s_pod_affinity(activation):
+    """Test that k8s_pod_affinity is passed through to ContainerRequest."""
+    affinity = {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": "eda-lab/zone",
+                                "operator": "In",
+                                "values": ["a"],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+    activation.k8s_pod_affinity = affinity
+    activation.save(update_fields=["k8s_pod_affinity"])
+    request = activation.get_container_request()
+    assert request.k8s_pod_affinity == affinity
+
+
+@pytest.mark.django_db
+def test_get_container_request_no_affinity_by_default(activation):
+    """Test that k8s_pod_affinity defaults to empty when unset."""
+    request = activation.get_container_request()
+    assert request.k8s_pod_affinity == {}
+
+
+@pytest.mark.django_db
 def test_get_container_request_no_instance(activation_no_instance):
     """Test the construction of a ContainerRequest."""
     with pytest.raises(ContainerableInvalidError):

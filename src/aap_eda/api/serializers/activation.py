@@ -417,6 +417,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "k8s_pod_annotations",
             "k8s_pod_node_selector",
             "k8s_pod_tolerations",
+            "k8s_pod_affinity",
         ]
         read_only_fields = [
             "id",
@@ -498,6 +499,7 @@ class ActivationListSerializer(
             "k8s_pod_annotations",
             "k8s_pod_node_selector",
             "k8s_pod_tolerations",
+            "k8s_pod_affinity",
         ]
         read_only_fields = [
             "id",
@@ -570,6 +572,7 @@ class ActivationListSerializer(
             "rule_engine_credential_id": activation.rule_engine_credential_id,
             **_activation_k8s_pod_metadata_payload(activation),
             "k8s_pod_tolerations": activation.k8s_pod_tolerations,
+            "k8s_pod_affinity": activation.k8s_pod_affinity,
         }
 
 
@@ -606,6 +609,7 @@ class ActivationCreateSerializer(
             "k8s_pod_annotations",
             "k8s_pod_node_selector",
             "k8s_pod_tolerations",
+            "k8s_pod_affinity",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -658,6 +662,11 @@ class ActivationCreateSerializer(
         required=False,
         default=list,
         validators=[validators.validate_k8s_pod_tolerations],
+    )
+    k8s_pod_affinity = serializers.JSONField(
+        required=False,
+        default=dict,
+        validators=[validators.check_if_k8s_pod_affinity_valid],
     )
 
     def validate(self, data):
@@ -736,6 +745,7 @@ class ActivationCopySerializer(serializers.ModelSerializer):
         validators.validate_k8s_pod_tolerations(
             activation.k8s_pod_tolerations or []
         )
+        validators.check_if_k8s_pod_affinity_valid(activation.k8s_pod_affinity)
         validators.check_if_rulebook_exists(activation.rulebook_id)
 
         copied_data = {
@@ -765,6 +775,7 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             "rule_engine_credential_id": activation.rule_engine_credential_id,
             **pod_metadata,
             "k8s_pod_tolerations": activation.k8s_pod_tolerations,
+            "k8s_pod_affinity": activation.k8s_pod_affinity,
         }
         if activation.eda_system_vault_credential:
             inputs = yaml.safe_load(
@@ -814,6 +825,7 @@ class ActivationUpdateSerializer(
             "k8s_pod_annotations",
             "k8s_pod_node_selector",
             "k8s_pod_tolerations",
+            "k8s_pod_affinity",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -859,28 +871,30 @@ class ActivationUpdateSerializer(
         default=list,
         validators=[validators.validate_k8s_pod_tolerations],
     )
+    k8s_pod_affinity = serializers.JSONField(
+        required=False,
+        default=dict,
+        validators=[validators.check_if_k8s_pod_affinity_valid],
+    )
 
     def refill_needed_data(
         self, data: dict, activation: models.Activation
     ) -> None:
-        if "name" not in data:
-            data["name"] = activation.name
-        if "k8s_service_name" not in data:
-            data["k8s_service_name"] = activation.k8s_service_name
-        if "k8s_pod_service_account_name" not in data:
-            data[
-                "k8s_pod_service_account_name"
-            ] = activation.k8s_pod_service_account_name
-        if "k8s_pod_labels" not in data:
-            data["k8s_pod_labels"] = activation.k8s_pod_labels or {}
-        if "k8s_pod_annotations" not in data:
-            data["k8s_pod_annotations"] = activation.k8s_pod_annotations or {}
-        if "k8s_pod_node_selector" not in data:
-            data["k8s_pod_node_selector"] = (
-                activation.k8s_pod_node_selector or {}
-            )
-        if "k8s_pod_tolerations" not in data:
-            data["k8s_pod_tolerations"] = activation.k8s_pod_tolerations or []
+        default_field_values = {
+            "name": activation.name,
+            "k8s_service_name": activation.k8s_service_name,
+            "k8s_pod_service_account_name": (
+                activation.k8s_pod_service_account_name
+            ),
+            "k8s_pod_labels": activation.k8s_pod_labels or {},
+            "k8s_pod_annotations": activation.k8s_pod_annotations or {},
+            "k8s_pod_node_selector": activation.k8s_pod_node_selector or {},
+            "k8s_pod_tolerations": activation.k8s_pod_tolerations or [],
+            "k8s_pod_affinity": activation.k8s_pod_affinity or {},
+        }
+        for field_name, default_value in default_field_values.items():
+            if field_name not in data:
+                data[field_name] = default_value
         if "extra_var" not in data:
             data["extra_var"] = activation.extra_var
         data["extra_var"] = _get_user_extra_vars(activation, data["extra_var"])
@@ -1017,6 +1031,7 @@ class ActivationUpdateSerializer(
             "enable_persistence": activation.enable_persistence,
             "rule_engine_credential_id": activation.rule_engine_credential_id,
             "k8s_pod_tolerations": activation.k8s_pod_tolerations,
+            "k8s_pod_affinity": activation.k8s_pod_affinity,
         }
 
 
@@ -1170,6 +1185,7 @@ class ActivationReadSerializer(
             "rule_engine_credential_id",
             "rule_engine_credential",
             "k8s_pod_tolerations",
+            "k8s_pod_affinity",
         ]
         read_only_fields = [
             "id",
@@ -1314,6 +1330,7 @@ class ActivationReadSerializer(
             "rule_engine_credential_id": activation.rule_engine_credential_id,
             "rule_engine_credential": rule_engine_credential,
             "k8s_pod_tolerations": activation.k8s_pod_tolerations,
+            "k8s_pod_affinity": activation.k8s_pod_affinity,
         }
 
 
@@ -1362,6 +1379,11 @@ class PostActivationSerializer(
         default=list,
         validators=[validators.validate_k8s_pod_tolerations],
     )
+    k8s_pod_affinity = serializers.JSONField(
+        required=False,
+        default=dict,
+        validators=[validators.check_if_k8s_pod_affinity_valid],
+    )
 
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data=data, creating=False)
@@ -1392,6 +1414,7 @@ class PostActivationSerializer(
             "k8s_pod_annotations",
             "k8s_pod_node_selector",
             "k8s_pod_tolerations",
+            "k8s_pod_affinity",
             "source_mappings",
             "skip_audit_events",
             "enable_persistence",
@@ -1428,6 +1451,7 @@ def is_activation_valid(activation: models.Activation) -> tuple[bool, str]:
     data["rule_engine_credential_id"] = activation.rule_engine_credential_id
     data.update(_activation_k8s_pod_metadata_payload(activation))
     data["k8s_pod_tolerations"] = activation.k8s_pod_tolerations or []
+    data["k8s_pod_affinity"] = activation.k8s_pod_affinity or {}
     serializer = PostActivationSerializer(data=data)
 
     valid = serializer.is_valid()
