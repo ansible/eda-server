@@ -34,6 +34,7 @@ from rest_framework.exceptions import AuthenticationFailed, ParseError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from aap_eda.api.blacklist import BlacklistManager
 from aap_eda.api.event_stream_authentication import (
     BasicAuthentication,
     EcdsaAuthentication,
@@ -52,6 +53,7 @@ from aap_eda.utils.log_sanitizer import REDACTED_STRING
 
 logger = logging.getLogger(__name__)
 UNSAFE_HEADER_KEYS = {"X-Trusted-Proxy", "X-Forwarded-For", "X-Real-IP"}
+blacklist_manager = BlacklistManager()
 
 
 class ExternalEventStreamViewSet(viewsets.GenericViewSet):
@@ -306,17 +308,41 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                 )
             raise
 
+    def _get_client_ip(self, request):
+        """Return the normalized client IP from the request.
+
+        Uses the rightmost X-Forwarded-For IP (appended by the
+        trusted proxy) when proxy validation is enabled, otherwise
+        falls back to REMOTE_ADDR. Normalizes IPv4-mapped IPv6
+        addresses to IPv4 form for consistent allowlist matching.
+        """
+        from aap_eda.api.blacklist import normalize_ip
+
+        if settings.EVENT_STREAM_REQUIRE_TRUSTED_PROXY:
+            x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+            if x_forwarded_for:
+                return normalize_ip(x_forwarded_for.split(",")[-1])
+        remote_addr = request.META.get("REMOTE_ADDR")
+        if not remote_addr:
+            raise AuthenticationFailed("Unable to determine client IP")
+        return normalize_ip(remote_addr)
+
     @extend_schema(exclude=True)
     @action(detail=True, methods=["POST"], rbac_action=None)
     def post(self, request, *_args, **kwargs):
         """Handle posts from external vendors."""
+        # Validate X-Trusted-Proxy header from Gateway/Envoy
+        self._validate_trusted_proxy_header(request)
+
+        client_ip = self._get_client_ip(request)
+
         try:
             self.event_stream = EventStream.objects.get(uuid=kwargs["pk"])
         except (EventStream.DoesNotExist, ValidationError) as exc:
             raise ParseError("bad uuid specified") from exc
 
-        # Validate X-Trusted-Proxy header from Gateway/Envoy
-        self._validate_trusted_proxy_header(request)
+        org_id = self.event_stream.organization_id
+        blacklist_manager.check_ip_policy(client_ip, org_id)
 
         try:
             inputs = get_resolved_secrets(self.event_stream.eda_credential)
@@ -338,7 +364,11 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                 )
             raise ParseError(message)
 
-        self._handle_auth(request, inputs)
+        try:
+            self._handle_auth(request, inputs)
+        except AuthenticationFailed:
+            blacklist_manager.record_blocked_ip(client_ip, org_id)
+            raise
 
         body = self._parse_body(
             request.headers.get("Content-Type", ""), request.body

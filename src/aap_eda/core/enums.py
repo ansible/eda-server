@@ -55,6 +55,7 @@ class ResourceType(DjangoStrEnum):
     ORGANIZATION = "organization"
     TEAM = "team"
     EVENT_STREAM = "event_stream"
+    EVENT_STREAM_SETTING = "event_stream_setting"
     CREDENTIAL_INPUT_SOURCE = "credential_input_source"
 
 

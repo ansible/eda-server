@@ -1200,6 +1200,15 @@ def default_event_stream(
 
 
 @pytest.fixture
+def default_event_stream_setting(
+    default_organization: models.Organization,
+) -> models.EventStreamSetting:
+    return models.EventStreamSetting.objects.create(
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
 def activation_payload_skip_audit_events(activation_payload: dict) -> dict:
     activation_payload["skip_audit_events"] = True
     return activation_payload

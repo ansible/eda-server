@@ -52,6 +52,11 @@ from .eda_credential import (
     EdaCredentialUpdateSerializer,
 )
 from .event_stream import EventStreamInSerializer, EventStreamOutSerializer
+from .event_stream_setting import (
+    EventStreamSettingCreateSerializer,
+    EventStreamSettingOutSerializer,
+    RemoveBlockedIpsSerializer,
+)
 from .organization import (
     OrganizationCreateSerializer,
     OrganizationRefSerializer,
@@ -155,4 +160,8 @@ __all__ = (
     # event streams
     "EventStreamInSerializer",
     "EventStreamOutSerializer",
+    # event stream settings
+    "EventStreamSettingCreateSerializer",
+    "EventStreamSettingOutSerializer",
+    "RemoveBlockedIpsSerializer",
 )
