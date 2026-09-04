@@ -3,7 +3,10 @@
 # timestamp
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 
-if which tput &> /dev/null; then
+if command -v tput &> /dev/null \
+    && [ -t 1 ] \
+    && [ -n "${TERM:-}" ] \
+    && tput setaf 1 &> /dev/null; then
   # colors
   ERR=$(tput setaf 1)
   INFO=$(tput setaf 178)
