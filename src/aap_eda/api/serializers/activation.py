@@ -880,26 +880,21 @@ class ActivationUpdateSerializer(
     def refill_needed_data(
         self, data: dict, activation: models.Activation
     ) -> None:
-        if "name" not in data:
-            data["name"] = activation.name
-        if "k8s_service_name" not in data:
-            data["k8s_service_name"] = activation.k8s_service_name
-        if "k8s_pod_service_account_name" not in data:
-            data[
-                "k8s_pod_service_account_name"
-            ] = activation.k8s_pod_service_account_name
-        if "k8s_pod_labels" not in data:
-            data["k8s_pod_labels"] = activation.k8s_pod_labels or {}
-        if "k8s_pod_annotations" not in data:
-            data["k8s_pod_annotations"] = activation.k8s_pod_annotations or {}
-        if "k8s_pod_node_selector" not in data:
-            data["k8s_pod_node_selector"] = (
-                activation.k8s_pod_node_selector or {}
-            )
-        if "k8s_pod_tolerations" not in data:
-            data["k8s_pod_tolerations"] = activation.k8s_pod_tolerations or []
-        if "k8s_pod_affinity" not in data:
-            data["k8s_pod_affinity"] = activation.k8s_pod_affinity or {}
+        default_field_values = {
+            "name": activation.name,
+            "k8s_service_name": activation.k8s_service_name,
+            "k8s_pod_service_account_name": (
+                activation.k8s_pod_service_account_name
+            ),
+            "k8s_pod_labels": activation.k8s_pod_labels or {},
+            "k8s_pod_annotations": activation.k8s_pod_annotations or {},
+            "k8s_pod_node_selector": activation.k8s_pod_node_selector or {},
+            "k8s_pod_tolerations": activation.k8s_pod_tolerations or [],
+            "k8s_pod_affinity": activation.k8s_pod_affinity or {},
+        }
+        for field_name, default_value in default_field_values.items():
+            if field_name not in data:
+                data[field_name] = default_value
         if "extra_var" not in data:
             data["extra_var"] = activation.extra_var
         data["extra_var"] = _get_user_extra_vars(activation, data["extra_var"])
