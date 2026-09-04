@@ -19,6 +19,8 @@ runs:
 
     - name: Install package
       shell: bash
+      env:
+        POETRY_INSTALLER_ONLY_BINARY: ":all:"
       run: poetry install -E all --only main,test
 
     - name: Check migrations are up to date
@@ -45,8 +47,10 @@ runs:
 
     - name: Merge test results
       shell: bash
+      env:
+        PIP_ONLY_BINARY: ":all:"
       run: |
-        pip install junitparser
+        pip install junitparser==5.0.1
         junitparser merge eda-server-default.xml eda-server-multithreaded.xml eda-server-test-results.xml
 
     # Verify coverage.xml exists and has content
