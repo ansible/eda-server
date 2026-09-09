@@ -22,6 +22,7 @@ The validation is gated behind ENHANCED_INPUT_VALIDATION_ENABLED, so a
 module-level autouse fixture (enable_input_validation) enables it for
 every test in this module.
 """
+
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -31,6 +32,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.api.serializers.credential_input_source import (
+    CredentialInputSourceCreateSerializer,
     CredentialInputSourceUpdateSerializer,
 )
 from aap_eda.api.serializers.credential_type import (
@@ -736,11 +738,30 @@ class TestEventStreamCleanText:
 @pytest.mark.django_db
 class TestCredentialInputSourceCleanText:
     """Test CleanTextMixin integration with
+    CredentialInputSourceCreateSerializer /
     CredentialInputSourceUpdateSerializer.
 
     Note: CredentialInputSource has no name field, so only the Tier 2
     (free-text) description field is exercised here.
     """
+
+    def test_rejects_invalid_description_on_create(
+        self,
+        default_credential_input_source: models.CredentialInputSource,
+    ):
+        source = default_credential_input_source
+        serializer = CredentialInputSourceCreateSerializer(
+            data={
+                "description": DANGEROUS_TEXT,
+                "source_credential": source.source_credential.id,
+                "target_credential": source.target_credential.id,
+                "input_field_name": source.input_field_name,
+                "metadata": source.metadata,
+                "organization_id": source.organization.id,
+            }
+        )
+        assert not serializer.is_valid()
+        assert "description" in serializer.errors
 
     def test_rejects_invalid_description_on_update(
         self,
