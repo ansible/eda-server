@@ -755,7 +755,7 @@ class TestCredentialInputSourceCleanText:
                 "description": DANGEROUS_TEXT,
                 "source_credential": source.source_credential.id,
                 "target_credential": source.target_credential.id,
-                "input_field_name": source.input_field_name,
+                "input_field_name": "username",
                 "metadata": source.metadata,
                 "organization_id": source.organization.id,
             }
