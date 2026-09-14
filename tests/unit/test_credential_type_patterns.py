@@ -216,12 +216,10 @@ class TestToRepresentation:
             side_effect=lambda i: {**i, "_decorated": True},
         ) as mock_wfp, mock.patch.object(
             # Bypass the real ORM-backed super().to_representation
-            type(
-                __import__(
-                    "aap_eda.api.serializers.credential_type",
-                    fromlist=["CredentialTypeSerializer"],
-                ).CredentialTypeSerializer
-            ).__bases__[0],
+            __import__(
+                "aap_eda.api.serializers.credential_type",
+                fromlist=["CredentialTypeSerializer"],
+            ).CredentialTypeSerializer.__bases__[0],
             "to_representation",
             return_value=fake_data,
         ):
