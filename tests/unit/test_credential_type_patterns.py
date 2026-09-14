@@ -168,9 +168,7 @@ class TestWithFieldPatterns:
 
         user_field = result["fields"][0]
         assert user_field["pattern"] == FAKE_PATTERN["pattern"]
-        assert (
-            user_field["pattern_description"] == FAKE_PATTERN["description"]
-        )
+        assert user_field["pattern_description"] == FAKE_PATTERN["description"]
 
         pass_field = result["fields"][1]
         assert "pattern" not in pass_field
@@ -204,24 +202,30 @@ class TestToRepresentation:
             "inputs": instance_inputs,
         }
 
-        ve = None if validation_enabled_is_none else (
-            mock.Mock(return_value=validation_enabled_val)
+        ve = (
+            None
+            if validation_enabled_is_none
+            else (mock.Mock(return_value=validation_enabled_val))
         )
 
-        with mock.patch(
-            "aap_eda.api.serializers.credential_type.validation_enabled",
-            ve,
-        ), mock.patch(
-            "aap_eda.api.serializers.credential_type._with_field_patterns",
-            side_effect=lambda i: {**i, "_decorated": True},
-        ) as mock_wfp, mock.patch.object(
-            # Bypass the real ORM-backed super().to_representation
-            __import__(
-                "aap_eda.api.serializers.credential_type",
-                fromlist=["CredentialTypeSerializer"],
-            ).CredentialTypeSerializer.__bases__[0],
-            "to_representation",
-            return_value=fake_data,
+        with (
+            mock.patch(
+                "aap_eda.api.serializers.credential_type.validation_enabled",
+                ve,
+            ),
+            mock.patch(
+                "aap_eda.api.serializers.credential_type._with_field_patterns",
+                side_effect=lambda i: {**i, "_decorated": True},
+            ) as mock_wfp,
+            mock.patch.object(
+                # Bypass the real ORM-backed super().to_representation
+                __import__(
+                    "aap_eda.api.serializers.credential_type",
+                    fromlist=["CredentialTypeSerializer"],
+                ).CredentialTypeSerializer.__bases__[0],
+                "to_representation",
+                return_value=fake_data,
+            ),
         ):
             from aap_eda.api.serializers.credential_type import (
                 CredentialTypeSerializer,
@@ -286,33 +290,37 @@ class TestEDAMetadataGetFieldInfo:
         )
         fake_field = mock.Mock(spec=[])
 
-        with mock.patch(
-            "aap_eda.api.metadata.inject_clean_text_patterns",
-            fake_inject,
-        ), mock.patch(
-            "aap_eda.api.metadata.metadata.SimpleMetadata.get_field_info",
-            return_value={"type": "string"},
+        with (
+            mock.patch(
+                "aap_eda.api.metadata.inject_clean_text_patterns",
+                fake_inject,
+            ),
+            mock.patch(
+                "aap_eda.api.metadata.metadata.SimpleMetadata.get_field_info",
+                return_value={"type": "string"},
+            ),
         ):
             from aap_eda.api.metadata import EDAMetadata
 
             meta = EDAMetadata()
             result = meta.get_field_info(fake_field)
 
-        fake_inject.assert_called_once_with(
-            fake_field, {"type": "string"}
-        )
+        fake_inject.assert_called_once_with(fake_field, {"type": "string"})
         assert result["pattern"] == "^.*$"
 
     def test_inject_skipped_when_none(self):
         """When inject_clean_text_patterns is None, skip it."""
         fake_field = mock.Mock(spec=[])
 
-        with mock.patch(
-            "aap_eda.api.metadata.inject_clean_text_patterns",
-            None,
-        ), mock.patch(
-            "aap_eda.api.metadata.metadata.SimpleMetadata.get_field_info",
-            return_value={"type": "string"},
+        with (
+            mock.patch(
+                "aap_eda.api.metadata.inject_clean_text_patterns",
+                None,
+            ),
+            mock.patch(
+                "aap_eda.api.metadata.metadata.SimpleMetadata.get_field_info",
+                return_value={"type": "string"},
+            ),
         ):
             from aap_eda.api.metadata import EDAMetadata
 
