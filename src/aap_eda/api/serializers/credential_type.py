@@ -12,8 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from ansible_base.lib.metadata import get_tier2_pattern, validation_enabled
-from ansible_base.lib.serializers.mixins import CleanTextMixin
+try:
+    from ansible_base.lib.metadata import get_tier2_pattern, validation_enabled
+except ImportError:  # pragma: no cover - DAB without AAP-85987
+    get_tier2_pattern = None
+    validation_enabled = None
+
+try:
+    from ansible_base.lib.serializers.mixins import CleanTextMixin
+except ImportError:  # pragma: no cover - DAB without AAP-85987
+    # Provide a no-op stand-in so the class definition is valid
+    class CleanTextMixin:
+        pass
 from rest_framework import serializers
 
 from aap_eda.core import models, validators
@@ -42,12 +52,11 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         inputs = data.get("inputs")
-        if validation_enabled() and isinstance(inputs, dict):
+        if validation_enabled is not None and validation_enabled() and isinstance(inputs, dict):
             data["inputs"] = _with_field_patterns(inputs)
         return data
 
 
-python
 def _with_field_patterns(inputs: dict) -> dict:
     """Return a copy of the inputs schema with patterns for string fields.
 
@@ -61,6 +70,8 @@ def _with_field_patterns(inputs: dict) -> dict:
     if not isinstance(fields, list):
         return inputs
 
+    if get_tier2_pattern is None:
+        return inputs
     pattern = get_tier2_pattern()
     new_fields = [
         {
