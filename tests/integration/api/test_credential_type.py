@@ -25,7 +25,10 @@ from aap_eda.core.utils.credentials import SUPPORTED_KEYS_IN_INJECTORS
 from tests.integration.constants import api_url_v1
 
 try:
-    from ansible_base.lib.metadata import get_tier2_pattern as _get_tier2_pattern
+    from ansible_base.lib.metadata import (
+        get_tier2_pattern as _get_tier2_pattern,
+    )
+
     _has_dab_validation_metadata = True
 except ImportError:
     _get_tier2_pattern = None
@@ -1281,7 +1284,10 @@ def test_eda_rule_engine_credential_validates_required_fields(
 class TestCredentialTypeValidationPatterns:
     """AAP-87587: pattern/pattern_description injection for JSON sub-keys."""
 
-    @pytest.mark.skipif(not _has_dab_validation_metadata, reason="DAB validation metadata not available (AAP-85987)")
+    @pytest.mark.skipif(
+        not _has_dab_validation_metadata,
+        reason="DAB validation metadata not available (AAP-85987)",
+    )
     @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
     def test_patterns_present_when_toggle_on(
         self,
@@ -1335,7 +1341,10 @@ class TestCredentialTypeOptionsValidationPatterns:
     advertise a pattern on OPTIONS, same as any other DAB consumer.
     """
 
-    @pytest.mark.skipif(not _has_dab_validation_metadata, reason="DAB validation metadata not available (AAP-85987)")
+    @pytest.mark.skipif(
+        not _has_dab_validation_metadata,
+        reason="DAB validation metadata not available (AAP-85987)",
+    )
     @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
     def test_options_includes_pattern_when_toggle_on(
         self, superuser_client: APIClient

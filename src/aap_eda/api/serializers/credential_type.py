@@ -24,6 +24,8 @@ except ImportError:  # pragma: no cover - DAB without AAP-85987
     # Provide a no-op stand-in so the class definition is valid
     class CleanTextMixin:
         pass
+
+
 from rest_framework import serializers
 
 from aap_eda.core import models, validators
@@ -52,7 +54,11 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         inputs = data.get("inputs")
-        if validation_enabled is not None and validation_enabled() and isinstance(inputs, dict):
+        if (
+            validation_enabled is not None
+            and validation_enabled()
+            and isinstance(inputs, dict)
+        ):
             data["inputs"] = _with_field_patterns(inputs)
         return data
 
@@ -61,7 +67,9 @@ def _with_field_patterns(inputs: dict) -> dict:
     """Return a copy of the inputs schema with patterns for string fields.
 
     CleanTextMixin (from DAB) enforces free-text validation rules on
-    serializer string fields at write time (when the ENHANCED_INPUT_VALIDATION_ENABLED setting is turned on).  Only non-secret "string"
+    serializer string fields at write time (when the
+    ENHANCED_INPUT_VALIDATION_ENABLED setting is turned on).
+    Only non-secret "string"
     sub-fields get a pattern here, since those are the only ones its
     JSON sub-key validation applies to; secret and boolean fields are
     left untouched.
@@ -74,18 +82,21 @@ def _with_field_patterns(inputs: dict) -> dict:
         return inputs
     pattern = get_tier2_pattern()
     new_fields = [
-        {
-            **field,
-            "pattern": pattern["pattern"],
-            "pattern_description": pattern["description"],
-        }
-        if isinstance(field, dict)
-        and field.get("type") == "string"
-        and not field.get("secret")
-        else field
+        (
+            {
+                **field,
+                "pattern": pattern["pattern"],
+                "pattern_description": pattern["description"],
+            }
+            if isinstance(field, dict)
+            and field.get("type") == "string"
+            and not field.get("secret")
+            else field
+        )
         for field in fields
     ]
     return {**inputs, "fields": new_fields}
+
 
 class CredentialTypeCreateSerializer(
     CleanTextMixin, serializers.ModelSerializer
