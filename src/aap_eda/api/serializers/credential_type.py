@@ -13,12 +13,6 @@
 #  limitations under the License.
 
 try:
-    from ansible_base.lib.metadata import get_tier2_pattern, validation_enabled
-except ImportError:  # pragma: no cover - DAB without AAP-85987
-    get_tier2_pattern = None
-    validation_enabled = None
-
-try:
     from ansible_base.lib.serializers.mixins import CleanTextMixin
 except ImportError:  # pragma: no cover - DAB without AAP-85987
     # Provide a no-op stand-in so the class definition is valid
@@ -28,6 +22,9 @@ except ImportError:  # pragma: no cover - DAB without AAP-85987
 
 from rest_framework import serializers
 
+from aap_eda.api.validation_patterns import (
+    inject_patterns_into_field_list,
+)
 from aap_eda.core import models, validators
 from aap_eda.core.utils.credentials import validate_injectors
 
@@ -54,48 +51,13 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         inputs = data.get("inputs")
-        if (
-            validation_enabled is not None
-            and validation_enabled()
-            and isinstance(inputs, dict)
-        ):
-            data["inputs"] = _with_field_patterns(inputs)
+        if isinstance(inputs, dict):
+            # Advertise CleanTextMixin Tier 2 patterns on JSON
+            # sub-keys (AAP-87587).  Gated on
+            # ENHANCED_INPUT_VALIDATION_ENABLED; secret fields
+            # are skipped.
+            inject_patterns_into_field_list(inputs.get("fields"))
         return data
-
-
-def _with_field_patterns(inputs: dict) -> dict:
-    """Return a copy of the inputs schema with patterns for string fields.
-
-    CleanTextMixin (from DAB) enforces free-text validation rules on
-    serializer string fields at write time (when the
-    ENHANCED_INPUT_VALIDATION_ENABLED setting is turned on).
-    Only non-secret "string"
-    sub-fields get a pattern here, since those are the only ones its
-    JSON sub-key validation applies to; secret and boolean fields are
-    left untouched.
-    """
-    fields = inputs.get("fields")
-    if not isinstance(fields, list):
-        return inputs
-
-    if get_tier2_pattern is None:
-        return inputs
-    pattern = get_tier2_pattern()
-    new_fields = [
-        (
-            {
-                **field,
-                "pattern": pattern["pattern"],
-                "pattern_description": pattern["description"],
-            }
-            if isinstance(field, dict)
-            and field.get("type") == "string"
-            and not field.get("secret")
-            else field
-        )
-        for field in fields
-    ]
-    return {**inputs, "fields": new_fields}
 
 
 class CredentialTypeCreateSerializer(
