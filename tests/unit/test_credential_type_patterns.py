@@ -138,7 +138,7 @@ class TestInjectFreeTextPattern:
 
 
 # ---------------------------------------------------------------
-# inject_patterns_into_field_list (copy-before-mutate)
+# inject_patterns_into_field_list — copy-before-mutate
 # ---------------------------------------------------------------
 class TestInjectPatternsIntoFieldList:
     """Copy-before-mutate and early-return gating."""
