@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import typing as tp
+import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Optional
@@ -586,9 +587,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     def insert_job_related_data(
         self, message: JobMessage
     ) -> models.JobInstance:
+        name = message.name.strip() or f"job-{message.job_id}"
         job_instance = models.JobInstance.objects.create(
             uuid=message.job_id,
-            name=message.name,
+            name=name,
             action=message.action,
             ruleset=message.ruleset,
             hosts=message.hosts,
