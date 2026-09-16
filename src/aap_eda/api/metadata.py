@@ -1,12 +1,12 @@
-try:
-    from ansible_base.lib.metadata import inject_clean_text_patterns
-except ImportError:  # pragma: no cover - DAB without AAP-85987
-    inject_clean_text_patterns = None
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.utils.encoding import force_str
 from rest_framework import exceptions, metadata
 from rest_framework.request import clone_request
+
+from aap_eda.api.validation_patterns import (
+    inject_top_level_clean_text_patterns,
+)
 
 ADDITIONAL_ATTRS = [
     "min_length",
@@ -27,8 +27,12 @@ class EDAMetadata(metadata.SimpleMetadata):
 
     def get_field_info(self, field):
         field_info = super().get_field_info(field)
-        if inject_clean_text_patterns is not None:
-            field_info = inject_clean_text_patterns(field, field_info)
+
+        # Advertise CleanTextMixin Tier 1/Tier 2 patterns on
+        # top-level CharFields (AAP-87587).  No-op unless
+        # ENHANCED_INPUT_VALIDATION_ENABLED is on and the
+        # serializer mixes in CleanTextMixin.
+        field_info = inject_top_level_clean_text_patterns(field, field_info)
 
         for attr in ADDITIONAL_ATTRS:
             value = getattr(field, attr, None)

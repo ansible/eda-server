@@ -26,12 +26,14 @@ from tests.integration.constants import api_url_v1
 
 try:
     from ansible_base.lib.metadata import (
-        get_tier2_pattern as _get_tier2_pattern,
+        TIER2_PATTERN_DESCRIPTION as _TIER2_DESC,
+        build_tier2_frontend_pattern as _build_tier2,
     )
 
     _has_dab_validation_metadata = True
 except ImportError:
-    _get_tier2_pattern = None
+    _build_tier2 = None
+    _TIER2_DESC = None
     _has_dab_validation_metadata = False
 
 INPUT = {
@@ -1294,23 +1296,21 @@ class TestCredentialTypeValidationPatterns:
         superuser_client: APIClient,
         credential_type: models.CredentialType,
     ):
-        get_tier2_pattern = _get_tier2_pattern
-
         response = superuser_client.get(
-            f"{api_url_v1}/credential-types/{credential_type.id}/"
+            f"{api_url_v1}/credential-types/" f"{credential_type.id}/"
         )
         assert response.status_code == status.HTTP_200_OK
 
-        pattern = get_tier2_pattern()
+        expected_pattern = _build_tier2()
         fields_by_id = {
             field["id"]: field for field in response.data["inputs"]["fields"]
         }
 
         username_field = fields_by_id["username"]
-        assert username_field["pattern"] == pattern["pattern"]
-        assert username_field["pattern_description"] == pattern["description"]
+        assert username_field["pattern"] == expected_pattern
+        assert username_field["pattern_description"] == _TIER2_DESC
 
-        # secret fields are excluded even though they are also type "string"
+        # secret fields are excluded
         password_field = fields_by_id["password"]
         assert "pattern" not in password_field
         assert "pattern_description" not in password_field
