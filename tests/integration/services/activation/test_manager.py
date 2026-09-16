@@ -84,6 +84,7 @@ def activation_with_instance(
 ) -> models.Activation:
     """Return an activation with an instance."""
     models.RulebookProcess.objects.create(
+        name=basic_activation.name,
         activation=basic_activation,
         organization=default_organization,
     )
@@ -157,6 +158,7 @@ def new_activation_with_instance(
         organization=default_organization,
     )
     models.RulebookProcess.objects.create(
+        name=activation.name,
         activation=activation,
         status=enums.ActivationStatus.RUNNING,
         organization=default_organization,

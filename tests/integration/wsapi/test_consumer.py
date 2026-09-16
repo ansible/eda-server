@@ -265,6 +265,38 @@ async def test_handle_jobs(
 
 
 @pytest.mark.django_db(transaction=True)
+async def test_handle_jobs_with_empty_name(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+):
+    rulebook_process_id = await _prepare_db_data(default_organization)
+
+    assert (await get_job_instance_count()) == 0
+    assert (await get_activation_instance_job_instance_count()) == 0
+
+    payload = {
+        "type": "Job",
+        "job_id": "940730a1-8b6f-45f3-84c9-bde8f04390e0",
+        "ansible_rulebook_id": rulebook_process_id,
+        "name": "",
+        "ruleset": "ruleset",
+        "rule": "rule",
+        "hosts": "hosts",
+        "action": "run_playbook",
+    }
+
+    await ws_communicator.send_json_to(payload)
+    await ws_communicator.wait()
+    expected_name = f"job-{payload['job_id']}"
+    saved_job_instance = await models.JobInstance.objects.aget(
+        name=expected_name
+    )
+    assert saved_job_instance.name == expected_name
+    assert str(saved_job_instance.uuid) == payload["job_id"]
+    assert (await get_activation_instance_job_instance_count()) == 1
+
+
+@pytest.mark.django_db(transaction=True)
 async def test_handle_events(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
@@ -924,6 +956,7 @@ def _prepare_activation_instance_with_credentials(
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
         organization=default_organization,
+        defaults={"name": f"rulebook {activation.name}-{uuid.uuid4()}"},
     )
 
     return rulebook_process.id
@@ -997,6 +1030,7 @@ def _prepare_activation_with_controller_info(
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
         organization=default_organization,
+        defaults={"name": f"rulebook {activation.name}-{uuid.uuid4()}"},
     )
 
     return rulebook_process.id
@@ -1056,6 +1090,7 @@ def _prepare_db_data(
     )
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
+        defaults={"name": f"rulebook {activation.name}-{uuid.uuid4()}"},
         activation=activation,
         status=status,
         organization=default_organization,
@@ -1116,6 +1151,7 @@ def _prepare_activation_instance_without_extra_var(
     )
 
     rulebook_process = models.RulebookProcess.objects.create(
+        name=f"rulebook {activation.name}-{uuid.uuid4()}",
         activation=activation,
         organization=default_organization,
     )
@@ -1171,6 +1207,7 @@ def _prepare_activation_instance_no_token(
     )
 
     rulebook_process = models.RulebookProcess.objects.create(
+        name=f"rulebook {activation.name}-{uuid.uuid4()}",
         activation=activation,
         organization=default_organization,
     )
@@ -1768,6 +1805,7 @@ def _prepare_activation_with_rule_engine_credential(
     )
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
+        defaults={"name": f"rulebook {activation.name}-{uuid.uuid4()}"},
         activation=activation,
         status=ActivationStatus.RUNNING,
         organization=default_organization,
@@ -1952,6 +1990,7 @@ def _prepare_activation_with_default_rule_engine_credential(
     )
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
+        defaults={"name": f"rulebook {activation.name}-{uuid.uuid4()}"},
         activation=activation,
         status=ActivationStatus.RUNNING,
         organization=default_organization,
