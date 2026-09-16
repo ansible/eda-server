@@ -36,9 +36,7 @@ import copy
 from ansible_base.lib.utils.settings import get_setting
 
 try:
-    from ansible_base.lib.metadata import (
-        build_tier2_frontend_pattern,
-    )
+    from ansible_base.lib.metadata import build_tier2_frontend_pattern
 except ImportError:  # pragma: no cover - DAB without AAP-85987
     build_tier2_frontend_pattern = None
 
