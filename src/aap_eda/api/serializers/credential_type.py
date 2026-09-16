@@ -22,9 +22,7 @@ except ImportError:  # pragma: no cover - DAB without AAP-85987
 
 from rest_framework import serializers
 
-from aap_eda.api.validation_patterns import (
-    inject_patterns_into_field_list,
-)
+from aap_eda.api.validation_patterns import inject_patterns_into_field_list
 from aap_eda.core import models, validators
 from aap_eda.core.utils.credentials import validate_injectors
 
