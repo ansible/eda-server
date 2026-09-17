@@ -15,7 +15,10 @@
 import logging
 from datetime import datetime, timezone
 
-from aap_eda.services.activation.db_log_handler import DBLogger
+from aap_eda.services.activation.db_log_handler import (
+    LOG_LEVEL_SEARCH_INDEX,
+    DBLogger,
+)
 
 EXCEPTIONS_TO_CATCH = (
     OverflowError,
@@ -27,8 +30,6 @@ EXCEPTIONS_TO_CATCH = (
 )
 
 LOGGER = logging.getLogger(__name__)
-
-LOG_LEVEL_SEARCH_INDEX = 40
 
 
 class TeeSystemLogger(DBLogger):
@@ -83,6 +84,4 @@ class TeeSystemLogger(DBLogger):
                 extra=extra,
             )
         finally:
-            # This will call the DBLoggers flush which will
-            # write to the Database and clear the log buffer
             super().flush()
