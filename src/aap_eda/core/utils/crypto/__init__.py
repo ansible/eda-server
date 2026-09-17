@@ -11,3 +11,18 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+import hmac
+
+
+def timing_safe_compare(a: str, b: str) -> bool:
+    """Compare two strings in constant time using hmac.compare_digest.
+
+    Python's hmac.compare_digest raises TypeError when either str
+    operand contains non-ASCII characters — not just on a str-vs-bytes
+    mismatch. Since Django provides HTTP header values as str with no
+    ASCII guarantee, callers comparing credentials from headers must
+    encode to bytes first. This function handles that conversion so
+    callers don't need to remember the footgun.
+    """
+    return hmac.compare_digest(a.encode(), b.encode())
