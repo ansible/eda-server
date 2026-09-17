@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
@@ -58,7 +59,7 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
 
 
 class DecisionEnvironmentCreateSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
     """Serializer for creating the DecisionEnvironment."""
 
@@ -75,7 +76,7 @@ class DecisionEnvironmentCreateSerializer(
         image_url = data.get("image_url") or self.instance.image_url
         validators.check_if_de_valid(image_url, eda_credential_id)
 
-        return data
+        return super().validate(data)
 
     class Meta:
         model = models.DecisionEnvironment

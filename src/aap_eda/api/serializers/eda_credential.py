@@ -13,6 +13,7 @@
 #  limitations under the License.
 import logging
 
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from django.db.models import Q
 from django.urls import reverse
 from drf_spectacular.utils import extend_schema_field
@@ -55,6 +56,8 @@ class EdaCredentialReferenceField(serializers.JSONField):
 
 
 class EdaCredentialSerializer(serializers.ModelSerializer):
+    """Serializer used during a GET."""
+
     inputs = serializers.SerializerMethodField()
     credential_type = CredentialTypeRefSerializer(
         required=False, allow_null=True
@@ -120,7 +123,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
         }
 
 
-class EdaCredentialCopySerializer(serializers.ModelSerializer):
+class EdaCredentialCopySerializer(CleanTextMixin, serializers.ModelSerializer):
     name = serializers.CharField(
         required=True,
         validators=[validators.check_if_credential_name_used],
@@ -135,8 +138,12 @@ class EdaCredentialCopySerializer(serializers.ModelSerializer):
 
 
 class EdaCredentialCreateSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
+    # inputs holds arbitrary secret credential values, so it is excluded
+    # from free-text checks.
+    excluded_fields = frozenset({"inputs"})
+
     credential_type_id = serializers.IntegerField(
         required=True,
         allow_null=False,
@@ -181,7 +188,7 @@ class EdaCredentialCreateSerializer(
         if bool(errors):
             raise serializers.ValidationError(errors)
 
-        return data
+        return super().validate(data)
 
     class Meta:
         model = models.EdaCredential
@@ -195,8 +202,12 @@ class EdaCredentialCreateSerializer(
 
 
 class EdaCredentialUpdateSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
+    # inputs holds arbitrary secret credential values, so it is excluded
+    # from free-text checks.
+    excluded_fields = frozenset({"inputs"})
+
     inputs = serializers.JSONField()
 
     def validate(self, data):
@@ -212,7 +223,7 @@ class EdaCredentialUpdateSerializer(
         inputs = data.get("inputs", {})
         # allow empty inputs during updating
         if self.partial and not bool(inputs):
-            return data
+            return super().validate(data)
 
         errors = validate_inputs(
             credential_type,
@@ -224,7 +235,7 @@ class EdaCredentialUpdateSerializer(
         if bool(errors):
             raise serializers.ValidationError(errors)
 
-        return data
+        return super().validate(data)
 
     class Meta:
         model = models.EdaCredential

@@ -16,6 +16,7 @@ from typing import Optional
 from urllib.parse import urljoin
 
 import yaml
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from django.conf import settings
 from django.urls import reverse
 from rest_framework import serializers
@@ -27,7 +28,7 @@ from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import enums, models, validators
 
 
-class EventStreamInSerializer(serializers.ModelSerializer):
+class EventStreamInSerializer(CleanTextMixin, serializers.ModelSerializer):
     organization_id = serializers.IntegerField(
         required=True,
         allow_null=False,
@@ -80,7 +81,7 @@ class EventStreamInSerializer(serializers.ModelSerializer):
         if not event_stream_type:
             data["event_stream_type"] = kind
 
-        return data
+        return super().validate(data)
 
     class Meta:
         model = models.EventStream
@@ -96,6 +97,8 @@ class EventStreamInSerializer(serializers.ModelSerializer):
 
 
 class EventStreamOutSerializer(serializers.ModelSerializer):
+    """Serializer used during a GET."""
+
     owner = serializers.SerializerMethodField()
     organization = serializers.SerializerMethodField()
     eda_credential = EdaCredentialRefSerializer(
