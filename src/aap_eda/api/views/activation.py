@@ -40,6 +40,7 @@ from aap_eda.core.utils import logging_utils
 from aap_eda.core.utils.delete_log_util import (
     delete_all_logs,
     delete_logs_for_activation,
+    delete_logs_for_activation_instance,
     delete_logs_older_than,
 )
 from aap_eda.tasks.orchestrator import (
@@ -854,6 +855,44 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset.model.access_qs(self.request.user, queryset=queryset)
             )
         return super().filter_queryset(queryset)
+
+    @extend_schema(
+        request=serializers.LogPurgeRequestSerializer,
+        responses={
+            status.HTTP_200_OK: serializers.LogPurgeResponseSerializer,
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                None, description="Activation Instance not found."
+            ),
+        },
+    )
+    @action(
+        methods=["post"],
+        detail=True,
+        rbac_action=None,
+        url_path="clear-logs",
+    )
+    def clear_logs(self, request, pk):
+        instance = self.get_object()
+        activation = instance.activation
+        if not request.user.has_obj_perm(activation, "delete"):
+            raise exceptions.PermissionDenied(
+                "You do not have permission to clear logs for this activation."
+            )
+
+        request_serializer = serializers.LogPurgeRequestSerializer(
+            data=request.data,
+        )
+        request_serializer.is_valid(raise_exception=True)
+        before_date = request_serializer.validated_data.get("before_date")
+        deleted = delete_logs_for_activation_instance(
+            instance.id,
+            cutoff=before_date,
+        )
+
+        return Response(
+            serializers.LogPurgeResponseSerializer({"deleted": deleted}).data,
+            status=status.HTTP_200_OK,
+        )
 
     @extend_schema(
         description=(

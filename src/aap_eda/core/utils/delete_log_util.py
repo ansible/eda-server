@@ -62,6 +62,25 @@ def delete_logs_for_activation(activation_id: int) -> int:
     return _batched_delete(qs)
 
 
+def delete_logs_for_activation_instance(
+    activation_instance_id: int,
+    cutoff: datetime | None = None,
+) -> int:
+    """Delete logs for a single activation instance.
+
+    If cutoff is provided, only delete logs older than the cutoff.
+
+    Returns the number of records deleted.
+    """
+    qs = models.RulebookProcessLog.objects.filter(
+        activation_instance_id=activation_instance_id,
+    )
+    if cutoff is not None:
+        cutoff_ts = int(cutoff.timestamp())
+        qs = qs.filter(log_timestamp__lt=cutoff_ts)
+    return _batched_delete(qs)
+
+
 def delete_all_logs(cutoff: datetime | None = None) -> int:
     """Delete all RulebookProcessLog records.
 
