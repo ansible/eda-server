@@ -20,7 +20,7 @@ from aap_eda.core import models
 class CredentialTypeFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
-        lookup_expr="istartswith",
+        lookup_expr="icontains",
         label="Filter by credential type name.",
     )
     namespace = django_filters.CharFilter(
