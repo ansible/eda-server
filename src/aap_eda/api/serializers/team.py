@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
@@ -41,6 +42,7 @@ class TeamSerializer(serializers.ModelSerializer):
 
 
 class TeamCreateSerializer(
+    CleanTextMixin,
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
     SharedResourceSerializerMixin,
@@ -63,7 +65,7 @@ class TeamCreateSerializer(
 
     def validate(self, data):
         self.validate_shared_resource()
-        return data
+        return super().validate(data)
 
 
 class TeamDetailSerializer(serializers.ModelSerializer):
@@ -86,6 +88,7 @@ class TeamDetailSerializer(serializers.ModelSerializer):
 
 
 class TeamUpdateSerializer(
+    CleanTextMixin,
     serializers.ModelSerializer,
     SharedResourceSerializerMixin,
 ):
@@ -98,4 +101,4 @@ class TeamUpdateSerializer(
 
     def validate(self, data):
         self.validate_shared_resource()
-        return data
+        return super().validate(data)
