@@ -56,6 +56,43 @@ You might want to configure the AWX integration. To do so, you need to set the e
   export EDA_CONTROLLER_SSL_VERIFY=yes
 ```
 
+#### Configure TLS Certificate Verification
+
+EDA enforces TLS certificate verification by default for both JWT key
+endpoints and resource server communication. In production deployments
+(the default mode), the following settings default to `True`:
+
+- `EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT` - Validates certificates when
+  fetching JWT signing keys.
+- `EDA_RESOURCE_SERVER__VALIDATE_HTTPS` - Validates certificates when
+  communicating with the AAP Gateway resource server.
+
+If your deployment uses certificates signed by a private CA, configure
+the system CA bundle rather than disabling verification:
+
+1. Add your CA certificate to the system trust store:
+
+   ```bash
+   cp your-ca.crt /etc/pki/ca-trust/source/anchors/
+   update-ca-trust
+   ```
+
+2. Alternatively, set the `REQUESTS_CA_BUNDLE` environment variable to
+   point to your CA bundle file:
+
+   ```bash
+   export REQUESTS_CA_BUNDLE=/path/to/ca-bundle.crt
+   ```
+
+**Warning:** Disabling TLS verification (`EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT=False`
+or `EDA_RESOURCE_SERVER__VALIDATE_HTTPS=False`) removes protection against
+man-in-the-middle attacks and should never be done in production. If either
+setting is disabled, the EDA server logs a prominent security warning at
+startup.
+
+For development environments, set `EDA_MODE=development` which defaults
+both settings to `False` to accommodate self-signed certificates.
+
 ```shell
 cd tools/docker
 ```

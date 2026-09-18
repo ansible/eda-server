@@ -48,6 +48,29 @@ def _normalize_queue_name(name: str) -> str:
     return normalized
 
 
+def _warn_tls_verification_disabled(settings: Dynaconf) -> None:
+    if settings.get("DEBUG", False):
+        return
+
+    if not settings.get("ANSIBLE_BASE_JWT_VALIDATE_CERT", True):
+        logger.warning(
+            "SECURITY WARNING: ANSIBLE_BASE_JWT_VALIDATE_CERT is False. "
+            "TLS certificate verification is disabled for JWT key "
+            "endpoints. This is unsafe for production. Set "
+            "ANSIBLE_BASE_JWT_VALIDATE_CERT=True and configure a "
+            "CA bundle instead."
+        )
+
+    if not settings.get("RESOURCE_SERVER", {}).get("VALIDATE_HTTPS", True):
+        logger.warning(
+            "SECURITY WARNING: RESOURCE_SERVER__VALIDATE_HTTPS is False. "
+            "TLS certificate verification is disabled for resource server "
+            "communication. This is unsafe for production. Set "
+            "RESOURCE_SERVER__VALIDATE_HTTPS=True and configure a "
+            "CA bundle instead."
+        )
+
+
 def _get_secret_key(settings: Dynaconf) -> str:
     secret_key = settings.get("SECRET_KEY")
     secret_key_file = settings.get("SECRET_KEY_FILE")
@@ -444,6 +467,8 @@ def post_loading(loaded_settings: Dynaconf):
     settings.update(loaded_settings.to_dict())
 
     _enforce_types(settings)
+
+    _warn_tls_verification_disabled(settings)
 
     # Configure authentication classes based on worker kind
     # WebSocket workers only need WebsocketJWTAuthentication
