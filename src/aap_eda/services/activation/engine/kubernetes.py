@@ -419,8 +419,19 @@ class Engine(ContainerEngine):
                 for t in tolerations
             ]
 
-        spec = k8sclient.V1PodSpec(**spec_kwargs)
+        affinity = request.k8s_pod_affinity or {}
 
+        if affinity:
+            # affinity is passed through as the raw
+            # dict the user supplied (validated for shape only in
+            # core/validators.py). V1Affinity's nested structure
+            # (nodeAffinity/podAffinity/podAntiAffinity, each several
+            # levels deep) is accepted by the client's serializer as a
+            # plain dict without needing manual construction of the
+            # typed sub-objects confirmed against kubernetes==26.1.0
+            spec_kwargs["affinity"] = affinity
+
+        spec = k8sclient.V1PodSpec(**spec_kwargs)
         pod_template = k8sclient.V1PodTemplateSpec(
             spec=spec,
             metadata=k8sclient.V1ObjectMeta(**pod_meta),
