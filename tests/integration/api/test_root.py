@@ -63,7 +63,6 @@ from tests.integration.constants import api_url_v1
                 "/role_team_assignments/",
                 "/role_metadata/",
                 "/service-index/metadata/",
-                "/service-index/object-delete/",
                 "/service-index/resources/",
                 "/service-index/resources/bulk-update/",
                 "/service-index/resource-types/",
