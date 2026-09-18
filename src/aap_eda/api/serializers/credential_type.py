@@ -12,9 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from ansible_base.lib.serializers.mixins import CleanTextMixin
+try:
+    from ansible_base.lib.serializers.mixins import CleanTextMixin
+except ImportError:  # pragma: no cover - DAB without AAP-85987
+    # Provide a no-op stand-in so the class definition is valid
+    class CleanTextMixin:
+        pass
+
+
 from rest_framework import serializers
 
+from aap_eda.api.validation_patterns import inject_patterns_into_field_list
 from aap_eda.core import models, validators
 from aap_eda.core.utils.credentials import validate_injectors
 
@@ -37,6 +45,17 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
             "injectors",
             *read_only_fields,
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        inputs = data.get("inputs")
+        if isinstance(inputs, dict):
+            # Advertise CleanTextMixin Tier 2 patterns on JSON
+            # sub-keys (AAP-87587).  Gated on
+            # ENHANCED_INPUT_VALIDATION_ENABLED; secret fields
+            # are skipped.
+            inject_patterns_into_field_list(inputs.get("fields"))
+        return data
 
 
 class CredentialTypeCreateSerializer(

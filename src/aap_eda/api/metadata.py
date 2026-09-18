@@ -4,6 +4,10 @@ from django.utils.encoding import force_str
 from rest_framework import exceptions, metadata
 from rest_framework.request import clone_request
 
+from aap_eda.api.validation_patterns import (
+    inject_top_level_clean_text_patterns,
+)
+
 ADDITIONAL_ATTRS = [
     "min_length",
     "max_length",
@@ -23,6 +27,12 @@ class EDAMetadata(metadata.SimpleMetadata):
 
     def get_field_info(self, field):
         field_info = super().get_field_info(field)
+
+        # Advertise CleanTextMixin Tier 1/Tier 2 patterns on
+        # top-level CharFields (AAP-87587).  No-op unless
+        # ENHANCED_INPUT_VALIDATION_ENABLED is on and the
+        # serializer mixes in CleanTextMixin.
+        field_info = inject_top_level_clean_text_patterns(field, field_info)
 
         for attr in ADDITIONAL_ATTRS:
             value = getattr(field, attr, None)
