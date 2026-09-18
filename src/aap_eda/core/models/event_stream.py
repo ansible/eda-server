@@ -26,6 +26,14 @@ EDA_EVENT_STREAM_CHANNEL_PREFIX = "eda_event_stream_"
 
 
 class EventStream(BaseOrgModel, UniqueNamedModel, PrimordialModel):
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=~models.Q(name=""),
+                name="ck_event_stream_name_not_empty",
+            ),
+        ]
+
     event_stream_type = models.TextField(
         null=False,
         help_text="The type of the event stream based on credential type",

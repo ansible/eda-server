@@ -55,3 +55,9 @@ class AwxToken(models.Model):
 
     class Meta:
         unique_together = ["user", "name"]
+        constraints = [
+            models.CheckConstraint(
+                check=~models.Q(name=""),
+                name="ck_awx_token_name_not_empty",
+            ),
+        ]
