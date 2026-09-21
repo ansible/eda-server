@@ -28,6 +28,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import exceptions, mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
@@ -847,6 +848,7 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
+    ordering_fields = None
     rbac_action = None
 
     def filter_queryset(self, queryset):
@@ -897,7 +899,8 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         description=(
             "List Activation instance logs. "
-            "Results are paginated with a maximum page_size of 5000."
+            "Results are paginated with a maximum page_size of 5000. "
+            "Use the ordering query parameter with id or -id."
         ),
         request=None,
         responses={
@@ -925,7 +928,9 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
     @action(
         detail=False,
         queryset=models.RulebookProcessLog.objects.order_by("id"),
+        filter_backends=(defaultfilters.DjangoFilterBackend, OrderingFilter),
         filterset_class=filters.ActivationInstanceLogFilter,
+        ordering_fields=["id"],
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/logs",
         pagination_class=LogPagination,

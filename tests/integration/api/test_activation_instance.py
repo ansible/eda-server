@@ -107,6 +107,11 @@ def test_list_logs_from_activation_instance(
     response_logs = response.data["results"]
 
     assert len(response_logs) == 2
+    response_ids = [log["id"] for log in response_logs]
+    assert response_ids == sorted(response_ids)
+    assert response_ids == sorted(
+        log.id for log in default_activation_instance_logs
+    )
     assert response_logs[0]["log"] == "activation-instance-log-1"
     assert list(response_logs[0]) == [
         "id",
@@ -219,6 +224,210 @@ def test_list_activation_instance_logs_filter_timestamp_no_results(
     )
     assert response.status_code == status.HTTP_200_OK
     assert response.data["results"] == []
+
+
+@pytest.mark.django_db
+def test_list_activation_instance_logs_ordering_descending(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}/logs/"
+        "?ordering=-id"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    response_ids = [log["id"] for log in response.data["results"]]
+    expected_ids = sorted(
+        (log.id for log in default_activation_instance_logs),
+        reverse=True,
+    )
+    assert response_ids == expected_ids
+    assert response_ids == sorted(response_ids, reverse=True)
+
+
+@pytest.mark.django_db
+def test_list_activation_instance_logs_filter_id_gt(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    additional_logs = models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                log="activation-instance-log-3",
+                activation_instance=instance,
+                log_timestamp=3000,
+            ),
+            models.RulebookProcessLog(
+                log="activation-instance-log-4",
+                activation_instance=instance,
+                log_timestamp=4000,
+            ),
+        ]
+    )
+    boundary = default_activation_instance_logs[0].id
+
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}/logs/"
+        f"?id__gt={boundary}&ordering=id"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    response_ids = [log["id"] for log in response.data["results"]]
+    expected_ids = sorted(
+        log.id
+        for log in [*default_activation_instance_logs, *additional_logs]
+        if log.id > boundary
+    )
+    assert response_ids == expected_ids
+    assert boundary not in response_ids
+
+
+@pytest.mark.django_db
+def test_list_activation_instance_logs_filter_id_lt_descending(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    additional_logs = models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                log="activation-instance-log-3",
+                activation_instance=instance,
+                log_timestamp=3000,
+            ),
+            models.RulebookProcessLog(
+                log="activation-instance-log-4",
+                activation_instance=instance,
+                log_timestamp=4000,
+            ),
+        ]
+    )
+    all_logs = [*default_activation_instance_logs, *additional_logs]
+    boundary = additional_logs[-1].id
+
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}/logs/"
+        f"?id__lt={boundary}&ordering=-id"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    response_ids = [log["id"] for log in response.data["results"]]
+    expected_ids = sorted(
+        (log.id for log in all_logs if log.id < boundary),
+        reverse=True,
+    )
+    assert response_ids == expected_ids
+    assert boundary not in response_ids
+    assert response_ids[0] == additional_logs[0].id
+
+
+@pytest.mark.django_db
+def test_list_activation_instance_logs_id_boundaries_include_tied_timestamps(
+    default_activation_instances: List[models.RulebookProcess],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    tied_logs = models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                log=f"same-timestamp-log-{index}",
+                activation_instance=instance,
+                log_timestamp=5000,
+            )
+            for index in range(4)
+        ]
+    )
+    lower_boundary = tied_logs[0].id
+    upper_boundary = tied_logs[-1].id
+
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}/logs/"
+        f"?id__gt={lower_boundary}&id__lt={upper_boundary}&ordering=id"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    response_ids = [log["id"] for log in response.data["results"]]
+    assert response_ids == [log.id for log in tied_logs[1:-1]]
+    assert all(
+        log["log_timestamp"] == 5000 for log in response.data["results"]
+    )
+
+
+@pytest.mark.django_db
+def test_list_activation_instance_logs_combine_filters_and_scope(
+    default_activation_instances: List[models.RulebookProcess],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    sibling_instance = default_activation_instances[1]
+    lower_boundary = models.RulebookProcessLog.objects.create(
+        log="target-before-boundaries",
+        activation_instance=instance,
+        log_timestamp=6000,
+    )
+    models.RulebookProcessLog.objects.create(
+        log="target-from-sibling-instance",
+        activation_instance=sibling_instance,
+        log_timestamp=6001,
+    )
+    inside_boundary = models.RulebookProcessLog.objects.create(
+        log="target-inside-boundaries",
+        activation_instance=instance,
+        log_timestamp=6002,
+    )
+    upper_boundary = models.RulebookProcessLog.objects.create(
+        log="target-after-boundaries",
+        activation_instance=instance,
+        log_timestamp=6003,
+    )
+
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}/logs/"
+        f"?id__gt={lower_boundary.id}&id__lt={upper_boundary.id}"
+        "&log=target&ordering=id"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    response_ids = [log["id"] for log in response.data["results"]]
+    assert response_ids == [inside_boundary.id]
+    assert response.data["results"][0]["log"] == "target-inside-boundaries"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("query_string", "expected_status"),
+    [
+        ("ordering=log", status.HTTP_200_OK),
+        ("id__gt=not-a-number", status.HTTP_400_BAD_REQUEST),
+        ("id__lt=not-a-number", status.HTTP_400_BAD_REQUEST),
+    ],
+)
+def test_activation_instance_logs_invalid_query_values_follow_api_behavior(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    admin_client: APIClient,
+    query_string: str,
+    expected_status: int,
+):
+    instance = default_activation_instances[0]
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}/logs/"
+        f"?{query_string}"
+    )
+
+    assert response.status_code == expected_status
+    if expected_status == status.HTTP_200_OK:
+        response_ids = [log["id"] for log in response.data["results"]]
+        expected_ids = sorted(
+            log.id for log in default_activation_instance_logs
+        )
+        assert response_ids == expected_ids
 
 
 @pytest.mark.django_db

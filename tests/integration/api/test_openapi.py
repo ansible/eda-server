@@ -39,6 +39,37 @@ def test_v1_openapi(admin_client, path):
 
 
 @pytest.mark.django_db
+def test_activation_instance_logs_schema_exposes_id_paging_and_ordering(
+    admin_client,
+):
+    response = admin_client.get(f"{api_url_v1}/openapi.json")
+    assert response.status_code == status.HTTP_200_OK
+
+    schema = response.json()
+    logs_path = next(
+        path
+        for path in schema["paths"]
+        if path.endswith("/activation-instances/{id}/logs/")
+    )
+    parameters = schema["paths"][logs_path]["get"]["parameters"]
+    parameter_names = {parameter["name"] for parameter in parameters}
+
+    assert {
+        "id__gt",
+        "id__lt",
+        "log",
+        "log_timestamp__gt",
+        "log_timestamp__lt",
+        "ordering",
+        "page",
+        "page_size",
+    } <= parameter_names
+
+    operation = schema["paths"][logs_path]["get"]
+    assert "id or -id" in operation["description"]
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "path",
     [
