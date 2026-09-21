@@ -325,7 +325,10 @@ class TestToRepresentation:
         """Dict inputs trigger inject_patterns_into_field_list."""
         inputs = {"fields": [{"id": "x", "type": "string"}]}
         result, mock_inject = self._make_and_call(inputs)
-        mock_inject.assert_called_once_with(inputs.get("fields"))
+        mock_inject.assert_called_once()
+        # inject receives a list with identical content (shallow copy).
+        called_fields = mock_inject.call_args[0][0]
+        assert called_fields == inputs["fields"]
 
     def test_non_dict_inputs_skips(self):
         """When inputs is None, skip injection."""
@@ -336,6 +339,56 @@ class TestToRepresentation:
         """When inputs is a string, skip injection."""
         result, mock_inject = self._make_and_call("not-a-dict")
         mock_inject.assert_not_called()
+
+    def test_representation_does_not_mutate_model_inputs(self):
+        """to_representation must not mutate the model-owned inputs."""
+        original_field = {"id": "host", "type": "string"}
+        original_fields = [original_field]
+        original_inputs = {"fields": original_fields, "extra": "keep"}
+
+        # Let inject_patterns_into_field_list actually mutate the
+        # list it receives, simulating the real injection path.
+        def fake_inject(fields):
+            if isinstance(fields, list):
+                for i, f in enumerate(fields):
+                    fields[i] = {**f, "pattern": "injected"}
+
+        fake_data = {
+            "id": 1,
+            "name": "test",
+            "inputs": original_inputs,
+        }
+
+        with (
+            mock.patch(
+                "aap_eda.api.serializers.credential_type"
+                ".inject_patterns_into_field_list",
+                side_effect=fake_inject,
+            ),
+            mock.patch.object(
+                __import__(
+                    "aap_eda.api.serializers.credential_type",
+                    fromlist=["CredentialTypeSerializer"],
+                ).CredentialTypeSerializer.__bases__[0],
+                "to_representation",
+                return_value=fake_data,
+            ),
+        ):
+            from aap_eda.api.serializers.credential_type import (
+                CredentialTypeSerializer,
+            )
+
+            serializer = CredentialTypeSerializer()
+            result = serializer.to_representation(mock.Mock())
+
+        # The response should carry the injected pattern.
+        assert result["inputs"]["fields"][0]["pattern"] == "injected"
+        # The original model-owned objects must be untouched.
+        assert "pattern" not in original_field
+        assert original_fields[0] is original_field
+        assert original_inputs["fields"] is original_fields
+        # Extra keys survive the copy.
+        assert result["inputs"]["extra"] == "keep"
 
 
 # ---------------------------------------------------------------
