@@ -103,6 +103,13 @@ class ProjectViewSet(
 
     rbac_action = None
 
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.ProjectCreateRequestSerializer
+        if self.action == "partial_update":
+            return serializers.ProjectUpdateRequestSerializer
+        return serializers.ProjectSerializer
+
     def filter_queryset(self, queryset):
         return super().filter_queryset(
             queryset.model.access_qs(self.request.user, queryset=queryset)

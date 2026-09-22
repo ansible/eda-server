@@ -74,6 +74,13 @@ class CredentialInputSourceViewSet(
     filterset_class = filters.CredentialInputSourceFilter
     rbac_resource_type = ResourceType.CREDENTIAL_INPUT_SOURCE
 
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.CredentialInputSourceCreateSerializer
+        if self.action == "partial_update":
+            return serializers.CredentialInputSourceUpdateSerializer
+        return serializers.CredentialInputSourceSerializer
+
     def filter_queryset(self, queryset):
         if queryset.model is models.CredentialInputSource:
             return super().filter_queryset(

@@ -8,6 +8,17 @@ from aap_eda.api.validation_patterns import (
     inject_top_level_clean_text_patterns,
 )
 
+# Map HTTP methods to the DRF action names that routers assign, so
+# get_serializer_class() overrides that dispatch on ``self.action``
+# return the correct (write) serializer during OPTIONS metadata
+# generation.  See ``determine_actions`` below.
+_METHOD_ACTION_MAP = {
+    "GET": "list",
+    "POST": "create",
+    "PUT": "update",
+    "PATCH": "partial_update",
+}
+
 ADDITIONAL_ATTRS = [
     "min_length",
     "max_length",
@@ -46,10 +57,27 @@ class EDAMetadata(metadata.SimpleMetadata):
         the fields that are accepted for 'PUT' and 'POST' methods.
         """
         actions = {}
+        original_action = getattr(view, "action", None)
         for method in {"GET", "PUT", "PATCH", "POST"} & set(
             view.allowed_methods
         ):
             view.request = clone_request(request, method)
+
+            # Set view.action so that get_serializer_class() overrides
+            # which dispatch on self.action (rather than
+            # self.request.method) return the correct write serializer.
+            # Prefer the view's own action_map when available (it
+            # carries the router-assigned action names); fall back to
+            # the static mapping for views without one.
+            action_map = getattr(view, "action_map", None)
+            if action_map:
+                view.action = action_map.get(
+                    method.lower(),
+                    _METHOD_ACTION_MAP.get(method, method.lower()),
+                )
+            else:
+                view.action = _METHOD_ACTION_MAP.get(method, method.lower())
+
             try:
                 # Test global permissions
                 if hasattr(view, "check_permissions"):
@@ -61,7 +89,8 @@ class EDAMetadata(metadata.SimpleMetadata):
                 pass
             else:
                 # If user has appropriate permissions for the view, include
-                # appropriate metadata about the fields that should be supplied
+                # appropriate metadata about the fields that should be
+                # supplied.
                 serializer = view.get_serializer()
                 action = self.get_serializer_info(serializer)
                 EDAMetadata._customize_field_attributes(method, action)
@@ -69,6 +98,7 @@ class EDAMetadata(metadata.SimpleMetadata):
             finally:
                 view.request = request
 
+        view.action = original_action
         return actions
 
     @staticmethod
