@@ -50,3 +50,15 @@ def test_v1_openapi_ui(admin_client, path):
     response = admin_client.get(f"{api_url_v1}{path}")
     assert response.status_code == status.HTTP_200_OK
     assert OPENAPI_TITLE in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_v1_openapi_credential_type_inputs_schema(admin_client):
+    response = admin_client.get(f"{api_url_v1}/openapi.json")
+    assert response.status_code == status.HTTP_200_OK
+    schemas = response.json()["components"]["schemas"]
+    inputs = schemas["CredentialType"]["properties"]["inputs"]
+    assert inputs["properties"]["fields"]["items"]["$ref"].endswith(
+        "CleanTextNestedStringField"
+    )
+    assert "metadata" in inputs["properties"]
