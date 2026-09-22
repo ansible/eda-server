@@ -15,6 +15,10 @@ from typing import Optional
 from unittest.mock import patch
 
 import pytest
+from ansible_base.lib.metadata import (
+    TIER2_PATTERN_DESCRIPTION as _TIER2_DESC,
+    build_tier2_frontend_pattern as _build_tier2,
+)
 from django.test import override_settings
 from pytest_lazyfixture import lazy_fixture
 from rest_framework import status
@@ -23,18 +27,6 @@ from rest_framework.test import APIClient
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import SUPPORTED_KEYS_IN_INJECTORS
 from tests.integration.constants import api_url_v1
-
-try:
-    from ansible_base.lib.metadata import (
-        TIER2_PATTERN_DESCRIPTION as _TIER2_DESC,
-        build_tier2_frontend_pattern as _build_tier2,
-    )
-
-    _has_dab_validation_metadata = True
-except ImportError:
-    _build_tier2 = None
-    _TIER2_DESC = None
-    _has_dab_validation_metadata = False
 
 INPUT = {
     "fields": [
@@ -1286,10 +1278,6 @@ def test_eda_rule_engine_credential_validates_required_fields(
 class TestCredentialTypeValidationPatterns:
     """AAP-87587: pattern/pattern_description injection for JSON sub-keys."""
 
-    @pytest.mark.skipif(
-        not _has_dab_validation_metadata,
-        reason="DAB validation metadata not available (AAP-85987)",
-    )
     @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
     def test_patterns_present_when_toggle_on(
         self,
@@ -1341,10 +1329,6 @@ class TestCredentialTypeOptionsValidationPatterns:
     advertise a pattern on OPTIONS, same as any other DAB consumer.
     """
 
-    @pytest.mark.skipif(
-        not _has_dab_validation_metadata,
-        reason="DAB validation metadata not available (AAP-85987)",
-    )
     @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
     def test_options_includes_pattern_when_toggle_on(
         self, superuser_client: APIClient
