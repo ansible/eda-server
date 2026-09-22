@@ -50,12 +50,16 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
             fields = inputs.get("fields")
             if isinstance(fields, list):
                 inputs["fields"] = list(fields)
+            metadata = inputs.get("metadata")
+            if isinstance(metadata, list):
+                inputs["metadata"] = list(metadata)
             data["inputs"] = inputs
             # Advertise CleanTextMixin Tier 2 patterns on JSON
             # sub-keys (AAP-87587).  Gated on
             # ENHANCED_INPUT_VALIDATION_ENABLED; secret fields
             # are skipped.
             inject_patterns_into_field_list(inputs.get("fields"))
+            inject_patterns_into_field_list(inputs.get("metadata"))
         return data
 
 
