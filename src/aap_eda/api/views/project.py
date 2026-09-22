@@ -158,7 +158,7 @@ class ProjectViewSet(
             import_task_id=job_id
         )
         project.import_task_id = job_id
-        serializer = self.get_serializer(project)
+        serializer = serializers.ProjectSerializer(project)
         headers = self.get_success_headers(serializer.data)
         logger.info(
             logging_utils.generate_simple_audit_log(

@@ -68,8 +68,8 @@ def _assert_pattern_on_field(actions, method, field_name, url=""):
     assert (
         "pattern" in field_info
     ), f"Missing 'pattern' on {field_name} in {method} for {url}"
-    assert "pattern_description" in field_info, (
-        f"Missing 'pattern_description' on {field_name} "
+    assert "patternDescription" in field_info, (
+        f"Missing 'patternDescription' on {field_name} "
         f"in {method} for {url}"
     )
 
@@ -160,10 +160,10 @@ class TestOptionsPostPatterns:
 
     def test_credential_types_post(
         self,
-        admin_client: APIClient,
+        superuser_client: APIClient,
     ):
         url = f"{api_url_v1}/credential-types/"
-        actions = _get_options_actions(admin_client, url)
+        actions = _get_options_actions(superuser_client, url)
         _assert_pattern_on_field(actions, "POST", "name", url)
 
     @patch(
@@ -262,10 +262,10 @@ class TestOptionsPatchPatterns:
     def test_credential_types_patch(
         self,
         credential_type: models.CredentialType,
-        admin_client: APIClient,
+        superuser_client: APIClient,
     ):
         url = f"{api_url_v1}/credential-types/" f"{credential_type.id}/"
-        actions = _get_options_actions(admin_client, url)
+        actions = _get_options_actions(superuser_client, url)
         _assert_pattern_on_field(actions, "PATCH", "name", url)
 
     def test_eda_credentials_patch(
