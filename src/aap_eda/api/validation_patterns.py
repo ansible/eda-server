@@ -24,37 +24,16 @@ not handled automatically by DAB --
 JSON sub-keys (credential type inputs) are domain-owned schemas
 that DAB has no visibility into at all, so pattern injection for
 those lives here unconditionally.
-
-Depends on django-ansible-base (AAP-85987) for
-``build_tier2_frontend_pattern`` and ``inject_clean_text_patterns``.
-Until that lands on DAB devel, injection is a no-op so EDA can
-still import and run.
 """
 
 import copy
 
+from ansible_base.lib.metadata import (
+    TIER2_PATTERN_DESCRIPTION,
+    build_tier2_frontend_pattern,
+    inject_clean_text_patterns as _dab_inject_clean_text_patterns,
+)
 from ansible_base.lib.utils.settings import get_setting
-
-try:
-    from ansible_base.lib.metadata import build_tier2_frontend_pattern
-except ImportError:  # pragma: no cover - DAB without AAP-85987
-    build_tier2_frontend_pattern = None
-
-try:
-    from ansible_base.lib.metadata import (
-        inject_clean_text_patterns as _dab_inject_clean_text_patterns,
-    )
-except ImportError:  # pragma: no cover - DAB without AAP-85987
-    _dab_inject_clean_text_patterns = None
-
-try:
-    from ansible_base.lib.metadata import TIER2_PATTERN_DESCRIPTION
-except ImportError:  # pragma: no cover - DAB without AAP-85987
-    TIER2_PATTERN_DESCRIPTION = (
-        "This field can't include HTML tags, script markup, "
-        "unsafe URI schemes, shell or template syntax, "
-        "or control characters."
-    )
 
 _STRING_TYPES = frozenset({"string", "str"})
 
@@ -65,9 +44,7 @@ def enhanced_input_validation_enabled():
 
 
 def free_text_pattern_metadata():
-    """Return Tier 2 pattern keys for API clients, or ``None``."""
-    if build_tier2_frontend_pattern is None:
-        return None
+    """Return Tier 2 pattern keys for API clients."""
     return {
         "pattern": build_tier2_frontend_pattern(),
         "pattern_description": TIER2_PATTERN_DESCRIPTION,
@@ -78,8 +55,7 @@ def free_text_pattern_metadata():
 def inject_free_text_pattern(field_schema, *, secret=False):
     """Mutate *field_schema* in place for non-secret string fields.
 
-    No-op when the install-time toggle is off or DAB pattern
-    helpers are missing.
+    No-op when the install-time toggle is off.
     """
     if not isinstance(field_schema, dict):
         return field_schema
@@ -91,10 +67,7 @@ def inject_free_text_pattern(field_schema, *, secret=False):
     if field_type not in _STRING_TYPES:
         return field_schema
 
-    metadata = free_text_pattern_metadata()
-    if metadata is None:
-        return field_schema
-    field_schema.update(metadata)
+    field_schema.update(free_text_pattern_metadata())
     return field_schema
 
 
@@ -118,8 +91,5 @@ def inject_top_level_clean_text_patterns(field, field_info):
     Delegates entirely to DAB's ``inject_clean_text_patterns``,
     which no-ops unless ``ENHANCED_INPUT_VALIDATION_ENABLED`` is on
     and the field's serializer mixes in ``CleanTextMixin``.
-    No-op when the DAB helper is missing.
     """
-    if _dab_inject_clean_text_patterns is None:
-        return field_info
     return _dab_inject_clean_text_patterns(field, field_info)

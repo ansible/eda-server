@@ -116,26 +116,6 @@ class TestInjectFreeTextPattern:
             result = inject_free_text_pattern(schema)
             assert "pattern" not in result
 
-    def test_build_tier2_none_skips(self):
-        """When build_tier2_frontend_pattern is None, skip."""
-        with (
-            mock.patch(
-                f"{VP}.build_tier2_frontend_pattern",
-                None,
-            ),
-            mock.patch(
-                f"{VP}.enhanced_input_validation_enabled",
-                return_value=True,
-            ),
-        ):
-            from aap_eda.api.validation_patterns import (
-                inject_free_text_pattern,
-            )
-
-            schema = {"id": "host", "type": "string"}
-            result = inject_free_text_pattern(schema)
-            assert "pattern" not in result
-
 
 # ---------------------------------------------------------------
 # inject_patterns_into_field_list — copy-before-mutate
@@ -268,21 +248,6 @@ class TestInjectTopLevelCleanTextPatterns:
 
         fake_inject.assert_called_once_with(field, {"type": "string"})
         assert result["pattern"] == "^.*$"
-
-    def test_noop_when_dab_missing(self):
-        """When DAB helper is None, return field_info as-is."""
-        with mock.patch(
-            f"{VP}._dab_inject_clean_text_patterns",
-            None,
-        ):
-            from aap_eda.api.validation_patterns import (
-                inject_top_level_clean_text_patterns,
-            )
-
-            info = {"type": "string"}
-            result = inject_top_level_clean_text_patterns(mock.Mock(), info)
-
-        assert result is info
 
 
 # ---------------------------------------------------------------
