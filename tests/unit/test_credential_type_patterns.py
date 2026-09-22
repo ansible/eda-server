@@ -61,7 +61,7 @@ class TestInjectFreeTextPattern:
         schema = {"id": "host", "type": "string"}
         result = self._call(schema)
         assert result["pattern"] == FAKE_PATTERN
-        assert "pattern_description" in result
+        assert "patternDescription" in result
 
     def test_secret_field_excluded(self):
         """Secret fields must NOT get a pattern."""
