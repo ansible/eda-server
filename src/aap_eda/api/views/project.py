@@ -103,6 +103,13 @@ class ProjectViewSet(
 
     rbac_action = None
 
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.ProjectCreateRequestSerializer
+        if self.action == "partial_update":
+            return serializers.ProjectUpdateRequestSerializer
+        return serializers.ProjectSerializer
+
     def filter_queryset(self, queryset):
         return super().filter_queryset(
             queryset.model.access_qs(self.request.user, queryset=queryset)
@@ -151,7 +158,7 @@ class ProjectViewSet(
             import_task_id=job_id
         )
         project.import_task_id = job_id
-        serializer = self.get_serializer(project)
+        serializer = serializers.ProjectSerializer(project)
         headers = self.get_success_headers(serializer.data)
         logger.info(
             logging_utils.generate_simple_audit_log(

@@ -15,6 +15,7 @@
 from ansible_base.lib.serializers.mixins import CleanTextMixin
 from rest_framework import serializers
 
+from aap_eda.api.validation_patterns import inject_patterns_into_field_list
 from aap_eda.core import models, validators
 from aap_eda.core.utils.credentials import validate_injectors
 
@@ -37,6 +38,25 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
             "injectors",
             *read_only_fields,
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        inputs = data.get("inputs")
+        if isinstance(inputs, dict):
+            # Shallow-copy *inputs* and its *fields* list so
+            # inject_patterns_into_field_list never mutates the
+            # model-owned JSON cached on the instance.
+            inputs = {**inputs}
+            fields = inputs.get("fields")
+            if isinstance(fields, list):
+                inputs["fields"] = list(fields)
+            data["inputs"] = inputs
+            # Advertise CleanTextMixin Tier 2 patterns on JSON
+            # sub-keys (AAP-87587).  Gated on
+            # ENHANCED_INPUT_VALIDATION_ENABLED; secret fields
+            # are skipped.
+            inject_patterns_into_field_list(inputs.get("fields"))
+        return data
 
 
 class CredentialTypeCreateSerializer(
