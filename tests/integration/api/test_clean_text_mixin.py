@@ -496,6 +496,30 @@ class TestProjectCleanText:
         assert not serializer.is_valid()
         assert "name" in serializer.errors
 
+    def test_grandfather_legacy_invalid_name_on_partial_update_api(
+        self,
+        default_project: models.Project,
+        admin_client: APIClient,
+    ):
+        """AAP-94099: PATCH a legacy project whose name predates validation.
+
+        Simulates a project created before ENHANCED_INPUT_VALIDATION was
+        enabled by writing an invalid name directly to the database.
+        A partial update that changes only the description must succeed;
+        the unchanged invalid name must be preserved.
+        """
+        models.Project.objects.filter(pk=default_project.pk).update(
+            name=DANGEROUS_NAME
+        )
+        response = admin_client.patch(
+            f"{api_url_v1}/projects/{default_project.id}/",
+            data={"description": "Updated description"},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        default_project.refresh_from_db()
+        assert default_project.name == DANGEROUS_NAME
+        assert default_project.description == "Updated description"
+
 
 @pytest.mark.django_db
 class TestDecisionEnvironmentCleanText:
