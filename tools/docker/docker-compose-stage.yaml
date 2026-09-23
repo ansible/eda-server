@@ -1,6 +1,7 @@
 x-environment: &common-env
   EDA_DB_HOST: postgres
   # Redis environment variables removed - no longer required with dispatcherd migration
+  EDA_MODE: ${EDA_MODE:-development}
   DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-aap_eda.settings.default}
   EDA_DB_PASSWORD: secret
   EDA_SECRET_KEY: secret
