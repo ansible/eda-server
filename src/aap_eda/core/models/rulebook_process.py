@@ -75,6 +75,12 @@ class RulebookProcess(BaseOrgModel):
         db_table = "core_rulebook_process"
         ordering = ("-started_at",)
         default_permissions = ("view",)
+        constraints = [
+            models.CheckConstraint(
+                check=~models.Q(name=""),
+                name="ck_rulebook_process_name_not_empty",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Rulebook Process id {self.id}"
