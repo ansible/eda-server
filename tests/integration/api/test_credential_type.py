@@ -533,6 +533,31 @@ def test_list_credential_types(superuser_client: APIClient):
 
 
 @pytest.mark.django_db
+def test_list_credential_types_filter_name_contains(
+    admin_client: APIClient,
+    aap_credential_type,
+):
+    """Name filter is a case-insensitive substring match (AAP-81333)."""
+    response = admin_client.get(f"{api_url_v1}/credential-types/?name=Ansible")
+    assert response.status_code == status.HTTP_200_OK
+    names = [item["name"] for item in response.json()["results"]]
+    assert aap_credential_type.name in names
+    assert enums.DefaultCredentialType.AAP in names
+
+    prefix_response = admin_client.get(
+        f"{api_url_v1}/credential-types/?name=Red Hat"
+    )
+    prefix_names = [item["name"] for item in prefix_response.json()["results"]]
+    assert aap_credential_type.name in prefix_names
+
+    empty_response = admin_client.get(
+        f"{api_url_v1}/credential-types/?name=does-not-exist"
+    )
+    assert empty_response.status_code == status.HTTP_200_OK
+    assert empty_response.json()["results"] == []
+
+
+@pytest.mark.django_db
 def test_delete_managed_credential_type(superuser_client: APIClient):
     obj = models.CredentialType.objects.create(
         name="type1",
