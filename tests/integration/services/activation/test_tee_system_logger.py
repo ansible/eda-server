@@ -32,6 +32,7 @@ log_test_data = [
             "CRITICAL Event is critical",
             "FATAL Event is fatal",
             "ERROR MAY DAY MAY DAY, ansible-rulebook going down",
+            "INFO DEBUG mentioned",
         ],
         [
             ("INFO", "Hello from ansible-rulebook"),
@@ -40,6 +41,7 @@ log_test_data = [
             ("CRITICAL", "Event is critical"),
             ("CRITICAL", "Event is fatal"),
             ("ERROR", "MAY DAY MAY DAY, ansible-rulebook going down"),
+            ("INFO", "DEBUG mentioned"),
         ],
     ),
 ]
@@ -84,21 +86,34 @@ def test_debug_lines_excluded_from_db_by_default(
     obj = TeeSystemLogger(
         default_activation_instance.id, store_debug_logs=False
     )
-    obj.write("DEBUG This is a debug message")
-    obj.write("ERROR This is an error message")
-    obj.write("INFO This is an info message")
+    lines = [
+        "DEBUG This is a debug message",
+        "[main] DEBUG This is a debug message",
+        "[debug] This is a debug message",
+        "INFO DEBUG mentioned",
+        "ERROR received DEBUG flag",
+    ]
+    for line in lines:
+        obj.write(line)
     obj.flush()
 
-    assert len(eda_log.records) == 3
+    assert len(eda_log.records) == len(lines)
+    assert [record.levelname for record in eda_log.records] == [
+        "DEBUG",
+        "DEBUG",
+        "DEBUG",
+        "INFO",
+        "ERROR",
+    ]
 
-    db_logs = RulebookProcessLog.objects.filter(
-        activation_instance=default_activation_instance
+    log_texts = list(
+        RulebookProcessLog.objects.filter(
+            activation_instance=default_activation_instance
+        )
+        .order_by("id")
+        .values_list("log", flat=True)
     )
-    assert db_logs.count() == 2
-    log_texts = [log.log for log in db_logs]
-    assert any("ERROR" in t for t in log_texts)
-    assert any("INFO" in t for t in log_texts)
-    assert not any("DEBUG" in t for t in log_texts)
+    assert log_texts == ["INFO DEBUG mentioned", "ERROR received DEBUG flag"]
 
 
 @pytest.mark.django_db
@@ -111,16 +126,34 @@ def test_debug_lines_stored_when_opted_in(
     obj = TeeSystemLogger(
         default_activation_instance.id, store_debug_logs=True
     )
-    obj.write("DEBUG This is a debug message")
-    obj.write("ERROR This is an error message")
+    lines = [
+        "DEBUG This is a debug message",
+        "[main] DEBUG This is a debug message",
+        "[debug] This is a debug message",
+        "INFO DEBUG mentioned",
+        "ERROR received DEBUG flag",
+    ]
+    for line in lines:
+        obj.write(line)
     obj.flush()
 
-    assert len(eda_log.records) == 2
+    assert len(eda_log.records) == len(lines)
+    assert [record.levelname for record in eda_log.records] == [
+        "DEBUG",
+        "DEBUG",
+        "DEBUG",
+        "INFO",
+        "ERROR",
+    ]
 
-    db_logs = RulebookProcessLog.objects.filter(
-        activation_instance=default_activation_instance
+    db_logs = list(
+        RulebookProcessLog.objects.filter(
+            activation_instance=default_activation_instance
+        )
+        .order_by("id")
+        .values_list("log", flat=True)
     )
-    assert db_logs.count() == 2
+    assert db_logs == lines
 
 
 @pytest.mark.django_db

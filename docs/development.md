@@ -458,7 +458,7 @@ task docker:purge && EDA_SECRET_KEY=insecure task docker:up
 | `EDA_SECRET_KEY` | Sets `settings.SECRET_KEY` via dynaconf. Used by Django for encryption at rest. |
 | `EDA_DB_ROTATION_KEY` | Provides the new key for `rotate_db_encryption_key --use-custom-key`. Operator-set, ad-hoc only. |
 | `EDA_ACTIVATION_DB_LOG_RETENTION_DAYS` | Days of rulebook process logs to retain. Disabled by default (`0`). Set to a positive integer (e.g. `30`) to enable automated hourly purging of logs older than that many days. |
-| `EDA_MAX_LOG_LINES_PER_INSTANCE` | Maximum persisted rulebook process log lines per activation instance. Defaults to `500000`; set to `0` for unlimited retention. Oldest rows are trimmed during log flushing when the limit is exceeded. |
+| `EDA_MAX_LOG_LINES_PER_INSTANCE` | Maximum persisted rulebook process log lines per activation instance. Defaults to `500000`; set to `0` for unlimited retention. Oldest rows are trimmed after every 1,000 rows actually stored in the database. DEBUG records excluded by `store_debug_logs=False` do not count toward this interval, and the cap can temporarily exceed the configured value by up to 999 stored rows. |
 
 Do **not** confuse the two — see the command docstring in
 `src/aap_eda/core/management/commands/rotate_db_encryption_key.py`.
@@ -472,8 +472,11 @@ to a positive number of days (e.g. `30`). An hourly task will then purge all
 To limit log volume for an individual activation instance, set
 `EDA_MAX_LOG_LINES_PER_INSTANCE`. The default is `500000` persisted log lines
 per activation instance. Set it to `0` to disable the per-instance line cap.
-When the cap is exceeded, the oldest rows for that activation instance are
-trimmed during log flushing. This setting is separate from
+The oldest logs are trimmed per activation instance after every 1,000 rows
+actually stored in the database. DEBUG records excluded by
+`store_debug_logs=False` do not count toward the interval. The configured cap
+can temporarily be exceeded by up to 999 stored rows before the next check.
+This setting is separate from
 `EDA_ACTIVATION_DB_LOG_RETENTION_DAYS`, which removes logs based on age.
 
 ```shell

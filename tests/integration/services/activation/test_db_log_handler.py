@@ -17,7 +17,10 @@ from unittest.mock import patch
 import pytest
 
 from aap_eda.core.models.rulebook_process import RulebookProcessLog
-from aap_eda.services.activation.db_log_handler import DBLogger
+from aap_eda.services.activation.db_log_handler import (
+    LOG_RETENTION_CHECK_INTERVAL,
+    DBLogger,
+)
 
 
 @pytest.mark.django_db
@@ -39,6 +42,8 @@ def test_enforce_max_log_lines_trims_oldest(default_activation_instance):
     assert len(logs) == 5
     assert logs[0] == "line-0995"
     assert logs[-1] == "line-0999"
+    default_activation_instance.refresh_from_db()
+    assert default_activation_instance.stored_lines_since_cap_check == 0
 
 
 @pytest.mark.django_db
@@ -47,62 +52,122 @@ def test_enforce_max_log_lines_disabled_when_zero(
 ):
     """Setting=0 means no cap; all lines are kept."""
     with patch("django.conf.settings.MAX_LOG_LINES_PER_INSTANCE", 0):
-        obj = DBLogger(default_activation_instance.id)
-        for i in range(1000):
-            obj.write(f"line-{i}")
-        obj.flush()
+        with patch.object(DBLogger, "_enforce_max_log_lines") as enforce:
+            obj = DBLogger(default_activation_instance.id)
+            for i in range(1000):
+                obj.write(f"line-{i}")
+            obj.flush()
+            enforce.assert_not_called()
 
     count = RulebookProcessLog.objects.filter(
         activation_instance=default_activation_instance,
     ).count()
     assert count == 1000
+    default_activation_instance.refresh_from_db()
+    assert default_activation_instance.stored_lines_since_cap_check == 0
 
 
 @pytest.mark.django_db
-def test_enforce_max_log_lines_check_interval(default_activation_instance):
-    """Trimming fires on every flush when cap is exceeded."""
-    with patch("django.conf.settings.MAX_LOG_LINES_PER_INSTANCE", 5):
-        obj = DBLogger(default_activation_instance.id)
-        for i in range(999):
-            obj.write(f"line-{i}")
-        obj.flush()
-
-    count = RulebookProcessLog.objects.filter(
-        activation_instance=default_activation_instance,
-    ).count()
-    assert count == 5
-
-
-@pytest.mark.django_db
-def test_enforce_max_log_lines_fires_across_instances(
+def test_retention_checkpoint_waits_for_1000_stored_lines(
     default_activation_instance,
 ):
-    """Trimming works correctly across separate DBLogger instances."""
+    """The cap check waits for 1,000 stored rows across logger instances."""
+    with patch("django.conf.settings.MAX_LOG_LINES_PER_INSTANCE", 5):
+        for start, count in ((0, 499), (499, 500)):
+            obj = DBLogger(default_activation_instance.id)
+            obj.write([f"line-{i:04d}" for i in range(start, start + count)])
+            obj.flush()
+
+    log_query = RulebookProcessLog.objects.filter(
+        activation_instance=default_activation_instance,
+    )
+    assert log_query.count() == 999
+    assert log_query.count() <= 5 + LOG_RETENTION_CHECK_INTERVAL - 1
+    default_activation_instance.refresh_from_db()
+    assert default_activation_instance.stored_lines_since_cap_check == 999
+
+    with patch("django.conf.settings.MAX_LOG_LINES_PER_INSTANCE", 5):
+        obj = DBLogger(default_activation_instance.id)
+        obj.write("line-0999")
+        obj.flush()
+
+    logs = list(log_query.order_by("id").values_list("log", flat=True))
+    assert len(logs) == 5
+    assert logs == [f"line-{i:04d}" for i in range(995, 1000)]
+    default_activation_instance.refresh_from_db()
+    assert default_activation_instance.stored_lines_since_cap_check == 0
+
+
+@pytest.mark.django_db
+def test_large_batch_enforces_and_preserves_checkpoint_remainder(
+    default_activation_instance,
+):
+    """A large batch enforces once and retains its checkpoint remainder."""
     with patch("django.conf.settings.MAX_LOG_LINES_PER_INSTANCE", 10):
-        # First poll cycle - write 7 lines
         obj1 = DBLogger(default_activation_instance.id)
-        for i in range(7):
-            obj1.write(f"poll1-line-{i}")
+        obj1.write(
+            [f"line-{i:04d}" for i in range(LOG_RETENTION_CHECK_INTERVAL + 5)]
+        )
         obj1.flush()
 
-        # Second poll cycle - write 8 more lines (total 15)
+        default_activation_instance.refresh_from_db()
+        assert default_activation_instance.stored_lines_since_cap_check == 5
+        assert obj1.num_of_log_lines() == 10
+
         obj2 = DBLogger(default_activation_instance.id)
-        for i in range(8):
-            obj2.write(f"poll2-line-{i}")
+        obj2.write([f"next-{i:04d}" for i in range(994)])
         obj2.flush()
 
-    # Should have trimmed to cap of 10
-    logs = list(
-        RulebookProcessLog.objects.filter(
-            activation_instance=default_activation_instance,
+        default_activation_instance.refresh_from_db()
+        assert default_activation_instance.stored_lines_since_cap_check == 999
+        assert obj2.num_of_log_lines() == 1004
+
+        obj3 = DBLogger(default_activation_instance.id)
+        obj3.write("next-0994")
+        obj3.flush()
+
+        default_activation_instance.refresh_from_db()
+        assert default_activation_instance.stored_lines_since_cap_check == 0
+        assert obj3.num_of_log_lines() == 10
+
+        logs = list(
+            RulebookProcessLog.objects.filter(
+                activation_instance=default_activation_instance,
+            )
+            .order_by("id")
+            .values_list("log", flat=True)
         )
-        .order_by("id")
-        .values_list("log", flat=True)
-    )
-    assert len(logs) == 10
-    # Oldest 5 from poll1 should be deleted, keeping last 2 from poll1
-    assert logs[0] == "poll1-line-5"
-    assert logs[1] == "poll1-line-6"
-    # All 8 from poll2 should be kept
-    assert logs[2] == "poll2-line-0"
-    assert logs[-1] == "poll2-line-7"
+        assert logs == [f"next-{i:04d}" for i in range(985, 995)]
+
+
+@pytest.mark.django_db
+def test_filtered_debug_lines_do_not_advance_checkpoint(
+    default_activation_instance,
+):
+    """Rows filtered from DB persistence do not trigger retention checks."""
+    with patch("django.conf.settings.MAX_LOG_LINES_PER_INSTANCE", 5):
+        with patch.object(DBLogger, "num_of_log_lines") as count:
+            obj = DBLogger(default_activation_instance.id)
+            obj.write(
+                [
+                    f"DEBUG hidden-{i}"
+                    for i in range(LOG_RETENTION_CHECK_INTERVAL)
+                ]
+            )
+            obj.flush()
+            count.assert_not_called()
+
+    assert not RulebookProcessLog.objects.filter(
+        activation_instance=default_activation_instance,
+    ).exists()
+    default_activation_instance.refresh_from_db()
+    assert default_activation_instance.stored_lines_since_cap_check == 0
+
+
+@pytest.mark.django_db
+def test_empty_flush_does_not_count_for_retention(default_activation_instance):
+    """An empty flush does not invoke the exact retention count."""
+    with patch.object(DBLogger, "num_of_log_lines") as count:
+        DBLogger(default_activation_instance.id).flush()
+
+    count.assert_not_called()

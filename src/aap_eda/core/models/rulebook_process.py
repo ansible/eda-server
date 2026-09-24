@@ -70,6 +70,7 @@ class RulebookProcess(BaseOrgModel):
     activation_pod_id = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
     log_read_at = models.DateTimeField(null=True)
+    stored_lines_since_cap_check = models.PositiveIntegerField(default=0)
 
     class Meta:
         db_table = "core_rulebook_process"
@@ -188,6 +189,12 @@ class RulebookProcess(BaseOrgModel):
 class RulebookProcessLog(models.Model):
     class Meta:
         db_table = "core_rulebook_process_log"
+        indexes = [
+            models.Index(
+                fields=["activation_instance", "id"],
+                name="ix_process_log_instance_id",
+            ),
+        ]
 
     # TODO(alex): this field should be renamed to rulebook_process
     # requires coordination with UI and QE teams.
