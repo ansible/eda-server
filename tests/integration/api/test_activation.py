@@ -971,6 +971,7 @@ def assert_activation_base_data(
     assert data["created_at"] == activation.created_at
     assert data["modified_at"] <= activation.modified_at
     assert data["status_message"]
+    assert data["k8s_pod_affinity"] == (activation.k8s_pod_affinity or {})
 
 
 def assert_activation_related_object_fks(
@@ -1034,6 +1035,33 @@ def test_is_activation_valid(
 ):
     valid, error = is_activation_valid(default_activation)
 
+    assert valid is True
+    assert error == "{}"  # noqa P103
+
+
+@pytest.mark.django_db
+def test_is_activation_valid_with_k8s_pod_affinity(
+    default_activation: models.Activation, preseed_credential_types
+):
+    """Test that is_activation_valid succeeds when k8s_pod_affinity is set."""
+    default_activation.k8s_pod_affinity = {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": "eda-lab/zone",
+                                "operator": "In",
+                                "values": ["a"],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+    valid, error = is_activation_valid(default_activation)
     assert valid is True
     assert error == "{}"  # noqa P103
 
@@ -1272,6 +1300,52 @@ def test_update_activation(
     assert activation.k8s_service_name == activation.name
     assert activation.is_enabled is True
     assert activation.status == enums.ActivationStatus.PENDING
+
+
+@pytest.mark.django_db
+@patch("aap_eda.api.serializers.activation.settings.DEPLOYMENT_TYPE", "k8s")
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_update_activation_k8s_pod_affinity(
+    mock_health_check,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    """Test that k8s_pod_affinity can be set and read back via update."""
+    activation_payload["is_enabled"] = False
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    id = response.data["id"]
+    affinity = {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": "eda-lab/zone",
+                                "operator": "In",
+                                "values": ["a"],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{id}/",
+        data={"k8s_pod_affinity": affinity},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["k8s_pod_affinity"] == affinity
+    activation = models.Activation.objects.get(id=id)
+    assert activation.k8s_pod_affinity == affinity
 
 
 @pytest.mark.django_db

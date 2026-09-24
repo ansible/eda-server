@@ -411,6 +411,35 @@ def check_if_k8s_pod_node_selector_valid(value) -> None:
         _validate_label_value(k, v)
 
 
+_K8S_AFFINITY_TOP_LEVEL_KEYS = frozenset(
+    {"nodeAffinity", "podAffinity", "podAntiAffinity"}
+)
+
+
+def check_if_k8s_pod_affinity_valid(value) -> None:
+    """Validate affinity dict at a structural level only."""
+    if value in (None, {}):
+        return
+    if settings.DEPLOYMENT_TYPE != "k8s":
+        return
+    if not isinstance(value, dict):
+        raise serializers.ValidationError(
+            "k8s_pod_affinity must be a JSON object"
+        )
+    unknown = set(value.keys()) - _K8S_AFFINITY_TOP_LEVEL_KEYS
+    if unknown:
+        raise serializers.ValidationError(
+            f"k8s_pod_affinity has unknown top-level keys: "
+            f"{sorted(unknown)}. Allowed: "
+            f"{sorted(_K8S_AFFINITY_TOP_LEVEL_KEYS)}"
+        )
+    for key, sub_value in value.items():
+        if not isinstance(sub_value, dict):
+            raise serializers.ValidationError(
+                f"k8s_pod_affinity.{key} must be a JSON object"
+            )
+
+
 def check_credential_types(
     eda_credential_id: int,
     types: list[enums.DefaultCredentialType],
