@@ -56,6 +56,25 @@ You might want to configure the AWX integration. To do so, you need to set the e
   export EDA_CONTROLLER_SSL_VERIFY=yes
 ```
 
+#### Configure log retention
+
+The per-instance log line cap is configured with
+`EDA_MAX_LOG_LINES_PER_INSTANCE`. It defaults to `500000` persisted log lines
+per activation instance. Set it to `0` to disable the cap. When the cap is
+exceeded, the oldest rows for that activation instance are trimmed during log
+flushing.
+
+```shell
+# Keep at most 500,000 lines per activation instance
+export EDA_MAX_LOG_LINES_PER_INSTANCE=500000
+
+# Disable the per-instance line cap
+export EDA_MAX_LOG_LINES_PER_INSTANCE=0
+```
+
+This setting is separate from `EDA_ACTIVATION_DB_LOG_RETENTION_DAYS`, which
+controls age-based log purging.
+
 #### Configure TLS Certificate Verification
 
 EDA enforces TLS certificate verification by default for both JWT key

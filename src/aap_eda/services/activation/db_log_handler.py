@@ -107,7 +107,7 @@ class DBLogger(LogHandler):
         self._enforce_max_log_lines()
 
     def _enforce_max_log_lines(self) -> None:
-        max_lines = int(settings.EDA_MAX_LOG_LINES_PER_INSTANCE)
+        max_lines = int(settings.MAX_LOG_LINES_PER_INSTANCE)
         if max_lines <= 0:
             return
 

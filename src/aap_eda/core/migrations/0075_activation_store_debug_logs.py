@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0073_activation_k8s_pod_tolerations"),
+        ("core", "0074_awxtoken_ck_awx_token_name_not_empty_and_more"),
     ]
 
     operations = [

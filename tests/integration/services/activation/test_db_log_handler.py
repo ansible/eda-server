@@ -23,7 +23,7 @@ from aap_eda.services.activation.db_log_handler import DBLogger
 @pytest.mark.django_db
 def test_enforce_max_log_lines_trims_oldest(default_activation_instance):
     """Oldest rows are deleted when count exceeds cap."""
-    with patch("django.conf.settings.EDA_MAX_LOG_LINES_PER_INSTANCE", 5):
+    with patch("django.conf.settings.MAX_LOG_LINES_PER_INSTANCE", 5):
         obj = DBLogger(default_activation_instance.id)
         for i in range(1000):
             obj.write(f"line-{i:04d}")  # noqa: E231
@@ -46,7 +46,7 @@ def test_enforce_max_log_lines_disabled_when_zero(
     default_activation_instance,
 ):
     """Setting=0 means no cap; all lines are kept."""
-    with patch("django.conf.settings.EDA_MAX_LOG_LINES_PER_INSTANCE", 0):
+    with patch("django.conf.settings.MAX_LOG_LINES_PER_INSTANCE", 0):
         obj = DBLogger(default_activation_instance.id)
         for i in range(1000):
             obj.write(f"line-{i}")
@@ -61,7 +61,7 @@ def test_enforce_max_log_lines_disabled_when_zero(
 @pytest.mark.django_db
 def test_enforce_max_log_lines_check_interval(default_activation_instance):
     """Trimming fires on every flush when cap is exceeded."""
-    with patch("django.conf.settings.EDA_MAX_LOG_LINES_PER_INSTANCE", 5):
+    with patch("django.conf.settings.MAX_LOG_LINES_PER_INSTANCE", 5):
         obj = DBLogger(default_activation_instance.id)
         for i in range(999):
             obj.write(f"line-{i}")
@@ -78,7 +78,7 @@ def test_enforce_max_log_lines_fires_across_instances(
     default_activation_instance,
 ):
     """Trimming works correctly across separate DBLogger instances."""
-    with patch("django.conf.settings.EDA_MAX_LOG_LINES_PER_INSTANCE", 10):
+    with patch("django.conf.settings.MAX_LOG_LINES_PER_INSTANCE", 10):
         # First poll cycle - write 7 lines
         obj1 = DBLogger(default_activation_instance.id)
         for i in range(7):

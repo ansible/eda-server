@@ -67,3 +67,21 @@ def test_import_from_yaml():
     importlib.reload(default)
     importlib.reload(conf)
     assert conf.settings.SECRET_KEY == dev_sec_key
+
+
+def test_max_log_lines_environment_override():
+    setting_name = "EDA_MAX_LOG_LINES_PER_INSTANCE"
+    original_value = os.environ.get(setting_name)
+
+    try:
+        os.environ[setting_name] = "7"
+        importlib.reload(default)
+        importlib.reload(conf)
+        assert conf.settings.MAX_LOG_LINES_PER_INSTANCE == 7
+    finally:
+        if original_value is None:
+            os.environ.pop(setting_name, None)
+        else:
+            os.environ[setting_name] = original_value
+        importlib.reload(default)
+        importlib.reload(conf)
