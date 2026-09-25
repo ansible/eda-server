@@ -191,6 +191,11 @@ ANSIBLE_RULEBOOK_FLUSH_AFTER: int = 100
 # ---------------------------------------------------------
 ACTIVATION_DB_LOG_RETENTION_DAYS: int = 0
 
+# Maximum log lines kept per activation instance (0 = unlimited).
+# Oldest rows are trimmed after each 1,000 newly stored lines. The cap may
+# temporarily be exceeded by up to 999 stored lines.
+MAX_LOG_LINES_PER_INSTANCE: int = 500_000
+
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE JWT SETTINGS
 # ---------------------------------------------------------

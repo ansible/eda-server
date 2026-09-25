@@ -143,6 +143,13 @@ class Activation(
         choices=RulebookProcessLogLevel.choices(),
         default=get_default_log_level,
     )
+    store_debug_logs = models.BooleanField(
+        default=False,
+        help_text=(
+            "When false (default), DEBUG-level log lines are sent to "
+            "container stdout but not stored in the database."
+        ),
+    )
     eda_credentials = models.ManyToManyField(
         "EdaCredential", related_name="activations", default=None
     )

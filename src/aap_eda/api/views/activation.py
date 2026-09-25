@@ -28,6 +28,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import exceptions, mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
@@ -37,6 +38,12 @@ from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
 from aap_eda.core.health import check_dispatcherd_workers_health
 from aap_eda.core.utils import logging_utils
+from aap_eda.core.utils.delete_log_util import (
+    delete_all_logs,
+    delete_logs_for_activation,
+    delete_logs_for_activation_instance,
+    delete_logs_older_than,
+)
 from aap_eda.tasks.orchestrator import (
     delete_rulebook_process,
     restart_rulebook_process,
@@ -678,6 +685,41 @@ class ActivationViewSet(
             status=status.HTTP_201_CREATED,
         )
 
+    @extend_schema(
+        request=serializers.LogPurgeRequestSerializer,
+        responses={
+            status.HTTP_200_OK: serializers.LogPurgeResponseSerializer,
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                None, description="Activation not found."
+            ),
+        },
+    )
+    @action(
+        methods=["post"],
+        detail=True,
+        rbac_action=Action.DELETE,
+        url_path="clear-logs",
+    )
+    def clear_logs(self, request, pk):
+        activation = self.get_object()
+        request_serializer = serializers.LogPurgeRequestSerializer(
+            data=request.data,
+        )
+        request_serializer.is_valid(raise_exception=True)
+        before_date = request_serializer.validated_data.get("before_date")
+
+        if before_date:
+            deleted = delete_logs_older_than(
+                before_date, activation_id=activation.id
+            )
+        else:
+            deleted = delete_logs_for_activation(activation.id)
+
+        return Response(
+            serializers.LogPurgeResponseSerializer({"deleted": deleted}).data,
+            status=status.HTTP_200_OK,
+        )
+
     def _sync_project_if_needed(
         self, activation: models.Activation
     ) -> Response | None:
@@ -806,6 +848,7 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
+    ordering_fields = None
     rbac_action = None
 
     def filter_queryset(self, queryset):
@@ -816,9 +859,48 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
         return super().filter_queryset(queryset)
 
     @extend_schema(
+        request=serializers.LogPurgeRequestSerializer,
+        responses={
+            status.HTTP_200_OK: serializers.LogPurgeResponseSerializer,
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                None, description="Activation Instance not found."
+            ),
+        },
+    )
+    @action(
+        methods=["post"],
+        detail=True,
+        rbac_action=None,
+        url_path="clear-logs",
+    )
+    def clear_logs(self, request, pk):
+        instance = self.get_object()
+        activation = instance.activation
+        if not request.user.has_obj_perm(activation, "delete"):
+            raise exceptions.PermissionDenied(
+                "You do not have permission to clear logs for this activation."
+            )
+
+        request_serializer = serializers.LogPurgeRequestSerializer(
+            data=request.data,
+        )
+        request_serializer.is_valid(raise_exception=True)
+        before_date = request_serializer.validated_data.get("before_date")
+        deleted = delete_logs_for_activation_instance(
+            instance.id,
+            cutoff=before_date,
+        )
+
+        return Response(
+            serializers.LogPurgeResponseSerializer({"deleted": deleted}).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
         description=(
             "List Activation instance logs. "
-            "Results are paginated with a maximum page_size of 5000."
+            "Results are paginated with a maximum page_size of 5000. "
+            "Use the ordering query parameter with id or -id."
         ),
         request=None,
         responses={
@@ -846,7 +928,9 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
     @action(
         detail=False,
         queryset=models.RulebookProcessLog.objects.order_by("id"),
+        filter_backends=(defaultfilters.DjangoFilterBackend, OrderingFilter),
         filterset_class=filters.ActivationInstanceLogFilter,
+        ordering_fields=["id"],
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/logs",
         pagination_class=LogPagination,
@@ -874,3 +958,37 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
             results, many=True
         )
         return self.get_paginated_response(serializer.data)
+
+
+class LogPurgeViewSet(viewsets.ViewSet):
+    """Global log purge endpoint (admin only)."""
+
+    @extend_schema(
+        request=serializers.LogPurgeRequestSerializer,
+        responses={
+            status.HTTP_200_OK: serializers.LogPurgeResponseSerializer,
+        },
+    )
+    @action(
+        methods=["post"],
+        detail=False,
+        url_path="purge",
+    )
+    def purge(self, request):
+        if not request.user.is_superuser:
+            raise exceptions.PermissionDenied(
+                "Only administrators can purge all logs."
+            )
+
+        request_serializer = serializers.LogPurgeRequestSerializer(
+            data=request.data,
+        )
+        request_serializer.is_valid(raise_exception=True)
+        before_date = request_serializer.validated_data.get("before_date")
+
+        deleted = delete_all_logs(cutoff=before_date)
+
+        return Response(
+            serializers.LogPurgeResponseSerializer({"deleted": deleted}).data,
+            status=status.HTTP_200_OK,
+        )

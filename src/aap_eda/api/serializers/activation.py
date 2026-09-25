@@ -486,6 +486,7 @@ class ActivationListSerializer(
             "status_message",
             "awx_token_id",
             "log_level",
+            "store_debug_logs",
             "eda_credentials",
             "k8s_service_name",
             "event_streams",
@@ -558,6 +559,7 @@ class ActivationListSerializer(
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
             "log_level": activation.log_level,
+            "store_debug_logs": activation.store_debug_logs,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
             "event_streams": event_streams,
@@ -601,6 +603,7 @@ class ActivationCreateSerializer(
             "restart_policy",
             "awx_token_id",
             "log_level",
+            "store_debug_logs",
             "eda_credentials",
             "k8s_service_name",
             "source_mappings",
@@ -788,6 +791,7 @@ class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
             "restart_policy": activation.restart_policy,
             "awx_token_id": activation.awx_token,
             "log_level": activation.log_level,
+            "store_debug_logs": activation.store_debug_logs,
             "eda_credentials": activation.eda_credentials.all(),
             "k8s_service_name": k8s_service_name,
             "source_mappings": source_mappings,
@@ -846,6 +850,7 @@ class ActivationUpdateSerializer(
             "restart_policy",
             "awx_token_id",
             "log_level",
+            "store_debug_logs",
             "eda_credentials",
             "k8s_service_name",
             "source_mappings",
@@ -1200,6 +1205,7 @@ class ActivationReadSerializer(
             "awx_token_id",
             "eda_credentials",
             "log_level",
+            "store_debug_logs",
             "k8s_service_name",
             "k8s_pod_service_account_name",
             "k8s_pod_labels",
@@ -1342,6 +1348,7 @@ class ActivationReadSerializer(
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
             "log_level": activation.log_level,
+            "store_debug_logs": activation.store_debug_logs,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
             **_activation_k8s_pod_metadata_payload(activation),
@@ -1859,3 +1866,22 @@ def _validate_persistence_credential(data: dict) -> None:
             f"'{settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME}' "
             "could not be found. Contact your system administrator."
         )
+
+
+class LogPurgeRequestSerializer(serializers.Serializer):
+    """Serializer for log purge request body."""
+
+    before_date = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+        help_text="Delete logs older than this date. "
+        "If omitted, all logs are deleted.",
+    )
+
+
+class LogPurgeResponseSerializer(serializers.Serializer):
+    """Serializer for log purge response."""
+
+    deleted = serializers.IntegerField(
+        help_text="Number of log records deleted.",
+    )
