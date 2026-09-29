@@ -692,6 +692,10 @@ class ActivationViewSet(
             status.HTTP_404_NOT_FOUND: OpenApiResponse(
                 None, description="Activation not found."
             ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None,
+                description="Requires delete permission on the activation.",
+            ),
         },
     )
     @action(
@@ -865,6 +869,12 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
             status.HTTP_404_NOT_FOUND: OpenApiResponse(
                 None, description="Activation Instance not found."
             ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None,
+                description=(
+                    "Requires delete permission on the parent activation."
+                ),
+            ),
         },
     )
     @action(
@@ -967,6 +977,9 @@ class LogPurgeViewSet(viewsets.ViewSet):
         request=serializers.LogPurgeRequestSerializer,
         responses={
             status.HTTP_200_OK: serializers.LogPurgeResponseSerializer,
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None, description="Only superusers can purge all logs."
+            ),
         },
     )
     @action(
