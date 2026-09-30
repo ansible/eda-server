@@ -26,6 +26,7 @@ from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import enums, models, validators
 from aap_eda.core.utils.credentials import (
+    get_secret_fields,
     inputs_from_store,
     inputs_to_display,
     validate_inputs,
@@ -140,10 +141,6 @@ class EdaCredentialCopySerializer(CleanTextMixin, serializers.ModelSerializer):
 class EdaCredentialCreateSerializer(
     CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
-    # inputs holds arbitrary secret credential values, so it is excluded
-    # from free-text checks.
-    excluded_fields = frozenset({"inputs"})
-
     credential_type_id = serializers.IntegerField(
         required=True,
         allow_null=False,
@@ -159,6 +156,14 @@ class EdaCredentialCreateSerializer(
         credential_type = models.CredentialType.objects.get(
             id=data.get("credential_type_id")
         )
+
+        # Only secret sub-keys inside `inputs` are excluded from
+        # CleanTextMixin free-text checks; non-secret sub-keys
+        # (e.g. host, username) are validated normally.
+        secret_keys = get_secret_fields(credential_type.inputs)
+        self.excluded_json_keys = {
+            "inputs": frozenset(secret_keys),
+        }
 
         # Analytics only allows one credential
         if (
@@ -204,14 +209,19 @@ class EdaCredentialCreateSerializer(
 class EdaCredentialUpdateSerializer(
     CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
 ):
-    # inputs holds arbitrary secret credential values, so it is excluded
-    # from free-text checks.
-    excluded_fields = frozenset({"inputs"})
-
     inputs = serializers.JSONField()
 
     def validate(self, data):
         credential_type = self.instance.credential_type
+
+        # Only secret sub-keys inside `inputs` are excluded from
+        # CleanTextMixin free-text checks; non-secret sub-keys
+        # (e.g. host, username) are validated normally.
+        secret_keys = get_secret_fields(credential_type.inputs)
+        self.excluded_json_keys = {
+            "inputs": frozenset(secret_keys),
+        }
+
         try:
             old_inputs = inputs_from_store(
                 self.instance.inputs.get_secret_value()
