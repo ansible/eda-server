@@ -17,7 +17,7 @@
 from aap_eda.api.openapi import inject_clean_text_pattern_components
 
 
-def test_inject_clean_text_pattern_components_documents_credential_type_inputs():
+def test_inject_clean_text_documents_credential_type_inputs():
     result = {
         "components": {
             "schemas": {

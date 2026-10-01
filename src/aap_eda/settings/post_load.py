@@ -207,7 +207,7 @@ def _get_spectacular_settings(settings: Dynaconf) -> dict:
             "aap_eda.api.openapi.preprocess_filter_api_routes"
         ],
         "POSTPROCESSING_HOOKS": [
-            # Retain spectacular default; setting this list replaces it entirely.
+            # Retain spectacular default; this list replaces it entirely.
             "drf_spectacular.hooks.postprocess_schema_enums",
             "aap_eda.api.openapi.inject_clean_text_pattern_components",
         ],
