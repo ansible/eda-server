@@ -287,13 +287,13 @@ class TestToRepresentation:
         return result, mock_inject
 
     def test_dict_inputs_calls_inject(self):
-        """Dict inputs trigger inject_patterns_into_field_list."""
+        """Dict inputs trigger inject for fields and metadata."""
         inputs = {"fields": [{"id": "x", "type": "string"}]}
         result, mock_inject = self._make_and_call(inputs)
-        mock_inject.assert_called_once()
-        # inject receives a list with identical content (shallow copy).
-        called_fields = mock_inject.call_args[0][0]
-        assert called_fields == inputs["fields"]
+        # Called for fields[] and metadata[] (None when absent; no-op).
+        assert mock_inject.call_count == 2
+        assert mock_inject.call_args_list[0].args[0] == inputs["fields"]
+        assert mock_inject.call_args_list[1].args[0] is None
 
     def test_non_dict_inputs_skips(self):
         """When inputs is None, skip injection."""

@@ -19,24 +19,30 @@ _INPUTS_DESCRIPTION_NOTE = (
 
 
 def _credential_type_inputs_openapi_schema(existing_inputs_prop=None):
-    """OpenAPI schema for CredentialType.inputs (field catalog JSON)."""
-    existing_inputs_prop = existing_inputs_prop if isinstance(existing_inputs_prop, dict) else {}
+    """Return OpenAPI schema for CredentialType.inputs (field catalog JSON)."""
+    if not isinstance(existing_inputs_prop, dict):
+        existing_inputs_prop = {}
     base_description = existing_inputs_prop.get("description") or (
-        "Credential type input schema: fields[], optional metadata[], and required ids."
+        "Credential type input schema: fields[], optional "
+        "metadata[], and required ids."
     )
     description = (
         base_description
         if _INPUTS_DESCRIPTION_NOTE in base_description
         else f"{base_description} {_INPUTS_DESCRIPTION_NOTE}".strip()
     )
-    field_item_ref = {"$ref": "#/components/schemas/CleanTextNestedStringField"}
+    field_item_ref = {
+        "$ref": "#/components/schemas/CleanTextNestedStringField",
+    }
     return {
         "type": "object",
         "description": description,
         "properties": {
             "fields": {
                 "type": "array",
-                "description": "Input field catalog. Dynamic per credential type.",
+                "description": (
+                    "Input field catalog. Dynamic per credential type."
+                ),
                 "items": field_item_ref,
             },
             "required": {
@@ -47,8 +53,8 @@ def _credential_type_inputs_openapi_schema(existing_inputs_prop=None):
             "metadata": {
                 "type": "array",
                 "description": (
-                    "Optional. Present on some external-secret credential types; "
-                    "same item shape as fields[]."
+                    "Optional. Present on some external-secret "
+                    "credential types; same item shape as fields[]."
                 ),
                 "items": field_item_ref,
             },
@@ -57,17 +63,23 @@ def _credential_type_inputs_openapi_schema(existing_inputs_prop=None):
     }
 
 
-def inject_clean_text_pattern_components(result, generator, request, public):  # noqa: ARG001
+def inject_clean_text_pattern_components(
+    result,
+    generator,
+    request,
+    public,
+):  # noqa: ARG001
     """Register DAB CleanText components and document CredentialType.inputs."""
     try:
         from ansible_base.api_documentation.clean_text_schema_hooks import (
             inject_clean_text_pattern_components as _dab_inject,
         )
     except ImportError:  # pragma: no cover - older DAB without shared schemas
-        _dab_inject = None
+        # Avoid emitting $ref to CleanTextNestedStringField when DAB cannot
+        # register the shared component.
+        return result
 
-    if _dab_inject is not None:
-        result = _dab_inject(result, generator, request, public)
+    result = _dab_inject(result, generator, request, public)
 
     schemas = result.get("components", {}).get("schemas", {})
     for schema_name in _CREDENTIAL_TYPE_SCHEMAS_WITH_INPUTS:
@@ -75,7 +87,9 @@ def inject_clean_text_pattern_components(result, generator, request, public):  #
         if not isinstance(schema, dict):
             continue
         props = schema.setdefault("properties", {})
-        props["inputs"] = _credential_type_inputs_openapi_schema(props.get("inputs"))
+        props["inputs"] = _credential_type_inputs_openapi_schema(
+            props.get("inputs")
+        )
 
     return result
 
