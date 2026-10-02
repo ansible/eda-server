@@ -25,6 +25,8 @@ import yaml
 from django.conf import settings
 from django.core import exceptions
 
+from ansible_base.lib.utils.bulk_validation_audit import audited_queryset_update
+
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.core.types import StrPath
@@ -205,8 +207,9 @@ class ProjectImportService:
     ):
         new_sha256 = get_rulebook_hash(rulebook_info.raw_content)
         if rulebook.rulesets_sha256 == new_sha256:
-            models.Activation.objects.filter(rulebook=rulebook).update(
-                git_hash=git_hash
+            audited_queryset_update(
+                models.Activation.objects.filter(rulebook=rulebook),
+                git_hash=git_hash,
             )
             return
         old_rulesets = rulebook.rulesets
@@ -245,11 +248,12 @@ class ProjectImportService:
         source_mappings are handled entirely by
         _auto_restart_activations() and are not touched here.
         """
-        models.Activation.objects.filter(
-            rulebook=rulebook,
-            restart_on_project_update=False,
-            source_mappings="",
-        ).update(
+        audited_queryset_update(
+            models.Activation.objects.filter(
+                rulebook=rulebook,
+                restart_on_project_update=False,
+                source_mappings="",
+            ),
             rulebook_rulesets=rulebook.rulesets,
             rulebook_rulesets_sha256=new_sha256,
             git_hash=git_hash,
