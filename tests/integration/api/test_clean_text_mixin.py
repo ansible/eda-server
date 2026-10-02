@@ -907,11 +907,13 @@ class TestExcludedFieldsCleanText:
         )
         assert serializer.is_valid(), serializer.errors
 
-    def test_eda_credential_inputs_excluded(
+    def test_eda_credential_secret_input_excluded_on_create(
         self,
         default_organization: models.Organization,
         preseed_credential_types,
     ):
+        """Secret sub-keys inside credential inputs (e.g. password)
+        must bypass CleanTextMixin validation."""
         registry_type = models.CredentialType.objects.get(
             name=enums.DefaultCredentialType.REGISTRY
         )
@@ -927,6 +929,71 @@ class TestExcludedFieldsCleanText:
             }
         )
         assert serializer.is_valid(), serializer.errors
+
+    def test_eda_credential_non_secret_input_rejected_on_create(
+        self,
+        default_organization: models.Organization,
+        preseed_credential_types,
+    ):
+        """Non-secret sub-keys inside credential inputs (e.g.
+        username) must be validated by CleanTextMixin."""
+        registry_type = models.CredentialType.objects.get(
+            name=enums.DefaultCredentialType.REGISTRY
+        )
+        serializer = EdaCredentialCreateSerializer(
+            data={
+                "name": VALID_NAME,
+                "credential_type_id": registry_type.id,
+                "inputs": {
+                    "username": DANGEROUS_TEXT,
+                    "password": "dummy-password",
+                },
+                "organization_id": default_organization.id,
+            }
+        )
+        assert not serializer.is_valid()
+        assert "inputs" in serializer.errors
+
+    def test_eda_credential_secret_input_excluded_on_update(
+        self,
+        default_registry_credential: models.EdaCredential,
+    ):
+        """Secret sub-keys inside credential inputs must bypass
+        CleanTextMixin validation during updates."""
+        serializer = EdaCredentialUpdateSerializer(
+            instance=default_registry_credential,
+            data={
+                "inputs": {
+                    "username": "dummy-user",
+                    "password": DANGEROUS_TEXT,
+                    "host": "quay.io",
+                    "verify_ssl": False,
+                },
+            },
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+
+    def test_eda_credential_non_secret_input_rejected_on_update(
+        self,
+        default_registry_credential: models.EdaCredential,
+    ):
+        """Non-secret sub-keys inside credential inputs must be
+        validated by CleanTextMixin during updates."""
+        serializer = EdaCredentialUpdateSerializer(
+            instance=default_registry_credential,
+            data={
+                "inputs": {
+                    "username": DANGEROUS_TEXT,
+                    "password": "dummy-password",
+                    "host": "quay.io",
+                    "verify_ssl": False,
+                },
+            },
+            partial=True,
+        )
+        assert not serializer.is_valid()
+        assert "inputs" in serializer.errors
 
     def test_awx_token_excluded(self, default_user: models.User):
         serializer = AwxTokenCreateSerializer(
