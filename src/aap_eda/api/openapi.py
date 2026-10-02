@@ -1,3 +1,6 @@
+from ansible_base.api_documentation.clean_text_schema_hooks import (
+    inject_clean_text_pattern_components as _dab_inject,
+)
 from django.conf import settings
 from drf_spectacular.authentication import SessionScheme as _SessionScheme
 
@@ -70,15 +73,6 @@ def inject_clean_text_pattern_components(
     public,
 ):  # noqa: ARG001
     """Register DAB CleanText components and document CredentialType.inputs."""
-    try:
-        from ansible_base.api_documentation.clean_text_schema_hooks import (
-            inject_clean_text_pattern_components as _dab_inject,
-        )
-    except ImportError:  # pragma: no cover - older DAB without shared schemas
-        # Avoid emitting $ref to CleanTextNestedStringField when DAB cannot
-        # register the shared component.
-        return result
-
     result = _dab_inject(result, generator, request, public)
 
     schemas = result.get("components", {}).get("schemas", {})
