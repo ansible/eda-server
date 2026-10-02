@@ -295,6 +295,20 @@ class TestToRepresentation:
         assert mock_inject.call_args_list[0].args[0] == inputs["fields"]
         assert mock_inject.call_args_list[1].args[0] is None
 
+    def test_metadata_list_calls_inject(self):
+        """A present metadata list is copied, then passed to inject."""
+        metadata = [{"id": "become_method", "type": "string"}]
+        inputs = {
+            "fields": [{"id": "x", "type": "string"}],
+            "metadata": metadata,
+        }
+        result, mock_inject = self._make_and_call(inputs)
+        assert mock_inject.call_count == 2
+        passed = mock_inject.call_args_list[1].args[0]
+        assert passed == metadata
+        assert passed is not metadata
+        assert result["inputs"]["metadata"] is passed
+
     def test_non_dict_inputs_skips(self):
         """When inputs is None, skip injection."""
         result, mock_inject = self._make_and_call(None)
@@ -309,7 +323,13 @@ class TestToRepresentation:
         """to_representation must not mutate the model-owned inputs."""
         original_field = {"id": "host", "type": "string"}
         original_fields = [original_field]
-        original_inputs = {"fields": original_fields, "extra": "keep"}
+        original_meta = {"id": "become_method", "type": "string"}
+        original_metadata = [original_meta]
+        original_inputs = {
+            "fields": original_fields,
+            "metadata": original_metadata,
+            "extra": "keep",
+        }
 
         # Let inject_patterns_into_field_list actually mutate the
         # list it receives, simulating the real injection path.
@@ -348,10 +368,14 @@ class TestToRepresentation:
 
         # The response should carry the injected pattern.
         assert result["inputs"]["fields"][0]["pattern"] == "injected"
+        assert result["inputs"]["metadata"][0]["pattern"] == "injected"
         # The original model-owned objects must be untouched.
         assert "pattern" not in original_field
         assert original_fields[0] is original_field
         assert original_inputs["fields"] is original_fields
+        assert "pattern" not in original_meta
+        assert original_metadata[0] is original_meta
+        assert original_inputs["metadata"] is original_metadata
         # Extra keys survive the copy.
         assert result["inputs"]["extra"] == "keep"
 
