@@ -47,7 +47,8 @@ def free_text_pattern_metadata():
     """Return Tier 2 pattern keys for API clients."""
     return {
         "pattern": build_tier2_frontend_pattern(),
-        "pattern_description": TIER2_PATTERN_DESCRIPTION,
+        # camelCase to match DAB OPTIONS / OpenAPI (patternDescription).
+        "patternDescription": TIER2_PATTERN_DESCRIPTION,
         "flags": "i",
     }
 
