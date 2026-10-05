@@ -138,8 +138,31 @@ class EdaCredentialCopySerializer(CleanTextMixin, serializers.ModelSerializer):
         ]
 
 
+class _EncryptedInputsClassifyMixin:
+    """Reclassify ``inputs`` from text_fields to json_fields.
+
+    ``EncryptedTextField.get_internal_type()`` returns ``"TextField"``, so
+    ``CleanTextMixin._classify_fields`` puts ``inputs`` into text_fields.
+    Because the serializer declares ``inputs = serializers.JSONField()``,
+    the submitted value is a *dict*, which ``_validate_text_fields`` silently
+    skips (``not isinstance(value, str)``).  Moving it to json_fields lets
+    ``_validate_json_fields`` recurse into nested keys and honour
+    ``excluded_json_keys`` for secret sub-keys.
+    """
+
+    def _classify_fields(self, model):
+        text_fields, json_fields = super()._classify_fields(model)
+        if "inputs" in text_fields:
+            text_fields = [f for f in text_fields if f != "inputs"]
+            json_fields = [*json_fields, "inputs"]
+        return text_fields, json_fields
+
+
 class EdaCredentialCreateSerializer(
-    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
+    _EncryptedInputsClassifyMixin,
+    CleanTextMixin,
+    OrganizationIdFieldMixin,
+    serializers.ModelSerializer,
 ):
     credential_type_id = serializers.IntegerField(
         required=True,
@@ -207,7 +230,10 @@ class EdaCredentialCreateSerializer(
 
 
 class EdaCredentialUpdateSerializer(
-    CleanTextMixin, OrganizationIdFieldMixin, serializers.ModelSerializer
+    _EncryptedInputsClassifyMixin,
+    CleanTextMixin,
+    OrganizationIdFieldMixin,
+    serializers.ModelSerializer,
 ):
     inputs = serializers.JSONField()
 
