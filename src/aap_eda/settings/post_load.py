@@ -203,8 +203,23 @@ def _get_spectacular_settings(settings: Dynaconf) -> dict:
         "SCHEMA_PATH_PREFIX": f"/{settings.API_PREFIX}/v[0-9]",
         "SCHEMA_PATH_PREFIX_TRIM": True,
         "SERVERS": [{"url": f"/{settings.API_PREFIX}/v1"}],
+        "GET_LIB_DOC_EXCLUDES": (
+            "ansible_base.api_documentation.customizations."
+            "get_dab_lib_doc_excludes"
+        ),
         "PREPROCESSING_HOOKS": [
             "aap_eda.api.openapi.preprocess_filter_api_routes"
+        ],
+        "POSTPROCESSING_HOOKS": [
+            "drf_spectacular.hooks.postprocess_schema_enums",
+            (
+                "ansible_base.api_documentation.postprocessing_hooks."
+                "add_x_ai_description"
+            ),
+            (
+                "ansible_base.api_documentation.clean_text_schema_hooks."
+                "inject_clean_text_pattern_components"
+            ),
         ],
         "GENERIC_ADDITIONAL_PROPERTIES": "bool",
     }

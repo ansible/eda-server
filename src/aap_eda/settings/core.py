@@ -18,11 +18,6 @@
 # See https://cfpb.github.io/django-flags/
 ANALYTICS_FEATURE_FLAG_NAME = "FEATURE_EDA_ANALYTICS_ENABLED"
 
-ANSIBLE_BASE_APPS_EXCLUDE_VIEW_LIST = [
-    "ansible_base.api_documentation",
-]
-
-
 INSTALLED_APPS = [
     "daphne",
     # Django apps
@@ -39,7 +34,6 @@ INSTALLED_APPS = [
     "ansible_base.jwt_consumer",
     "ansible_base.rest_filters",
     "ansible_base.feature_flags",
-    "ansible_base.api_documentation",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
