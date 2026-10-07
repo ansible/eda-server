@@ -164,6 +164,8 @@ class EdaCredentialCreateSerializer(
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
 ):
+    """Create an EDA credential."""
+
     credential_type_id = serializers.IntegerField(
         required=True,
         allow_null=False,
@@ -235,6 +237,8 @@ class EdaCredentialUpdateSerializer(
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
 ):
+    """Update an EDA credential."""
+
     inputs = serializers.JSONField()
 
     def validate(self, data):
