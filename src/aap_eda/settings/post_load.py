@@ -220,6 +220,8 @@ def _get_spectacular_settings(settings: Dynaconf) -> dict:
                 "ansible_base.api_documentation.clean_text_schema_hooks."
                 "inject_clean_text_pattern_components"
             ),
+            "aap_eda.api.openapi.inject_clean_text_pattern_components",
+            "aap_eda.api.openapi.remove_optional_rule_engine_credential_id",
         ],
         "GENERIC_ADDITIONAL_PROPERTIES": "bool",
     }

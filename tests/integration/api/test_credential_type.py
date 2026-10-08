@@ -1276,7 +1276,7 @@ def test_eda_rule_engine_credential_validates_required_fields(
 
 @pytest.mark.django_db
 class TestCredentialTypeValidationPatterns:
-    """AAP-87587: pattern/pattern_description injection for JSON sub-keys."""
+    """AAP-87587: pattern/patternDescription injection for JSON sub-keys."""
 
     @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=True)
     def test_patterns_present_when_toggle_on(
@@ -1296,12 +1296,12 @@ class TestCredentialTypeValidationPatterns:
 
         username_field = fields_by_id["username"]
         assert username_field["pattern"] == expected_pattern
-        assert username_field["pattern_description"] == _TIER2_DESC
+        assert username_field["patternDescription"] == _TIER2_DESC
 
         # secret fields are excluded
         password_field = fields_by_id["password"]
         assert "pattern" not in password_field
-        assert "pattern_description" not in password_field
+        assert "patternDescription" not in password_field
 
     @override_settings(ENHANCED_INPUT_VALIDATION_ENABLED=False)
     def test_patterns_absent_when_toggle_off(
@@ -1316,7 +1316,7 @@ class TestCredentialTypeValidationPatterns:
 
         for field in response.data["inputs"]["fields"]:
             assert "pattern" not in field
-            assert "pattern_description" not in field
+            assert "patternDescription" not in field
 
 
 @pytest.mark.django_db

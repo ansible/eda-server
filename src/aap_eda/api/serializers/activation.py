@@ -451,6 +451,11 @@ class ActivationListSerializer(
         allow_null=True,
         child=EventStreamOutSerializer(),
     )
+    rule_engine_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        read_only=True,
+    )
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
     edited_by = BasicUserFieldSerializer()
@@ -1166,6 +1171,11 @@ class ActivationReadSerializer(
         allow_null=True,
         allow_blank=True,
         help_text="Log tracking ID of the activation",
+    )
+    rule_engine_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        read_only=True,
     )
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
