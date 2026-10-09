@@ -21,8 +21,17 @@ _INPUTS_DESCRIPTION_NOTE = (
 )
 
 
-def _credential_type_inputs_openapi_schema(existing_inputs_prop=None):
-    """Return OpenAPI schema for CredentialType.inputs (field catalog JSON)."""
+def _credential_type_inputs_openapi_schema(
+    existing_inputs_prop=None, *, include_structure
+):
+    """Return the OpenAPI schema for ``CredentialType.inputs``.
+
+    The read schema documents the conventional field-catalog structure. The
+    create and update schemas remain free-form JSON because
+    ``openapi-python-client`` generates a model for object schemas with
+    properties, which is incompatible with the dynamic credential-type input
+    dictionaries accepted by the API.
+    """
     if not isinstance(existing_inputs_prop, dict):
         existing_inputs_prop = {}
     base_description = existing_inputs_prop.get("description") or (
@@ -34,12 +43,29 @@ def _credential_type_inputs_openapi_schema(existing_inputs_prop=None):
         if _INPUTS_DESCRIPTION_NOTE in base_description
         else f"{base_description} {_INPUTS_DESCRIPTION_NOTE}".strip()
     )
+    schema = {
+        "description": description,
+        "additionalProperties": True,
+    }
+    if not include_structure:
+        schema["example"] = {
+            "fields": [
+                {
+                    "id": "username",
+                    "type": "string",
+                    "label": "Username",
+                }
+            ],
+            "required": ["username"],
+        }
+        return schema
+
     field_item_ref = {
         "$ref": "#/components/schemas/CleanTextNestedStringField",
     }
     return {
+        **schema,
         "type": "object",
-        "description": description,
         "properties": {
             "fields": {
                 "type": "array",
@@ -51,7 +77,9 @@ def _credential_type_inputs_openapi_schema(existing_inputs_prop=None):
             "required": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Optional list of field ids that are required.",
+                "description": (
+                    "Optional list of field ids that are required."
+                ),
             },
             "metadata": {
                 "type": "array",
@@ -62,7 +90,6 @@ def _credential_type_inputs_openapi_schema(existing_inputs_prop=None):
                 "items": field_item_ref,
             },
         },
-        "additionalProperties": True,
     }
 
 
@@ -82,7 +109,8 @@ def inject_clean_text_pattern_components(
             continue
         props = schema.setdefault("properties", {})
         props["inputs"] = _credential_type_inputs_openapi_schema(
-            props.get("inputs")
+            props.get("inputs"),
+            include_structure=schema_name == "CredentialType",
         )
 
     return result

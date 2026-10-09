@@ -63,6 +63,12 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
         return data
 
 
+# ``CredentialType.inputs`` is dynamic JSON. Its OpenAPI representation is
+# customized in ``aap_eda/api/openapi.py`` by
+# ``inject_clean_text_pattern_components`` so response schemas can document
+# the conventional field-catalog structure while create/update request
+# schemas remain free-form for generated API clients. Review that hook when
+# changing the public ``inputs`` structure.
 class CredentialTypeCreateSerializer(
     CleanTextMixin, serializers.ModelSerializer
 ):

@@ -36,6 +36,13 @@ def test_inject_clean_text_documents_credential_type_inputs():
                         },
                     },
                 },
+                "PatchedCredentialTypeCreate": {
+                    "properties": {
+                        "inputs": {
+                            "description": "Inputs of the credential type",
+                        },
+                    },
+                },
             },
         },
     }
@@ -58,7 +65,9 @@ def test_inject_clean_text_documents_credential_type_inputs():
     assert "patternDescription" in nested
     assert "normalize" not in nested
 
-    create_inputs = schemas["CredentialTypeCreate"]["properties"]["inputs"]
-    assert create_inputs["properties"]["fields"]["items"]["$ref"].endswith(
-        "CleanTextNestedStringField"
-    )
+    for schema_name in ("CredentialTypeCreate", "PatchedCredentialTypeCreate"):
+        request_inputs = schemas[schema_name]["properties"]["inputs"]
+        assert "type" not in request_inputs
+        assert "properties" not in request_inputs
+        assert request_inputs["additionalProperties"] is True
+        assert request_inputs["example"]["required"] == ["username"]
