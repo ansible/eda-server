@@ -111,3 +111,10 @@ def test_v1_openapi_credential_type_inputs_schema(admin_client):
         "CleanTextNestedStringField"
     )
     assert "metadata" in inputs["properties"]
+
+    for schema_name in ("CredentialTypeCreate", "PatchedCredentialTypeCreate"):
+        request_inputs = schemas[schema_name]["properties"]["inputs"]
+        assert "type" not in request_inputs
+        assert "properties" not in request_inputs
+        assert request_inputs["additionalProperties"] is True
+        assert request_inputs["example"]["required"] == ["username"]
