@@ -22,16 +22,22 @@ spec:
     tasks: "2h"
     finally: "1h"
   pipelineRef:
-    resolver: bundles
+    resolver: git
     params:
-      - name: name
-        value: aap-api-tests
-      - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/aap-api-tests:0.1@sha256:4ffd90162c6e1067d34fd0ec6c4809c6ea9e99853117621cb9f6809d2768bcd3
-      - name: kind
-        value: pipeline
-      - name: secret
-        value: quay-aap-ci-viewer
+      - name: org
+        value: ansible-automation-platform
+      - name: repo
+        value: aap-konflux-pipelines
+      - name: revision
+        value: rywillia/AAP-94453
+      - name: pathInRepo
+        value: pipelines/test/aap-api-tests/0.1/development/pipeline.yaml
+      - name: token
+        value: github-aap-pde-ci-bot-credentials-ansible-automation-platform
+      - name: tokenKey
+        value: password
+      - name: scmType
+        value: github
 
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
@@ -51,6 +57,17 @@ spec:
       value: "{{pull_request_number}}"
     - name: aap-dev-component-source-name
       value: "eda"
+
+    - name: git-resolver-org
+      value: ansible-automation-platform
+    - name: git-resolver-repo
+      value: aap-konflux-pipelines
+    - name: git-resolver-revision
+      value: rywillia/AAP-94453
+    - name: git-resolver-token-secret
+      value: github-aap-pde-ci-bot-credentials-ansible-automation-platform
+    - name: git-resolver-token-key
+      value: password
 
   workspaces:
     - name: workspace
