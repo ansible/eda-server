@@ -28,6 +28,12 @@ class CoreConfig(AppConfig):
     def ready(self):
         # make sure we apply DAB decorations in case they are not yet imported
         from aap_eda.api.views import dab_decorate  # noqa: F401
+        from aap_eda.core.utils.validation_bypass_observability import (
+            configure_validation_bypass_observability,
+        )
+
+        configure_validation_bypass_observability()
+        import aap_eda.api.serializers  # noqa: F401
 
         # Enable default dispatcher config. Workers may override this
         dispatcher_setup(settings.DISPATCHERD_DEFAULT_SETTINGS)
