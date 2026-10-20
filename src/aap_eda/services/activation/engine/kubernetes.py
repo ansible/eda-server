@@ -338,6 +338,11 @@ class Engine(ContainerEngine):
                 k8sclient.V1ContainerPort(container_port=port)
                 for port in self._get_ports(request.ports)
             ]
+        requests: dict = {}
+        if request.k8s_mem_request:
+            requests["memory"] = request.k8s_mem_request
+        if request.k8s_cpu_request:
+            requests["cpu"] = request.k8s_cpu_request
         limits: dict = {}
         if request.k8s_mem_limit:
             limits["memory"] = request.k8s_mem_limit
@@ -353,8 +358,11 @@ class Engine(ContainerEngine):
             ports=ports,
             command=[request.cmdline.command()],
             resources=(
-                k8sclient.V1ResourceRequirements(limits=limits)
-                if limits
+                k8sclient.V1ResourceRequirements(
+                    requests=requests or None,
+                    limits=limits or None,
+                )
+                if requests or limits
                 else None
             ),
         )

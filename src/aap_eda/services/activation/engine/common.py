@@ -131,6 +131,8 @@ class ContainerRequest(BaseModel):
     k8s_pod_annotations: tp.Optional[dict] = None
     k8s_pod_node_selector: tp.Optional[dict] = None
     k8s_pod_tolerations: tp.Optional[list[dict]] = None
+    k8s_mem_request: tp.Optional[str] = None
+    k8s_cpu_request: tp.Optional[str] = None
     k8s_mem_limit: tp.Optional[str] = None
     k8s_cpu_limit: tp.Optional[str] = None
     log_tracking_id: tp.Optional[str] = None
@@ -184,6 +186,8 @@ class ContainerableMixin:
             k8s_pod_annotations=self.k8s_pod_annotations or {},
             k8s_pod_node_selector=self.k8s_pod_node_selector or {},
             k8s_pod_tolerations=self.k8s_pod_tolerations or [],
+            k8s_mem_request=settings.K8S_MEM_REQUEST,
+            k8s_cpu_request=settings.K8S_CPU_REQUEST,
             k8s_mem_limit=settings.K8S_MEM_LIMIT,
             k8s_cpu_limit=settings.K8S_CPU_LIMIT,
             log_tracking_id=self.log_tracking_id,
