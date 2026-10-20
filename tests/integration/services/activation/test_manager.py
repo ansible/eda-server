@@ -35,6 +35,9 @@ from aap_eda.services.activation.engine.common import (
     ContainerEngine,
     ContainerRequest,
 )
+from aap_eda.services.activation.engine.kubernetes import (
+    Engine as KubernetesEngine,
+)
 from aap_eda.services.activation.status_manager import StatusManager
 
 
@@ -367,6 +370,7 @@ def test_start_first_run(
         activation_instance=basic_activation.latest_instance
     ).all()
     assert not any("The activation was edited at" in log.log for log in logs)
+    assert not any("Job started in namespace" in log.log for log in logs)
 
 
 @pytest.mark.django_db
@@ -454,6 +458,234 @@ def test_monitor_container_not_found(
     )
     activation_manager.monitor()
     assert running_activation.status == enums.ActivationStatus.FAILED
+
+
+@pytest.mark.parametrize(
+    "container_status",
+    [
+        enums.ActivationStatus.COMPLETED,
+        enums.ActivationStatus.FAILED,
+        enums.ActivationStatus.ERROR,
+    ],
+)
+@pytest.mark.django_db
+def test_monitor_cleanup_failure_preserves_job_for_retry(
+    running_activation: models.Activation,
+    container_status: enums.ActivationStatus,
+):
+    """Do not apply terminal policies when Job deletion is uncertain."""
+    engine = MagicMock(spec=KubernetesEngine)
+    engine.namespace = "new-ns"
+    engine.get_status.return_value = MagicMock(
+        status=container_status, message="container exited"
+    )
+    engine.cleanup.side_effect = engine_exceptions.ContainerCleanupError(
+        "cleanup failed"
+    )
+    process = running_activation.latest_instance
+    process.activation_job_namespace = "old-ns"
+    process.save(update_fields=["activation_job_namespace"])
+    manager = ActivationManager(running_activation, container_engine=engine)
+
+    with patch(SYSTEM_RESTART_PATH) as restart_mock:
+        with pytest.raises(exceptions.ActivationMonitorError) as exc:
+            manager.monitor()
+
+    assert isinstance(
+        exc.value.__cause__, engine_exceptions.ContainerCleanupError
+    )
+    running_activation.refresh_from_db()
+    process.refresh_from_db()
+    assert running_activation.status == enums.ActivationStatus.ERROR
+    assert "cleanup failed" in running_activation.status_message
+    assert process.status == enums.ActivationStatus.RUNNING
+    assert process.activation_pod_id == "test-pod-id"
+    assert engine.namespace == "new-ns"
+    engine.cleanup.assert_called_once()
+    restart_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "container_status",
+    [
+        enums.ActivationStatus.COMPLETED,
+        enums.ActivationStatus.FAILED,
+        enums.ActivationStatus.ERROR,
+    ],
+)
+@pytest.mark.django_db
+def test_monitor_terminal_status_after_cleanup(
+    running_activation: models.Activation,
+    container_status: enums.ActivationStatus,
+):
+    """Successful cleanup still applies the corresponding terminal policy."""
+    running_activation.restart_policy = enums.RestartPolicy.NEVER
+    running_activation.save(update_fields=["restart_policy"])
+    engine = MagicMock(spec=KubernetesEngine)
+    engine.namespace = "new-ns"
+    engine.get_status.return_value = MagicMock(
+        status=container_status, message="container exited"
+    )
+    manager = ActivationManager(running_activation, container_engine=engine)
+
+    if container_status == enums.ActivationStatus.ERROR:
+        with pytest.raises(exceptions.ActivationMonitorError):
+            manager.monitor()
+    else:
+        manager.monitor()
+
+    running_activation.refresh_from_db()
+    assert running_activation.status == container_status
+    assert running_activation.latest_instance.status == container_status
+    engine.cleanup.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("failure_count", "should_restart"),
+    [
+        (0, True),
+        (django_settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE, False),
+    ],
+)
+@pytest.mark.django_db
+def test_monitor_failed_job_cleans_up_once_with_restart_policy(
+    running_activation: models.Activation,
+    failure_count: int,
+    should_restart: bool,
+):
+    """Failed Jobs are not cleaned up again when applying restart policy."""
+    running_activation.restart_policy = enums.RestartPolicy.ON_FAILURE
+    running_activation.failure_count = failure_count
+    running_activation.save(update_fields=["restart_policy", "failure_count"])
+    engine = MagicMock(spec=KubernetesEngine)
+    engine.namespace = "new-ns"
+    engine.get_status.return_value = MagicMock(
+        status=enums.ActivationStatus.FAILED, message="container exited"
+    )
+    manager = ActivationManager(running_activation, container_engine=engine)
+
+    with patch(SYSTEM_RESTART_PATH) as restart_mock:
+        manager.monitor()
+
+    running_activation.refresh_from_db()
+    process = running_activation.latest_instance
+    process.refresh_from_db()
+    assert running_activation.status == enums.ActivationStatus.FAILED
+    assert process.status == enums.ActivationStatus.FAILED
+    assert process.activation_pod_id is None
+    assert running_activation.failure_count == failure_count + 1
+    engine.cleanup.assert_called_once()
+    if should_restart:
+        restart_delay = django_settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE
+        restart_mock.assert_called_once_with(
+            enums.ProcessParentType.ACTIVATION,
+            running_activation.id,
+            delay_seconds=restart_delay,
+        )
+    else:
+        restart_mock.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_error_instance_cleans_up_job_when_not_already_done(
+    running_activation: models.Activation,
+):
+    """Errors with a live Job clean up in the recorded namespace."""
+    process = running_activation.latest_instance
+    process.activation_job_namespace = "old-ns"
+    process.save(update_fields=["activation_job_namespace"])
+    engine = MagicMock(spec=KubernetesEngine)
+    engine.namespace = "new-ns"
+    namespaces = []
+    engine.cleanup.side_effect = lambda *_: namespaces.append(engine.namespace)
+    manager = ActivationManager(running_activation, container_engine=engine)
+
+    manager._error_instance("engine error")
+
+    process.refresh_from_db()
+    assert process.status == enums.ActivationStatus.ERROR
+    assert process.activation_pod_id is None
+    assert namespaces == ["old-ns"]
+    assert engine.namespace == "new-ns"
+    engine.cleanup.assert_called_once()
+    assert engine.cleanup.call_args.args[0] == "test-pod-id"
+
+
+@pytest.mark.django_db
+def test_monitor_disabled_cleanup_failure_maps_to_monitor_error(
+    running_activation: models.Activation,
+):
+    running_activation.is_enabled = False
+    running_activation.save(update_fields=["is_enabled"])
+    engine = MagicMock(spec=KubernetesEngine)
+    engine.namespace = "new-ns"
+    engine.cleanup.side_effect = engine_exceptions.ContainerCleanupError(
+        "cleanup failed"
+    )
+    manager = ActivationManager(running_activation, container_engine=engine)
+
+    with pytest.raises(exceptions.ActivationMonitorError) as exc:
+        manager.monitor()
+
+    assert isinstance(exc.value.__cause__, exceptions.ActivationStopError)
+    running_activation.refresh_from_db()
+    assert running_activation.status == enums.ActivationStatus.ERROR
+    assert running_activation.latest_instance.status == (
+        enums.ActivationStatus.STOPPING
+    )
+    assert (
+        running_activation.latest_instance.activation_pod_id == "test-pod-id"
+    )
+
+
+@pytest.mark.django_db
+def test_start_cleanup_failure_blocks_replacement(
+    running_activation: models.Activation,
+    preseed_credential_types,
+):
+    running_activation.status = enums.ActivationStatus.STOPPED
+    running_activation.save(update_fields=["status"])
+    engine = MagicMock(spec=KubernetesEngine)
+    engine.namespace = "new-ns"
+    engine.get_status.return_value = MagicMock(
+        status=enums.ActivationStatus.STOPPED
+    )
+    engine.cleanup.side_effect = engine_exceptions.ContainerCleanupError(
+        "cleanup failed"
+    )
+    process = running_activation.latest_instance
+    process.activation_job_namespace = "old-ns"
+    process.save(update_fields=["activation_job_namespace"])
+    manager = ActivationManager(running_activation, container_engine=engine)
+
+    with pytest.raises(exceptions.ActivationStartError) as exc:
+        manager.start()
+
+    assert isinstance(
+        exc.value.__cause__, engine_exceptions.ContainerCleanupError
+    )
+    running_activation.refresh_from_db()
+    process.refresh_from_db()
+    assert running_activation.status == enums.ActivationStatus.ERROR
+    assert process.status == enums.ActivationStatus.RUNNING
+    assert process.activation_pod_id == "test-pod-id"
+    assert (
+        models.RulebookProcess.objects.filter(
+            activation=running_activation
+        ).count()
+        == 1
+    )
+    assert engine.namespace == "new-ns"
+    engine.start.assert_not_called()
+
+    engine.cleanup.side_effect = None
+    engine.start.return_value = "replacement-pod-id"
+    manager.start()
+
+    process.refresh_from_db()
+    assert process.status == enums.ActivationStatus.STOPPED
+    assert running_activation.latest_instance.id != process.id
+    engine.start.assert_called_once()
 
 
 @pytest.mark.django_db
@@ -1110,6 +1342,37 @@ def test_handle_unresponsive_activation_reraises_cleanup_error(
 
 
 @pytest.mark.django_db
+def test_handle_unresponsive_kubernetes_cleanup_failure_preserves_job(
+    starting_activation: models.Activation,
+):
+    """Failed Job cleanup keeps the process available for a later retry."""
+    activation = starting_activation
+    process = activation.latest_instance
+    process.activation_job_namespace = "old-ns"
+    process.save(update_fields=["activation_job_namespace"])
+    engine = MagicMock(spec=KubernetesEngine)
+    engine.namespace = "new-ns"
+    engine.cleanup.side_effect = engine_exceptions.ContainerCleanupError(
+        "cleanup failed"
+    )
+    manager = ActivationManager(activation, container_engine=engine)
+
+    with pytest.raises(engine_exceptions.ContainerCleanupError):
+        manager._handle_unresponsive_activation(check_type="Readiness")
+
+    activation.refresh_from_db()
+    process.refresh_from_db()
+    assert activation.status == enums.ActivationStatus.ERROR
+    assert "cleanup failed" in activation.status_message
+    assert process.status == enums.ActivationStatus.STARTING
+    assert process.activation_pod_id == "test-pod-id"
+    assert process.activation_job_namespace == "old-ns"
+    assert engine.namespace == "new-ns"
+    engine.cleanup.assert_called_once()
+    assert engine.cleanup.call_args.args[0] == "test-pod-id"
+
+
+@pytest.mark.django_db
 def test_handle_unresponsive_activation_fails_instance_on_success(
     starting_activation: models.Activation,
     container_engine_mock: MagicMock,
@@ -1128,3 +1391,178 @@ def test_handle_unresponsive_activation_fails_instance_on_success(
     activation.refresh_from_db()
     assert activation.status == enums.ActivationStatus.FAILED
     assert "Liveness" in activation.status_message
+
+
+# --- Namespace-aware lifecycle tests ---
+
+
+@pytest.mark.django_db
+def test_create_activation_instance_records_k8s_namespace(
+    basic_activation: models.Activation,
+    settings: SettingsWrapper,
+):
+    """When engine is KubernetesEngine, namespace is recorded on process."""
+    override_settings = {
+        "WEBSOCKET_BASE_URL": "ws://localhost:8000",
+        "WEBSOCKET_SSL_VERIFY": "no",
+        "RULEBOOK_LIVENESS_CHECK_SECONDS": 73,
+    }
+    apply_settings(settings, **override_settings)
+
+    k8s_engine = MagicMock(spec=KubernetesEngine)
+    k8s_engine.namespace = "eda-activations"
+
+    manager = ActivationManager(
+        basic_activation,
+        container_engine=k8s_engine,
+    )
+    manager._create_activation_instance()
+
+    process = basic_activation.latest_instance
+    assert process is not None
+    assert process.activation_job_namespace == "eda-activations"
+
+
+@pytest.mark.parametrize(
+    ("has_previous_instance", "previous_namespace"),
+    [(False, None), (True, None), (True, "aap-eda")],
+)
+@pytest.mark.django_db
+def test_start_logs_k8s_namespace_with_activation_and_instance(
+    basic_activation: models.Activation,
+    preseed_credential_types,
+    has_previous_instance: bool,
+    previous_namespace: str | None,
+):
+    """Record the new Job's namespace and any known previous namespace."""
+    k8s_engine = MagicMock(spec=KubernetesEngine)
+    k8s_engine.namespace = "eda-activations"
+    k8s_engine.start.return_value = "activation-job"
+    previous_instance = None
+    if has_previous_instance:
+        previous_instance = models.RulebookProcess.objects.create(
+            name=basic_activation.name,
+            activation=basic_activation,
+            organization=basic_activation.organization,
+            status=enums.ActivationStatus.STOPPED,
+            activation_job_namespace=previous_namespace,
+        )
+
+    manager = ActivationManager(basic_activation, container_engine=k8s_engine)
+    manager.start()
+
+    process = basic_activation.latest_instance
+    assert process.activation_job_namespace == "eda-activations"
+    logs = models.RulebookProcessLog.objects.filter(
+        activation_instance=process,
+        log__contains="Job started in namespace",
+    )
+    expected_log = (
+        f"Activation {basic_activation.id} "
+        f"(name={basic_activation.name!r}), "
+        f"instance {process.id}: Job started in namespace 'eda-activations'"
+    )
+    if previous_namespace:
+        expected_log += (
+            f"; previous instance {previous_instance.id} recorded "
+            "Job namespace 'aap-eda'"
+        )
+    assert [log.log for log in logs] == [f"{expected_log}."]
+
+
+@pytest.mark.django_db
+def test_failed_k8s_start_does_not_log_job_started(
+    basic_activation: models.Activation,
+    preseed_credential_types,
+):
+    k8s_engine = MagicMock(spec=KubernetesEngine)
+    k8s_engine.namespace = "eda-activations"
+    k8s_engine.start.side_effect = engine_exceptions.ContainerStartError(
+        "job creation failed"
+    )
+
+    manager = ActivationManager(basic_activation, container_engine=k8s_engine)
+    with pytest.raises(exceptions.ActivationStartError):
+        manager.start()
+
+    assert not models.RulebookProcessLog.objects.filter(
+        activation_instance=basic_activation.latest_instance,
+        log__contains="Job started in namespace",
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_create_activation_instance_null_namespace_non_k8s(
+    basic_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    settings: SettingsWrapper,
+):
+    """Non-K8s engine leaves activation_job_namespace as None."""
+    override_settings = {
+        "WEBSOCKET_BASE_URL": "ws://localhost:8000",
+        "WEBSOCKET_SSL_VERIFY": "no",
+        "RULEBOOK_LIVENESS_CHECK_SECONDS": 73,
+    }
+    apply_settings(settings, **override_settings)
+
+    manager = ActivationManager(
+        basic_activation,
+        container_engine=container_engine_mock,
+    )
+    manager._create_activation_instance()
+
+    process = basic_activation.latest_instance
+    assert process is not None
+    assert process.activation_job_namespace is None
+
+
+@pytest.mark.django_db
+def test_cleanup_uses_instance_engine_namespace(
+    running_activation: models.Activation,
+):
+    """Cleanup targets the process's recorded namespace, not engine default."""
+    k8s_engine = MagicMock(spec=KubernetesEngine)
+    k8s_engine.namespace = "new-ns"
+
+    proc = running_activation.latest_instance
+    proc.activation_job_namespace = "old-ns"
+    proc.save(update_fields=["activation_job_namespace"])
+
+    namespace_during_cleanup = []
+
+    def capture_namespace(*args, **kwargs):
+        namespace_during_cleanup.append(k8s_engine.namespace)
+
+    k8s_engine.cleanup.side_effect = capture_namespace
+
+    manager = ActivationManager(
+        running_activation,
+        container_engine=k8s_engine,
+    )
+    manager._cleanup()
+
+    assert k8s_engine.namespace == "new-ns"
+    k8s_engine.cleanup.assert_called_once()
+    assert namespace_during_cleanup == ["old-ns"]
+
+
+@pytest.mark.django_db
+def test_cleanup_uses_engine_default_for_null_namespace(
+    running_activation: models.Activation,
+):
+    """Legacy process (null namespace) uses engine default for cleanup."""
+    k8s_engine = MagicMock(spec=KubernetesEngine)
+    k8s_engine.namespace = "current-ns"
+
+    proc = running_activation.latest_instance
+    proc.activation_job_namespace = None
+    proc.save(update_fields=["activation_job_namespace"])
+
+    manager = ActivationManager(
+        running_activation,
+        container_engine=k8s_engine,
+    )
+    manager._cleanup()
+
+    assert k8s_engine.namespace == "current-ns"
+    k8s_engine.cleanup.assert_called_once()

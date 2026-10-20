@@ -87,6 +87,16 @@ class ActivationStatus(DjangoStrEnum):
     WORKERS_OFFLINE = "workers offline"
 
 
+ACTIVATION_TERMINAL_STATUSES = frozenset(
+    {
+        ActivationStatus.STOPPED,
+        ActivationStatus.COMPLETED,
+        ActivationStatus.FAILED,
+        ActivationStatus.ERROR,
+    }
+)
+
+
 # TODO: Deprecated, will be removed in future version, use
 # DefaultCredentialType instead
 class CredentialType(DjangoStrEnum):
