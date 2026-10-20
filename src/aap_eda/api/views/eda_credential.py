@@ -86,6 +86,13 @@ class EdaCredentialViewSet(
     ordering_fields = ["name"]
     rbac_action = None
 
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.EdaCredentialCreateSerializer
+        if self.action == "partial_update":
+            return serializers.EdaCredentialUpdateSerializer
+        return serializers.EdaCredentialSerializer
+
     def filter_queryset(self, queryset):
         if queryset.model is models.EdaCredential:
             return super().filter_queryset(

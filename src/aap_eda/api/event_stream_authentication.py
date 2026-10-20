@@ -33,6 +33,7 @@ from rest_framework.exceptions import AuthenticationFailed
 
 from aap_eda.core.enums import SignatureEncodingType
 from aap_eda.core.utils.credentials import validate_x509_subject_match
+from aap_eda.core.utils.crypto import timing_safe_compare
 
 logger = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = 30
@@ -81,7 +82,7 @@ class HMACAuthentication(EventStreamAuthentication):
             logger.warning(message)
             raise AuthenticationFailed(message)
 
-        if not hmac.compare_digest(expected_signature, self.signature):
+        if not timing_safe_compare(expected_signature, self.signature):
             message = "Signature mismatch, check your payload and secret"
             logger.warning(message)
             raise AuthenticationFailed(message)
@@ -96,7 +97,7 @@ class TokenAuthentication(EventStreamAuthentication):
 
     def authenticate(self, _body=None):
         """Handle Token authentication."""
-        if self.token != _token_sans_bearer(self.value):
+        if not timing_safe_compare(self.token, _token_sans_bearer(self.value)):
             message = "Token mismatch, check your token"
             logger.warning(message)
             raise AuthenticationFailed(message)
@@ -152,9 +153,9 @@ class BasicAuthentication(EventStreamAuthentication):
         if self.authorization.startswith("Basic"):
             auth_str = self.authorization.split("Basic ")[1]
 
-        user_pass = f"{self.username}:{self.password}"
+        user_pass = "%s:%s" % (self.username, self.password)
         b64_value = base64.b64encode(user_pass.encode()).decode()
-        if auth_str != b64_value:
+        if not timing_safe_compare(auth_str, b64_value):
             message = "Credential mismatch"
             logger.warning(message)
             raise AuthenticationFailed(message)

@@ -18,7 +18,6 @@
 # See https://cfpb.github.io/django-flags/
 ANALYTICS_FEATURE_FLAG_NAME = "FEATURE_EDA_ANALYTICS_ENABLED"
 
-
 INSTALLED_APPS = [
     "daphne",
     # Django apps

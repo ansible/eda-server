@@ -38,6 +38,12 @@ class JobInstance(models.Model):
             models.Index(fields=["name"], name="ix_job_instance_name"),
             models.Index(fields=["uuid"], name="ix_job_instance_uuid"),
         ]
+        constraints = [
+            models.CheckConstraint(
+                check=~models.Q(name=""),
+                name="ck_job_instance_name_not_empty",
+            ),
+        ]
 
     uuid = models.UUIDField()
     action = models.TextField()

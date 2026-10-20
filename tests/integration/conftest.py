@@ -745,10 +745,12 @@ def default_activation_instance_logs(
             models.RulebookProcessLog(
                 log="activation-instance-log-1",
                 activation_instance=default_activation_instances[0],
+                log_timestamp=1000,
             ),
             models.RulebookProcessLog(
                 log="activation-instance-log-2",
                 activation_instance=default_activation_instances[0],
+                log_timestamp=2000,
             ),
         ]
     )

@@ -971,6 +971,7 @@ def assert_activation_base_data(
     assert data["created_at"] == activation.created_at
     assert data["modified_at"] <= activation.modified_at
     assert data["status_message"]
+    assert data["store_debug_logs"] == activation.store_debug_logs
 
 
 def assert_activation_related_object_fks(

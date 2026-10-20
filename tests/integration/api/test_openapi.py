@@ -39,6 +39,55 @@ def test_v1_openapi(admin_client, path):
 
 
 @pytest.mark.django_db
+def test_activation_instance_logs_schema_exposes_id_paging_and_ordering(
+    admin_client,
+):
+    response = admin_client.get(f"{api_url_v1}/openapi.json")
+    assert response.status_code == status.HTTP_200_OK
+
+    schema = response.json()
+    logs_path = next(
+        path
+        for path in schema["paths"]
+        if path.endswith("/activation-instances/{id}/logs/")
+    )
+    parameters = schema["paths"][logs_path]["get"]["parameters"]
+    parameter_names = {parameter["name"] for parameter in parameters}
+
+    assert {
+        "id__gt",
+        "id__lt",
+        "log",
+        "log_timestamp__gt",
+        "log_timestamp__lt",
+        "ordering",
+        "page",
+        "page_size",
+    } <= parameter_names
+
+    operation = schema["paths"][logs_path]["get"]
+    assert "id or -id" in operation["description"]
+
+
+@pytest.mark.django_db
+def test_activation_rule_engine_credential_id_is_optional_in_read_schemas(
+    admin_client,
+):
+    response = admin_client.get(f"{api_url_v1}/openapi.json")
+    assert response.status_code == status.HTTP_200_OK
+
+    schemas = response.json()["components"]["schemas"]
+    for schema_name in ("ActivationList", "ActivationRead"):
+        schema = schemas[schema_name]
+        assert "rule_engine_credential_id" not in schema.get("required", [])
+        assert schema["properties"]["rule_engine_credential_id"] == {
+            "type": "integer",
+            "nullable": True,
+            "readOnly": True,
+        }
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "path",
     [
@@ -50,3 +99,22 @@ def test_v1_openapi_ui(admin_client, path):
     response = admin_client.get(f"{api_url_v1}{path}")
     assert response.status_code == status.HTTP_200_OK
     assert OPENAPI_TITLE in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_v1_openapi_credential_type_inputs_schema(admin_client):
+    response = admin_client.get(f"{api_url_v1}/openapi.json")
+    assert response.status_code == status.HTTP_200_OK
+    schemas = response.json()["components"]["schemas"]
+    inputs = schemas["CredentialType"]["properties"]["inputs"]
+    assert inputs["properties"]["fields"]["items"]["$ref"].endswith(
+        "CleanTextNestedStringField"
+    )
+    assert "metadata" in inputs["properties"]
+
+    for schema_name in ("CredentialTypeCreate", "PatchedCredentialTypeCreate"):
+        request_inputs = schemas[schema_name]["properties"]["inputs"]
+        assert "type" not in request_inputs
+        assert "properties" not in request_inputs
+        assert request_inputs["additionalProperties"] is True
+        assert request_inputs["example"]["required"] == ["username"]

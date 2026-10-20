@@ -32,6 +32,7 @@ log_test_data = [
             "CRITICAL Event is critical",
             "FATAL Event is fatal",
             "ERROR MAY DAY MAY DAY, ansible-rulebook going down",
+            "INFO DEBUG mentioned",
         ],
         [
             ("INFO", "Hello from ansible-rulebook"),
@@ -40,6 +41,7 @@ log_test_data = [
             ("CRITICAL", "Event is critical"),
             ("CRITICAL", "Event is fatal"),
             ("ERROR", "MAY DAY MAY DAY, ansible-rulebook going down"),
+            ("INFO", "DEBUG mentioned"),
         ],
     ),
 ]
@@ -56,7 +58,9 @@ def test_logging(
     """Test that TeeSystemLogger writes to DB and log."""
     eda_log = caplog_factory(LOGGER, level=logging.DEBUG)
 
-    obj = TeeSystemLogger(default_activation_instance.id)
+    obj = TeeSystemLogger(
+        default_activation_instance.id, store_debug_logs=True
+    )
     for line in log_lines:
         obj.write(line)
     obj.flush()
@@ -70,6 +74,108 @@ def test_logging(
     assert RulebookProcessLog.objects.filter(
         activation_instance=default_activation_instance
     ).count() == len(expectations)
+
+
+@pytest.mark.django_db
+def test_debug_lines_excluded_from_db_by_default(
+    caplog_factory, default_activation_instance
+):
+    """With store_debug_logs=False, DEBUG lines go to stdout but not DB."""
+    eda_log = caplog_factory(LOGGER, level=logging.DEBUG)
+
+    obj = TeeSystemLogger(
+        default_activation_instance.id, store_debug_logs=False
+    )
+    lines = [
+        "DEBUG This is a debug message",
+        "[main] DEBUG This is a debug message",
+        "[debug] This is a debug message",
+        "INFO DEBUG mentioned",
+        "ERROR received DEBUG flag",
+    ]
+    for line in lines:
+        obj.write(line)
+    obj.flush()
+
+    assert len(eda_log.records) == len(lines)
+    assert [record.levelname for record in eda_log.records] == [
+        "DEBUG",
+        "DEBUG",
+        "DEBUG",
+        "INFO",
+        "ERROR",
+    ]
+
+    log_texts = list(
+        RulebookProcessLog.objects.filter(
+            activation_instance=default_activation_instance
+        )
+        .order_by("id")
+        .values_list("log", flat=True)
+    )
+    assert log_texts == ["INFO DEBUG mentioned", "ERROR received DEBUG flag"]
+
+
+@pytest.mark.django_db
+def test_debug_lines_stored_when_opted_in(
+    caplog_factory, default_activation_instance
+):
+    """With store_debug_logs=True, all lines including DEBUG go to DB."""
+    eda_log = caplog_factory(LOGGER, level=logging.DEBUG)
+
+    obj = TeeSystemLogger(
+        default_activation_instance.id, store_debug_logs=True
+    )
+    lines = [
+        "DEBUG This is a debug message",
+        "[main] DEBUG This is a debug message",
+        "[debug] This is a debug message",
+        "INFO DEBUG mentioned",
+        "ERROR received DEBUG flag",
+    ]
+    for line in lines:
+        obj.write(line)
+    obj.flush()
+
+    assert len(eda_log.records) == len(lines)
+    assert [record.levelname for record in eda_log.records] == [
+        "DEBUG",
+        "DEBUG",
+        "DEBUG",
+        "INFO",
+        "ERROR",
+    ]
+
+    db_logs = list(
+        RulebookProcessLog.objects.filter(
+            activation_instance=default_activation_instance
+        )
+        .order_by("id")
+        .values_list("log", flat=True)
+    )
+    assert db_logs == lines
+
+
+@pytest.mark.django_db
+def test_non_debug_lines_always_stored(
+    caplog_factory, default_activation_instance
+):
+    """ERROR/WARNING/INFO always go to DB regardless of toggle."""
+    caplog_factory(LOGGER, level=logging.DEBUG)
+
+    obj = TeeSystemLogger(
+        default_activation_instance.id, store_debug_logs=False
+    )
+    obj.write("ERROR an error")
+    obj.write("WARN a warning")
+    obj.write("INFO an info")
+    obj.write("CRITICAL a critical")
+    obj.flush()
+
+    db_logs = RulebookProcessLog.objects.filter(
+        activation_instance=default_activation_instance
+    )
+    assert db_logs.count() == 4
 
 
 @pytest.mark.django_db

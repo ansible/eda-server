@@ -13,6 +13,7 @@
 #  limitations under the License.
 import logging
 
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from django.db.models import Q
 from django.urls import reverse
 from drf_spectacular.utils import extend_schema_field
@@ -25,6 +26,7 @@ from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import enums, models, validators
 from aap_eda.core.utils.credentials import (
+    get_secret_fields,
     inputs_from_store,
     inputs_to_display,
     validate_inputs,
@@ -55,6 +57,8 @@ class EdaCredentialReferenceField(serializers.JSONField):
 
 
 class EdaCredentialSerializer(serializers.ModelSerializer):
+    """Serializer used during a GET."""
+
     inputs = serializers.SerializerMethodField()
     credential_type = CredentialTypeRefSerializer(
         required=False, allow_null=True
@@ -120,7 +124,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
         }
 
 
-class EdaCredentialCopySerializer(serializers.ModelSerializer):
+class EdaCredentialCopySerializer(CleanTextMixin, serializers.ModelSerializer):
     name = serializers.CharField(
         required=True,
         validators=[validators.check_if_credential_name_used],
@@ -134,9 +138,34 @@ class EdaCredentialCopySerializer(serializers.ModelSerializer):
         ]
 
 
+class _EncryptedInputsClassifyMixin:
+    """Reclassify ``inputs`` from text_fields to json_fields.
+
+    ``EncryptedTextField.get_internal_type()`` returns ``"TextField"``, so
+    ``CleanTextMixin._classify_fields`` puts ``inputs`` into text_fields.
+    Because the serializer declares ``inputs = serializers.JSONField()``,
+    the submitted value is a *dict*, which ``_validate_text_fields`` silently
+    skips (``not isinstance(value, str)``).  Moving it to json_fields lets
+    ``_validate_json_fields`` recurse into nested keys and honour
+    ``excluded_json_keys`` for secret sub-keys.
+    """
+
+    def _classify_fields(self, model):
+        text_fields, json_fields = super()._classify_fields(model)
+        if "inputs" in text_fields:
+            text_fields = [f for f in text_fields if f != "inputs"]
+            json_fields = [*json_fields, "inputs"]
+        return text_fields, json_fields
+
+
 class EdaCredentialCreateSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    _EncryptedInputsClassifyMixin,
+    CleanTextMixin,
+    OrganizationIdFieldMixin,
+    serializers.ModelSerializer,
 ):
+    """Create an EDA credential."""
+
     credential_type_id = serializers.IntegerField(
         required=True,
         allow_null=False,
@@ -152,6 +181,14 @@ class EdaCredentialCreateSerializer(
         credential_type = models.CredentialType.objects.get(
             id=data.get("credential_type_id")
         )
+
+        # Only secret sub-keys inside `inputs` are excluded from
+        # CleanTextMixin free-text checks; non-secret sub-keys
+        # (e.g. host, username) are validated normally.
+        secret_keys = get_secret_fields(credential_type.inputs)
+        self.excluded_json_keys = {
+            "inputs": frozenset(secret_keys),
+        }
 
         # Analytics only allows one credential
         if (
@@ -181,7 +218,7 @@ class EdaCredentialCreateSerializer(
         if bool(errors):
             raise serializers.ValidationError(errors)
 
-        return data
+        return super().validate(data)
 
     class Meta:
         model = models.EdaCredential
@@ -195,12 +232,26 @@ class EdaCredentialCreateSerializer(
 
 
 class EdaCredentialUpdateSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    _EncryptedInputsClassifyMixin,
+    CleanTextMixin,
+    OrganizationIdFieldMixin,
+    serializers.ModelSerializer,
 ):
+    """Update an EDA credential."""
+
     inputs = serializers.JSONField()
 
     def validate(self, data):
         credential_type = self.instance.credential_type
+
+        # Only secret sub-keys inside `inputs` are excluded from
+        # CleanTextMixin free-text checks; non-secret sub-keys
+        # (e.g. host, username) are validated normally.
+        secret_keys = get_secret_fields(credential_type.inputs)
+        self.excluded_json_keys = {
+            "inputs": frozenset(secret_keys),
+        }
+
         try:
             old_inputs = inputs_from_store(
                 self.instance.inputs.get_secret_value()
@@ -212,7 +263,7 @@ class EdaCredentialUpdateSerializer(
         inputs = data.get("inputs", {})
         # allow empty inputs during updating
         if self.partial and not bool(inputs):
-            return data
+            return super().validate(data)
 
         errors = validate_inputs(
             credential_type,
@@ -224,7 +275,7 @@ class EdaCredentialUpdateSerializer(
         if bool(errors):
             raise serializers.ValidationError(errors)
 
-        return data
+        return super().validate(data)
 
     class Meta:
         model = models.EdaCredential

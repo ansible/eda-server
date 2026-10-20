@@ -67,3 +67,17 @@ def test_import_from_yaml():
     importlib.reload(default)
     importlib.reload(conf)
     assert conf.settings.SECRET_KEY == dev_sec_key
+
+
+def test_max_log_lines_environment_override(monkeypatch):
+    setting_name = "EDA_MAX_LOG_LINES_PER_INSTANCE"
+
+    try:
+        with monkeypatch.context() as env:
+            env.setenv(setting_name, "7")
+            importlib.reload(default)
+            importlib.reload(conf)
+            assert conf.settings.MAX_LOG_LINES_PER_INSTANCE == 7
+    finally:
+        importlib.reload(default)
+        importlib.reload(conf)

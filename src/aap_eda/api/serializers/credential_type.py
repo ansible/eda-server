@@ -12,8 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from rest_framework import serializers
 
+from aap_eda.api.validation_patterns import inject_patterns_into_field_list
 from aap_eda.core import models, validators
 from aap_eda.core.utils.credentials import validate_injectors
 
@@ -37,8 +39,43 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
             *read_only_fields,
         ]
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        inputs = data.get("inputs")
+        if isinstance(inputs, dict):
+            # Shallow-copy *inputs* and its *fields* list so
+            # inject_patterns_into_field_list never mutates the
+            # model-owned JSON cached on the instance.
+            inputs = {**inputs}
+            fields = inputs.get("fields")
+            if isinstance(fields, list):
+                inputs["fields"] = list(fields)
+            metadata = inputs.get("metadata")
+            if isinstance(metadata, list):
+                inputs["metadata"] = list(metadata)
+            data["inputs"] = inputs
+            # Advertise CleanTextMixin Tier 2 patterns on JSON
+            # sub-keys (AAP-87587).  Gated on
+            # ENHANCED_INPUT_VALIDATION_ENABLED; secret fields
+            # are skipped.
+            inject_patterns_into_field_list(inputs.get("fields"))
+            inject_patterns_into_field_list(inputs.get("metadata"))
+        return data
 
-class CredentialTypeCreateSerializer(serializers.ModelSerializer):
+
+# ``CredentialType.inputs`` is dynamic JSON. Its OpenAPI representation is
+# customized in ``aap_eda/api/openapi.py`` by
+# ``inject_clean_text_pattern_components`` so response schemas can document
+# the conventional field-catalog structure while create/update request
+# schemas remain free-form for generated API clients. Review that hook when
+# changing the public ``inputs`` structure.
+class CredentialTypeCreateSerializer(
+    CleanTextMixin, serializers.ModelSerializer
+):
+    # injectors commonly contain Jinja2 template syntax, so it is excluded
+    # from free-text checks.
+    excluded_fields = frozenset({"injectors"})
+
     inputs = serializers.JSONField(
         required=False,
         default=dict,
@@ -63,7 +100,7 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
             if bool(errors):
                 raise serializers.ValidationError(errors)
 
-        return data
+        return super().validate(data)
 
     class Meta:
         model = models.CredentialType

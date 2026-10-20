@@ -81,6 +81,11 @@ class CredentialTypeViewSet(
     rbac_resource_type = ResourceType.CREDENTIAL_TYPE
     rbac_action = None
 
+    def get_serializer_class(self):
+        if self.request and self.request.method in ("POST", "PUT", "PATCH"):
+            return serializers.CredentialTypeCreateSerializer
+        return serializers.CredentialTypeSerializer
+
     @extend_schema(
         description="Create a new credential type.",
         request=serializers.CredentialTypeCreateSerializer,

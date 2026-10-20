@@ -17,9 +17,10 @@ from datetime import datetime
 from typing import Optional, Union
 
 from django.conf import settings
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 
 from aap_eda.core import models
+from aap_eda.core.utils.log_levels import classify_log_level
 from aap_eda.core.utils.rulebook_process_logs import (
     extract_datetime_and_message_from_log_entry,
 )
@@ -30,11 +31,17 @@ from aap_eda.services.activation.engine.exceptions import (
 from aap_eda.utils.log_sanitizer import sanitize_string
 
 LOGGER = logging.getLogger(__name__)
+LOG_RETENTION_CHECK_INTERVAL = 1_000
 
 
 class DBLogger(LogHandler):
-    def __init__(self, activation_instance_id: int):
+    def __init__(
+        self,
+        activation_instance_id: int,
+        store_debug_logs: bool = False,
+    ):
         self.activation_instance_id = activation_instance_id
+        self.store_debug_logs = store_debug_logs
         self.line_count = 0
         self.activation_instance_log_buffer = []
         if str(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER) == "end":
@@ -80,18 +87,90 @@ class DBLogger(LogHandler):
             self.flush()
 
     def flush(self) -> None:
+        if not self.store_debug_logs:
+            self.activation_instance_log_buffer = [
+                buf
+                for buf in self.activation_instance_log_buffer
+                if classify_log_level(buf.log) != logging.DEBUG
+            ]
+
+        if not self.activation_instance_log_buffer:
+            return
+
+        max_lines = int(settings.MAX_LOG_LINES_PER_INSTANCE)
         try:
-            if self.activation_instance_log_buffer:
+            with transaction.atomic():
+                activation_instance = None
+                if max_lines > 0:
+                    activation_instance = (
+                        models.RulebookProcess.objects.select_for_update().get(
+                            pk=self.activation_instance_id
+                        )
+                    )
+
                 models.RulebookProcessLog.objects.bulk_create(
                     self.activation_instance_log_buffer
                 )
-        except IntegrityError:
+                if activation_instance is not None:
+                    self._update_retention_checkpoint(
+                        activation_instance,
+                        len(self.activation_instance_log_buffer),
+                    )
+        except (IntegrityError, models.RulebookProcess.DoesNotExist):
             message = (
                 f"Instance id: {self.activation_instance_id} is not present."
             )
             raise ContainerUpdateLogsError(message)
 
         self.activation_instance_log_buffer = []
+
+    def _update_retention_checkpoint(
+        self,
+        activation_instance: models.RulebookProcess,
+        stored_lines: int,
+    ) -> None:
+        checkpoint = (
+            activation_instance.stored_lines_since_cap_check + stored_lines
+        )
+        should_enforce = checkpoint >= LOG_RETENTION_CHECK_INTERVAL
+        checkpoint %= LOG_RETENTION_CHECK_INTERVAL
+
+        models.RulebookProcess.objects.filter(
+            pk=self.activation_instance_id,
+        ).update(stored_lines_since_cap_check=checkpoint)
+
+        if should_enforce:
+            self._enforce_max_log_lines()
+
+    def _enforce_max_log_lines(self) -> None:
+        max_lines = int(settings.MAX_LOG_LINES_PER_INSTANCE)
+        if max_lines <= 0:
+            return
+
+        count = self.num_of_log_lines()
+        if count <= max_lines:
+            return
+
+        excess = count - max_lines
+        oldest_ids = list(
+            models.RulebookProcessLog.objects.filter(
+                activation_instance_id=self.activation_instance_id,
+            )
+            .order_by("id")
+            .values_list("id", flat=True)[:excess]
+        )
+        if oldest_ids:
+            models.RulebookProcessLog.objects.filter(
+                id__in=oldest_ids,
+            ).delete()
+            LOGGER.warning(
+                "Instance %s: trimmed %d oldest log lines "
+                "(cap: %d, was: %d)",
+                self.activation_instance_id,
+                len(oldest_ids),
+                max_lines,
+                count,
+            )
 
     def get_log_read_at(self) -> Optional[datetime]:
         try:

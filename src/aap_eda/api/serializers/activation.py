@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import yaml
+from ansible_base.lib.serializers.mixins import CleanTextMixin
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
@@ -450,6 +451,11 @@ class ActivationListSerializer(
         allow_null=True,
         child=EventStreamOutSerializer(),
     )
+    rule_engine_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        read_only=True,
+    )
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
     edited_by = BasicUserFieldSerializer()
@@ -485,6 +491,7 @@ class ActivationListSerializer(
             "status_message",
             "awx_token_id",
             "log_level",
+            "store_debug_logs",
             "eda_credentials",
             "k8s_service_name",
             "event_streams",
@@ -557,6 +564,7 @@ class ActivationListSerializer(
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
             "log_level": activation.log_level,
+            "store_debug_logs": activation.store_debug_logs,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
             "event_streams": event_streams,
@@ -574,11 +582,16 @@ class ActivationListSerializer(
 
 
 class ActivationCreateSerializer(
+    CleanTextMixin,
     _K8sPodMetadataWriteFields,
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
 ):
     """Serializer for creating the Activation."""
+
+    # extra_var may legitimately contain Jinja2 template syntax
+    # (e.g. credential injectors), so it is excluded from free-text checks.
+    excluded_fields = frozenset({"extra_var"})
 
     class Meta:
         model = models.Activation
@@ -595,6 +608,7 @@ class ActivationCreateSerializer(
             "restart_policy",
             "awx_token_id",
             "log_level",
+            "store_debug_logs",
             "eda_credentials",
             "k8s_service_name",
             "source_mappings",
@@ -665,7 +679,7 @@ class ActivationCreateSerializer(
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
         _normalize_activation_k8s_pod_fields(data)
-        return data
+        return super().validate(data)
 
     def create(self, validated_data):
         rulebook_id = validated_data["rulebook_id"]
@@ -708,7 +722,26 @@ class ActivationCreateSerializer(
         return super().create(validated_data)
 
 
-class ActivationCopySerializer(serializers.ModelSerializer):
+class _ActivationCopyTextCheckSerializer(
+    CleanTextMixin, serializers.ModelSerializer
+):
+    """Internal-only: re-validate copied free-text fields as new content.
+
+    ActivationCopySerializer.is_valid() only ever validates "name",
+    since it's constructed with instance=<source activation>, which
+    would make CleanTextMixin grandfather "description" as unchanged.
+    This serializer is never exposed to clients; it's only used from
+    copy() to re-check the copied description with no instance to
+    grandfather against, the same way EdaCredentialCreateSerializer
+    re-validates a copied credential's description.
+    """
+
+    class Meta:
+        model = models.Activation
+        fields = ["description", "k8s_service_name", "source_mappings"]
+
+
+class ActivationCopySerializer(CleanTextMixin, serializers.ModelSerializer):
     name = serializers.CharField(
         required=True, validators=[validators.check_if_activation_name_used]
     )
@@ -719,6 +752,19 @@ class ActivationCopySerializer(serializers.ModelSerializer):
 
     def copy(self) -> dict:
         activation: models.Activation = self.instance
+
+        text_check = _ActivationCopyTextCheckSerializer(
+            data={
+                "description": activation.description,
+                "k8s_service_name": activation.k8s_service_name,
+                "source_mappings": activation.source_mappings,
+            }
+        )
+        text_check.is_valid(raise_exception=True)
+        description = text_check.validated_data["description"]
+        k8s_service_name = text_check.validated_data["k8s_service_name"]
+        source_mappings = text_check.validated_data["source_mappings"]
+
         pod_metadata = _activation_k8s_pod_metadata_payload(activation)
         _normalize_activation_k8s_pod_fields(pod_metadata)
         validators.check_if_k8s_pod_service_account_name_valid(
@@ -740,7 +786,7 @@ class ActivationCopySerializer(serializers.ModelSerializer):
 
         copied_data = {
             "name": self.validated_data["name"],
-            "description": activation.description,
+            "description": description,
             "is_enabled": False,
             "decision_environment": activation.decision_environment,
             "rulebook": activation.rulebook,
@@ -750,9 +796,10 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             "restart_policy": activation.restart_policy,
             "awx_token_id": activation.awx_token,
             "log_level": activation.log_level,
+            "store_debug_logs": activation.store_debug_logs,
             "eda_credentials": activation.eda_credentials.all(),
-            "k8s_service_name": activation.k8s_service_name,
-            "source_mappings": activation.source_mappings,
+            "k8s_service_name": k8s_service_name,
+            "source_mappings": source_mappings,
             "event_streams": activation.event_streams.all(),
             "skip_audit_events": activation.skip_audit_events,
             "rulebook_name": activation.rulebook.name,
@@ -782,11 +829,16 @@ class ActivationCopySerializer(serializers.ModelSerializer):
 
 
 class ActivationUpdateSerializer(
+    CleanTextMixin,
     _K8sPodMetadataWriteFields,
     OrganizationIdFieldMixin,
     serializers.ModelSerializer,
 ):
     """Serializer for updating the Activation."""
+
+    # extra_var may legitimately contain Jinja2 template syntax
+    # (e.g. credential injectors), so it is excluded from free-text checks.
+    excluded_fields = frozenset({"extra_var"})
 
     class Meta:
         model = models.Activation
@@ -803,6 +855,7 @@ class ActivationUpdateSerializer(
             "restart_policy",
             "awx_token_id",
             "log_level",
+            "store_debug_logs",
             "eda_credentials",
             "k8s_service_name",
             "source_mappings",
@@ -897,7 +950,7 @@ class ActivationUpdateSerializer(
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
         _normalize_activation_k8s_pod_fields(data)
-        return data
+        return super().validate(data)
 
     def prepare_update(self, activation: models.Activation):
         rulebook_id = self.validated_data.get("rulebook_id")
@@ -1119,6 +1172,11 @@ class ActivationReadSerializer(
         allow_blank=True,
         help_text="Log tracking ID of the activation",
     )
+    rule_engine_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        read_only=True,
+    )
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
     edited_by = BasicUserFieldSerializer()
@@ -1157,6 +1215,7 @@ class ActivationReadSerializer(
             "awx_token_id",
             "eda_credentials",
             "log_level",
+            "store_debug_logs",
             "k8s_service_name",
             "k8s_pod_service_account_name",
             "k8s_pod_labels",
@@ -1299,6 +1358,7 @@ class ActivationReadSerializer(
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
             "log_level": activation.log_level,
+            "store_debug_logs": activation.store_debug_logs,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
             **_activation_k8s_pod_metadata_payload(activation),
@@ -1816,3 +1876,22 @@ def _validate_persistence_credential(data: dict) -> None:
             f"'{settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME}' "
             "could not be found. Contact your system administrator."
         )
+
+
+class LogPurgeRequestSerializer(serializers.Serializer):
+    """Serializer for log purge request body."""
+
+    before_date = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+        help_text="Delete logs older than this date. "
+        "If omitted, all logs are deleted.",
+    )
+
+
+class LogPurgeResponseSerializer(serializers.Serializer):
+    """Serializer for log purge response."""
+
+    deleted = serializers.IntegerField(
+        help_text="Number of log records deleted.",
+    )

@@ -76,7 +76,7 @@ Django Ansible Base settings:
 To configure a Resource Server for syncing of managed resources:
 * RESOURCE_SERVER__URL - The URL to connect to the resource server
 * RESOURCE_SERVER__SECRET_KEY - The secret key needed to pull the resource list
-* RESOURCE_SERVER__VALIDATE_HTTPS - Whether to validate https, default to False
+* RESOURCE_SERVER__VALIDATE_HTTPS - Whether to validate https, default to True
 * ANSIBLE_BASE_MANAGED_ROLE_REGISTRY - Syncing of the Platform Auditor role
 
 """
@@ -191,10 +191,15 @@ ANSIBLE_RULEBOOK_FLUSH_AFTER: int = 100
 # ---------------------------------------------------------
 ACTIVATION_DB_LOG_RETENTION_DAYS: int = 0
 
+# Maximum log lines kept per activation instance (0 = unlimited).
+# Oldest rows are trimmed after each 1,000 newly stored lines. The cap may
+# temporarily be exceeded by up to 999 stored lines.
+MAX_LOG_LINES_PER_INSTANCE: int = 500_000
+
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE JWT SETTINGS
 # ---------------------------------------------------------
-ANSIBLE_BASE_JWT_VALIDATE_CERT: bool = False
+ANSIBLE_BASE_JWT_VALIDATE_CERT: bool = True
 ANSIBLE_BASE_JWT_KEY: str = "https://localhost"
 
 # Default Not allow local resource management.
@@ -216,7 +221,7 @@ ALLOW_SHARED_RESOURCE_CUSTOM_ROLES: bool = False
 
 RESOURCE_SERVER__URL: Optional[str] = "https://localhost"
 RESOURCE_SERVER__SECRET_KEY: Optional[str] = ""
-RESOURCE_SERVER__VALIDATE_HTTPS: bool = False
+RESOURCE_SERVER__VALIDATE_HTTPS: bool = True
 RESOURCE_JWT_USER_ID: Optional[str] = None
 
 # The preload data scrip is used instead of the DAB managed role creator

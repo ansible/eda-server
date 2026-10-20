@@ -303,8 +303,8 @@ def null_activation_test_data(
             """
             INSERT INTO core_rulebook_process
             (name, status, git_hash, parent_type, started_at,
-             organization_id, activation_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+             organization_id, activation_id, stored_lines_since_cap_check)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """,
             [
                 "null-activation-process-test",
@@ -314,6 +314,7 @@ def null_activation_test_data(
                 timezone.now(),
                 default_organization.id,
                 None,
+                0,
             ],
         )
 

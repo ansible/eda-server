@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from dynaconf import Dynaconf
@@ -233,3 +235,58 @@ def test_non_websocket_worker_authentication_classes(mock_settings):
         mock_settings.REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"]
         == expected_classes
     )
+
+
+def test_tls_defaults_are_true(mock_settings):
+    assert mock_settings.ANSIBLE_BASE_JWT_VALIDATE_CERT is True
+    assert mock_settings.RESOURCE_SERVER__VALIDATE_HTTPS is True
+
+
+def test_tls_disabled_warning_in_production(mock_settings, caplog_factory):
+    mock_settings.ANSIBLE_BASE_JWT_VALIDATE_CERT = False
+    mock_settings.RESOURCE_SERVER = {
+        "URL": "https://localhost",
+        "SECRET_KEY": "",
+        "VALIDATE_HTTPS": False,
+    }
+    mock_settings.DEBUG = False
+
+    caplog = caplog_factory(
+        logging.getLogger("aap_eda.settings.post_load"),
+        level=logging.WARNING,
+    )
+    post_loading(mock_settings)
+
+    assert "ANSIBLE_BASE_JWT_VALIDATE_CERT is False" in caplog.text
+    assert "RESOURCE_SERVER__VALIDATE_HTTPS is False" in caplog.text
+
+
+def test_tls_disabled_no_warning_in_debug(mock_settings, caplog_factory):
+    mock_settings.ANSIBLE_BASE_JWT_VALIDATE_CERT = False
+    mock_settings.RESOURCE_SERVER = {
+        "URL": "https://localhost",
+        "SECRET_KEY": "",
+        "VALIDATE_HTTPS": False,
+    }
+    mock_settings.DEBUG = True
+
+    caplog = caplog_factory(
+        logging.getLogger("aap_eda.settings.post_load"),
+        level=logging.WARNING,
+    )
+    post_loading(mock_settings)
+
+    assert "ANSIBLE_BASE_JWT_VALIDATE_CERT is False" not in caplog.text
+    assert "RESOURCE_SERVER__VALIDATE_HTTPS is False" not in caplog.text
+
+
+def test_tls_enabled_no_warning(mock_settings, caplog_factory):
+    mock_settings.DEBUG = False
+
+    caplog = caplog_factory(
+        logging.getLogger("aap_eda.settings.post_load"),
+        level=logging.WARNING,
+    )
+    post_loading(mock_settings)
+
+    assert "SECURITY WARNING" not in caplog.text

@@ -15,6 +15,7 @@
 import logging
 from datetime import datetime, timezone
 
+from aap_eda.core.utils.log_levels import classify_log_level
 from aap_eda.services.activation.db_log_handler import DBLogger
 
 EXCEPTIONS_TO_CATCH = (
@@ -27,8 +28,6 @@ EXCEPTIONS_TO_CATCH = (
 )
 
 LOGGER = logging.getLogger(__name__)
-
-LOG_LEVEL_SEARCH_INDEX = 40
 
 
 class TeeSystemLogger(DBLogger):
@@ -53,17 +52,7 @@ class TeeSystemLogger(DBLogger):
                     buffer.log_timestamp
                 )
 
-                substring = line[:LOG_LEVEL_SEARCH_INDEX]
-                if "ERROR" in substring:
-                    log_level = logging.ERROR
-                elif "WARN" in substring:
-                    log_level = logging.WARNING
-                elif "DEBUG" in substring:
-                    log_level = logging.DEBUG
-                elif "CRITICAL" in substring or "FATAL" in substring:
-                    log_level = logging.CRITICAL
-                else:
-                    log_level = logging.INFO
+                log_level = classify_log_level(line) or logging.INFO
 
                 extra = {
                     "rulebook_timestamp": rulebook_timestamp,
@@ -83,6 +72,4 @@ class TeeSystemLogger(DBLogger):
                 extra=extra,
             )
         finally:
-            # This will call the DBLoggers flush which will
-            # write to the Database and clear the log buffer
             super().flush()
