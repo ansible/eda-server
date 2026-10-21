@@ -13,6 +13,7 @@
 #  limitations under the License.
 import logging
 
+import yaml
 from ansible_base.lib.serializers.mixins import CleanTextMixin
 from django.db.models import Q
 from django.urls import reverse
@@ -199,7 +200,7 @@ class _EncryptedInputsClassifyMixin:
                 )
                 return None
             return decoded
-        except (AttributeError, ValueError, TypeError) as exc:
+        except (AttributeError, ValueError, TypeError, yaml.YAMLError) as exc:
             LOGGER.warning(
                 "Failed to decode credential inputs for CleanTextMixin: %s",
                 exc,

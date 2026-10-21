@@ -97,6 +97,12 @@ class TestStoredInputsDictForCleanText:
 
         assert serializer._stored_inputs_dict_for_clean_text() is None
 
+    def test_returns_none_on_malformed_stored_yaml(self):
+        serializer = EdaCredentialUpdateSerializer()
+        serializer.instance = SimpleNamespace(inputs="username: [unclosed")
+
+        assert serializer._stored_inputs_dict_for_clean_text() is None
+
     def test_returns_none_when_inputs_attribute_missing(self):
         serializer = EdaCredentialUpdateSerializer()
         serializer.instance = SimpleNamespace()
