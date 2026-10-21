@@ -1884,14 +1884,60 @@ class LogPurgeRequestSerializer(serializers.Serializer):
     before_date = serializers.DateTimeField(
         required=False,
         allow_null=True,
-        help_text="Delete logs older than this date. "
-        "If omitted, all logs are deleted.",
+        help_text="Delete logs older than this date (YYYY-MM-DD). "
+        "If omitted, defaults to ACTIVATION_DB_LOG_RETENTION_DAYS. "
+        "Cannot be used with retention_duration.",
     )
+
+    retention_duration = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Delete logs older than this ISO8601 retention duration "
+        "(e.g., P30D for 30 days, P1M for 1 month, PT24H for 24 hours). "
+        "Cannot be used with before_date.",
+    )
+
+    activation_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_null=True,
+        help_text="Scope audit trail to these activation IDs. "
+        "Only used with audit_trail.",
+    )
+
+    activation_names = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_null=True,
+        help_text="Scope audit trail to these activation names. "
+        "Only used with audit_trail.",
+    )
+
+    audit_trail = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="Create audit trail log entries recording the purge.",
+    )
+
+    def validate(self, data):
+        """Validate that before_date and retention_duration are mutually exclusive."""
+        if data.get("before_date") and data.get("retention_duration"):
+            raise serializers.ValidationError(
+                "Cannot specify both before_date and retention_duration. "
+                "Please use only one."
+            )
+        return data
 
 
 class LogPurgeResponseSerializer(serializers.Serializer):
     """Serializer for log purge response."""
 
     deleted = serializers.IntegerField(
+        required=False,
         help_text="Number of log records deleted.",
+    )
+
+    job_id = serializers.CharField(
+        required=False,
+        help_text="UUID of the background job executing the purge.",
     )
