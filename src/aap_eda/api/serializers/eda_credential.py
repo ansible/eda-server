@@ -141,7 +141,8 @@ class EdaCredentialCopySerializer(CleanTextMixin, serializers.ModelSerializer):
 class _InputsGrandfatherInstance:
     """Present decrypted credential ``inputs`` as a dict for CleanTextMixin.
 
-    ``EdaCredential.inputs`` is stored in an ``EncryptedTextField`` (YAML blob).
+    ``EdaCredential.inputs`` is stored in an ``EncryptedTextField``
+    (YAML blob).
     ``CleanTextMixin`` JSON grandfathering expects ``instance.inputs`` to be a
     dict like Controller's ``CredentialInputField``; this proxy supplies the
     decoded map without mutating the model.
@@ -179,7 +180,7 @@ class _EncryptedInputsClassifyMixin:
         return text_fields, json_fields
 
     def _stored_inputs_dict_for_clean_text(self):
-        """Decoded credential inputs for nested CleanTextMixin grandfathering."""
+        """Return decoded credential inputs for CleanText grandfathering."""
         if not self.instance:
             return None
         try:
