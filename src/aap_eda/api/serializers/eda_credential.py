@@ -13,6 +13,7 @@
 #  limitations under the License.
 import logging
 
+import yaml
 from ansible_base.lib.serializers.mixins import CleanTextMixin
 from django.db.models import Q
 from django.urls import reverse
@@ -138,6 +139,28 @@ class EdaCredentialCopySerializer(CleanTextMixin, serializers.ModelSerializer):
         ]
 
 
+class _InputsGrandfatherInstance:
+    """Present decrypted credential ``inputs`` as a dict for CleanTextMixin.
+
+    ``EdaCredential.inputs`` is stored in an ``EncryptedTextField``
+    (YAML blob).
+    ``CleanTextMixin`` JSON grandfathering expects ``instance.inputs`` to be a
+    dict like Controller's ``CredentialInputField``; this proxy supplies the
+    decoded map without mutating the model.
+    """
+
+    __slots__ = ("_instance", "_inputs_dict")
+
+    def __init__(self, instance, inputs_dict):
+        self._instance = instance
+        self._inputs_dict = inputs_dict
+
+    def __getattr__(self, name):
+        if name == "inputs":
+            return self._inputs_dict
+        return getattr(self._instance, name)
+
+
 class _EncryptedInputsClassifyMixin:
     """Reclassify ``inputs`` from text_fields to json_fields.
 
@@ -156,6 +179,49 @@ class _EncryptedInputsClassifyMixin:
             text_fields = [f for f in text_fields if f != "inputs"]
             json_fields = [*json_fields, "inputs"]
         return text_fields, json_fields
+
+    def _stored_inputs_dict_for_clean_text(self):
+        """Return decoded credential inputs for CleanText grandfathering."""
+        if not self.instance:
+            return None
+        try:
+            raw = self.instance.inputs
+            if isinstance(raw, SecretValue):
+                raw = raw.get_secret_value()
+            if not isinstance(raw, str) or not raw.strip():
+                return {}
+            decoded = inputs_from_store(raw)
+            if decoded is None:
+                return {}
+            if not isinstance(decoded, dict):
+                LOGGER.warning(
+                    "Credential inputs YAML did not decode to a dict; "
+                    "skipping inputs grandfathering"
+                )
+                return None
+            return decoded
+        except (AttributeError, ValueError, TypeError, yaml.YAMLError) as exc:
+            LOGGER.warning(
+                "Failed to decode credential inputs for CleanTextMixin "
+                "(%s); skipping inputs grandfathering",
+                type(exc).__name__,
+            )
+            return None
+
+    def _validate_json_field(self, field_name, value):
+        if field_name != "inputs" or not self.instance:
+            return super()._validate_json_field(field_name, value)
+
+        stored_dict = self._stored_inputs_dict_for_clean_text()
+        if not isinstance(stored_dict, dict):
+            return super()._validate_json_field(field_name, value)
+
+        instance = self.instance
+        self.instance = _InputsGrandfatherInstance(instance, stored_dict)
+        try:
+            return super()._validate_json_field(field_name, value)
+        finally:
+            self.instance = instance
 
 
 class EdaCredentialCreateSerializer(

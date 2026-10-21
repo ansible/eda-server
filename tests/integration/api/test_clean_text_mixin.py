@@ -55,6 +55,7 @@ from aap_eda.api.serializers.user import (
     UserCreateUpdateSerializer,
 )
 from aap_eda.core import enums, models
+from aap_eda.core.utils.credentials import ENCRYPTED_STRING, inputs_to_store
 from tests.integration.constants import api_url_v1
 
 DANGEROUS_NAME = "<script>alert(1)</script>"
@@ -691,6 +692,71 @@ class TestEdaCredentialCleanText:
         )
         assert not serializer.is_valid()
         assert "name" in serializer.errors
+
+    def test_grandfather_unchanged_legacy_inputs_on_update(
+        self, default_registry_credential: models.EdaCredential
+    ):
+        """Round-trip PATCH with legacy non-secret inputs (Controller parity).
+
+        EncryptedTextField stores YAML, not a dict; grandfathering must compare
+        against decoded stored values, not ``SecretValue`` / ciphertext.
+        """
+        legacy_username = "{{malicious}}"
+        default_registry_credential.inputs = inputs_to_store(
+            {
+                "username": legacy_username,
+                "password": "dummy-password",
+                "host": "quay.io",
+                "verify_ssl": False,
+            }
+        )
+        default_registry_credential.save(update_fields=["inputs"])
+        default_registry_credential.refresh_from_db()
+
+        serializer = EdaCredentialUpdateSerializer(
+            instance=default_registry_credential,
+            data={
+                "description": "Updated description",
+                "inputs": {
+                    "username": legacy_username,
+                    "password": ENCRYPTED_STRING,
+                    "host": "quay.io",
+                    "verify_ssl": False,
+                },
+            },
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+
+    def test_rejects_changed_invalid_inputs_subkey_on_update(
+        self, default_registry_credential: models.EdaCredential
+    ):
+        legacy_username = "{{malicious}}"
+        default_registry_credential.inputs = inputs_to_store(
+            {
+                "username": legacy_username,
+                "password": "dummy-password",
+                "host": "quay.io",
+                "verify_ssl": False,
+            }
+        )
+        default_registry_credential.save(update_fields=["inputs"])
+        default_registry_credential.refresh_from_db()
+
+        serializer = EdaCredentialUpdateSerializer(
+            instance=default_registry_credential,
+            data={
+                "inputs": {
+                    "username": DANGEROUS_TEXT,
+                    "password": ENCRYPTED_STRING,
+                    "host": "quay.io",
+                    "verify_ssl": False,
+                },
+            },
+            partial=True,
+        )
+        assert not serializer.is_valid()
+        assert "inputs" in serializer.errors
 
 
 @pytest.mark.django_db
