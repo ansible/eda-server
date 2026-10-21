@@ -12,21 +12,25 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from datetime import datetime
+from datetime import datetime, time, timedelta, timezone
 
+from django.conf import settings
 from django.core.management.base import (
     BaseCommand,
     CommandError,
     CommandParser,
 )
-from django.db import transaction
-from django.db.models import Q
 
-from aap_eda.core import models
+from aap_eda.core.utils.delete_log_util import (
+    LogPurgeError,
+    create_audit_trail,
+    delete_logs_older_than,
+)
+from aap_eda.core.utils.log_retention import retention_cutoff
 
 
 class Command(BaseCommand):
-    """Purge the logs from a rulebook process."""
+    """Purge old logs globally, optionally writing audit trail entries."""
 
     help = (
         "Purge log records from rulebook processes. "
@@ -63,100 +67,100 @@ class Command(BaseCommand):
             "--date",
             dest="date",
             action="store",
-            required=True,
             help=(
                 "Purge records older than this date from the database. "
-                "The cutoff date in YYYY-MM-DD format"
+                "The UTC cutoff date in YYYY-MM-DD format. Mutually exclusive "
+                "with --retention-duration."
             ),
         )
 
-    def purge_log_records(
-        self, ids: list[int], names: list[str], cutoff_timestamp: datetime
-    ) -> None:
-        # Global purge of all old logs (regardless of activation)
-        cutoff_ts = int(cutoff_timestamp.timestamp())
-        old_logs = models.RulebookProcessLog.objects.filter(
-            log_timestamp__lt=cutoff_ts
+        parser.add_argument(
+            "--retention-duration",
+            dest="retention_duration",
+            help=(
+                "Purge records older than this ISO 8601 duration, for "
+                "example P30D or P1M. Mutually exclusive with --date."
+            ),
         )
-        deleted_count = old_logs.count()
-
-        if deleted_count == 0:
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"No log records found older than "
-                    f"{cutoff_timestamp.strftime('%Y-%m-%d')}."
-                )
-            )
-            return
-
-        # Delete all old logs globally
-        old_logs.delete()
-
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Purged {deleted_count} log records older than "
-                f"{cutoff_timestamp.strftime('%Y-%m-%d')} globally."
-            )
+        parser.add_argument(
+            "--audit-trail",
+            dest="audit_trail",
+            action="store_true",
+            help="Create audit log entries for affected processes.",
         )
 
-        # Create audit trail logs for reporting
-        audit_logs = []
-
-        if not bool(ids) and not bool(names):
-            # No filters: Create audit logs for all instances that might
-            # have been affected
-            instances = models.RulebookProcess.objects.all()
-        else:
-            # Filters provided: Create audit logs only for specified
-            # activations and orphaned records
-            instances = models.RulebookProcess.objects.filter(
-                Q(activation__id__in=ids)
-                | Q(activation__name__in=names)
-                | Q(activation__isnull=True),
-            )
-
-            # Report on orphaned records for user visibility
-            orphaned_count = models.RulebookProcess.objects.filter(
-                activation__isnull=True
-            ).count()
-            if orphaned_count > 0:
-                self.stdout.write(
-                    f"Audit trail will include {orphaned_count} orphaned "
-                    f"RulebookProcess records (with NULL activation)."
-                )
-
-        # Create audit trail logs for instances
-        dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        for instance in instances:
-            audit_logs.append(
-                models.RulebookProcessLog(
-                    log=(
-                        f"All log records older than "
-                        f"{cutoff_timestamp.strftime('%Y-%m-%d')} "
-                        f"were purged at {dt}."
-                    ),
-                    activation_instance_id=instance.id,
-                    log_timestamp=cutoff_ts,
-                )
-            )
-
-        if audit_logs:
-            models.RulebookProcessLog.objects.bulk_create(audit_logs)
-            self.stdout.write(
-                f"Created {len(audit_logs)} audit trail log entries."
-            )
-
-    @transaction.atomic
-    def handle(self, *args, **options):
-        input_ids = options.get("activation-ids") or []
-        input_names = options.get("activation-names") or []
+    @staticmethod
+    def _cutoff(options: dict) -> datetime | None:
         cutoff_date = options.get("date")
+        retention_duration = options.get("retention_duration")
+        if cutoff_date is not None and retention_duration is not None:
+            raise CommandError(
+                "--date and --retention-duration are mutually exclusive."
+            )
+
+        if cutoff_date is not None:
+            try:
+                parsed_date = datetime.strptime(cutoff_date, "%Y-%m-%d").date()
+            except (TypeError, ValueError) as exc:
+                raise CommandError(
+                    "--date must use YYYY-MM-DD format."
+                ) from exc
+            if parsed_date.strftime("%Y-%m-%d") != cutoff_date:
+                raise CommandError("--date must use YYYY-MM-DD format.")
+            return datetime.combine(parsed_date, time.min, tzinfo=timezone.utc)
+
+        if retention_duration is not None:
+            try:
+                return retention_cutoff(retention_duration)
+            except ValueError as exc:
+                raise CommandError(str(exc)) from exc
+
+        retention_days = settings.ACTIVATION_DB_LOG_RETENTION_DAYS
+        if retention_days <= 0:
+            return None
+        return datetime.now(timezone.utc) - timedelta(days=retention_days)
+
+    def handle(self, *args, **options):
+        ids = options.get("activation-ids") or []
+        names = options.get("activation-names") or []
+        if any(activation_id <= 0 for activation_id in ids):
+            raise CommandError("Activation IDs must be positive integers.")
+        if any(not name.strip() for name in names):
+            raise CommandError("Activation names cannot be blank.")
+
+        cutoff = self._cutoff(options)
+        if cutoff is None:
+            return self.style.WARNING(
+                "No logs purged: configured retention is not positive."
+            )
 
         try:
-            ts = datetime.strptime(cutoff_date, "%Y-%m-%d")
-        except ValueError as e:
-            raise CommandError(f"{e}") from e
+            deleted_count = delete_logs_older_than(cutoff)
+        except LogPurgeError as exc:
+            raise CommandError(str(exc)) from exc
 
-        self.purge_log_records(
-            ids=input_ids, names=input_names, cutoff_timestamp=ts
+        if deleted_count == 0:
+            return self.style.SUCCESS(
+                f"No log records found older than "
+                f"{cutoff.strftime('%Y-%m-%d %H:%M:%S UTC')}; 0 rows "
+                "deleted."
+            )
+
+        output = (
+            f"Purged {deleted_count} log records older than "
+            f"{cutoff.strftime('%Y-%m-%d %H:%M:%S UTC')} globally."
         )
+        if options.get("audit_trail"):
+            try:
+                audit_count = create_audit_trail(
+                    cutoff,
+                    activation_ids=ids,
+                    activation_names=names,
+                )
+            except Exception as exc:
+                raise CommandError(
+                    f"Deleted {deleted_count} logs, but audit trail failed: "
+                    f"{exc}"
+                ) from exc
+            output += f" Created {audit_count} audit trail entries."
+        return self.style.SUCCESS(output)

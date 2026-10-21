@@ -461,6 +461,46 @@ task docker:purge && EDA_SECRET_KEY=insecure task docker:up
 Do **not** confuse the two — see the command docstring in
 `src/aap_eda/core/management/commands/rotate_db_encryption_key.py`.
 
+## Global log purge
+
+The global log purge endpoint is `POST /api/eda/v1/logs/purge/`. Only a
+superuser can submit it. A successful request returns HTTP 202 with a `job_id`;
+this confirms that dispatcherd accepted the job, not that deletion has
+completed. The endpoint deletes qualifying log rows across all activations.
+Optional `activation_ids` and `activation_names` select audit-trail targets
+only; they never limit deletion. Audit entries are disabled by default for
+both API and CLI requests.
+
+```http
+POST /api/eda/v1/logs/purge/
+Content-Type: application/json
+
+{"retention_duration": "P30D", "audit_trail": true,
+ "activation_names": ["production-rules"]}
+```
+
+`retention_duration` is an optional ISO 8601 duration such as `P30D` or
+`P1M`. If omitted, the worker reads
+`ACTIVATION_DB_LOG_RETENTION_DAYS`; its default is `0`, which disables
+deletion. Calendar months and years are subtracted in UTC, clamping a day that
+does not exist in the target month to that month's final day. The CLI also
+supports `--date YYYY-MM-DD` (interpreted as midnight UTC) and
+`--retention-duration P30D`; those options are mutually exclusive. The API
+does not accept `before_date`.
+
+Inspect default-worker logs by the returned job ID to see started, completed,
+skipped, and failed outcomes, including `deleted_count`:
+
+```shell
+JOB_ID=<job-id-from-response>
+kubectl logs -n "${NAMESPACE:-aap-eda}" \
+  -l app=eda,comp=default-worker --all-containers=true --since=24h \
+  | grep "job_id=${JOB_ID}"
+```
+
+The dispatcherd `running` view only reports in-flight work; the structured
+worker log lines are the supported completion and deletion-count record.
+
 ### Running linters
 
 The project uses `flake8` with a set of plugins, `black`, `isort` and `ruff` (experimental),
