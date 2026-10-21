@@ -728,6 +728,36 @@ class TestEdaCredentialCleanText:
         )
         assert serializer.is_valid(), serializer.errors
 
+    def test_rejects_changed_invalid_inputs_subkey_on_update(
+        self, default_registry_credential: models.EdaCredential
+    ):
+        legacy_username = "{{malicious}}"
+        default_registry_credential.inputs = inputs_to_store(
+            {
+                "username": legacy_username,
+                "password": "dummy-password",
+                "host": "quay.io",
+                "verify_ssl": False,
+            }
+        )
+        default_registry_credential.save(update_fields=["inputs"])
+        default_registry_credential.refresh_from_db()
+
+        serializer = EdaCredentialUpdateSerializer(
+            instance=default_registry_credential,
+            data={
+                "inputs": {
+                    "username": DANGEROUS_TEXT,
+                    "password": ENCRYPTED_STRING,
+                    "host": "quay.io",
+                    "verify_ssl": False,
+                },
+            },
+            partial=True,
+        )
+        assert not serializer.is_valid()
+        assert "inputs" in serializer.errors
+
 
 @pytest.mark.django_db
 class TestEventStreamCleanText:
