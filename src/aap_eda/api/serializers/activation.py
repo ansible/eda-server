@@ -55,6 +55,7 @@ from aap_eda.core.utils.credentials import (
     get_secret_fields,
 )
 from aap_eda.core.utils.k8s_service_name import create_k8s_service_name
+from aap_eda.core.utils.log_retention import retention_cutoff
 from aap_eda.core.utils.rulebook import (
     build_rulebook_with_event_streams,
     build_source_list,
@@ -87,6 +88,48 @@ def _update_event_stream_source(validated_data: dict) -> str:
             "Failed to update event stream source in rulesets: %s", str(e)
         )
         raise InvalidEventStreamSource(e) from e
+
+
+class LogPurgeRequestSerializer(serializers.Serializer):
+    """Validate a global log purge request."""
+
+    retention_duration = serializers.CharField(required=False)
+    audit_trail = serializers.BooleanField(required=False, default=False)
+    activation_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=False,
+    )
+    activation_names = serializers.ListField(
+        child=serializers.CharField(allow_blank=False),
+        required=False,
+        allow_empty=False,
+    )
+
+    def validate(self, attrs):
+        if "before_date" in self.initial_data:
+            raise serializers.ValidationError(
+                {"before_date": "This field is not supported."}
+            )
+        if any(not name.strip() for name in attrs.get("activation_names", [])):
+            raise serializers.ValidationError(
+                {"activation_names": "Names cannot be blank."}
+            )
+        duration = attrs.get("retention_duration")
+        if duration is not None:
+            try:
+                retention_cutoff(duration)
+            except ValueError as exc:
+                raise serializers.ValidationError(
+                    {"retention_duration": str(exc)}
+                ) from exc
+        return attrs
+
+
+class LogPurgeResponseSerializer(serializers.Serializer):
+    """Acknowledgement returned after a purge task is queued."""
+
+    job_id = serializers.UUIDField()
 
 
 def _update_k8s_service_name(validated_data: dict) -> str:

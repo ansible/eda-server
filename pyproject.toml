@@ -68,6 +68,7 @@ pyjwt = { version = ">=2.13.0,<3", extras = ["crypto"] }
 ecdsa = "0.18.*"
 validators = "^0.34.0"
 django-flags = "^5.0.13"
+isodate = "^0.7.2"
 insights-analytics-collector = "^0.3.2"
 distro = "^1.9.0"
 dispatcherd = { version = "v2026.05.27", extras = ["pg_notify"] }

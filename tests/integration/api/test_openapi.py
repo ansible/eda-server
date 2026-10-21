@@ -87,3 +87,38 @@ def test_v1_openapi_credential_type_inputs_schema(admin_client):
         assert "properties" not in request_inputs
         assert request_inputs["additionalProperties"] is True
         assert request_inputs["example"]["required"] == ["username"]
+
+
+@pytest.mark.django_db
+def test_log_purge_openapi_contract(admin_client):
+    response = admin_client.get(f"{api_url_v1}/openapi.json")
+    assert response.status_code == status.HTTP_200_OK
+
+    spec = response.json()
+    purge_path = next(
+        path for path in spec["paths"] if path.endswith("/logs/purge/")
+    )
+    operation = spec["paths"][purge_path]["post"]
+    request_ref = operation["requestBody"]["content"]["application/json"][
+        "schema"
+    ]["$ref"]
+    request_schema = spec["components"]["schemas"][
+        request_ref.rsplit("/", 1)[1]
+    ]
+    request_properties = request_schema["properties"]
+    assert set(request_properties) == {
+        "retention_duration",
+        "audit_trail",
+        "activation_ids",
+        "activation_names",
+    }
+
+    responses = operation["responses"]
+    assert {"202", "400", "403"}.issubset(responses)
+    response_ref = responses["202"]["content"]["application/json"]["schema"][
+        "$ref"
+    ]
+    response_schema = spec["components"]["schemas"][
+        response_ref.rsplit("/", 1)[1]
+    ]
+    assert set(response_schema["properties"]) == {"job_id"}

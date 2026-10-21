@@ -31,11 +31,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api.permissions import IsSystemAdmin
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
 from aap_eda.core.health import check_dispatcherd_workers_health
 from aap_eda.core.utils import logging_utils
+from aap_eda.tasks.management import submit_log_purge
 from aap_eda.tasks.orchestrator import (
     delete_rulebook_process,
     restart_rulebook_process,
@@ -868,3 +870,44 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
             results, many=True
         )
         return self.get_paginated_response(serializer.data)
+
+
+class LogPurgeViewSet(viewsets.GenericViewSet):
+    """Global, superuser-only log purge scheduling endpoint."""
+
+    permission_classes = (IsSystemAdmin,)
+    serializer_class = serializers.LogPurgeRequestSerializer
+
+    @extend_schema(
+        description=(
+            "Queue a global deletion of old activation logs. The activation "
+            "IDs and names select audit-trail targets only. The returned job "
+            "ID acknowledges scheduling; it does not mean deletion is done."
+        ),
+        request=serializers.LogPurgeRequestSerializer,
+        responses={
+            status.HTTP_202_ACCEPTED: serializers.LogPurgeResponseSerializer,
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                description="The request contains invalid purge options."
+            ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                description="Only superusers can queue a log purge."
+            ),
+            status.HTTP_500_INTERNAL_SERVER_ERROR: OpenApiResponse(
+                description="The purge task could not be queued."
+            ),
+        },
+    )
+    @action(methods=["post"], detail=False, url_path="purge")
+    def purge(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            job_id = submit_log_purge(**serializer.validated_data)
+        except Exception:
+            logger.exception("Unable to queue global log purge")
+            return Response(
+                {"detail": "Unable to queue log purge job."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return Response({"job_id": job_id}, status=status.HTTP_202_ACCEPTED)
