@@ -202,8 +202,9 @@ class _EncryptedInputsClassifyMixin:
             return decoded
         except (AttributeError, ValueError, TypeError, yaml.YAMLError) as exc:
             LOGGER.warning(
-                "Failed to decode credential inputs for CleanTextMixin: %s",
-                exc,
+                "Failed to decode credential inputs for CleanTextMixin "
+                "(%s); skipping inputs grandfathering",
+                type(exc).__name__,
             )
             return None
 
