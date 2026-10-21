@@ -14,6 +14,7 @@
 """Activation Containerable Interface tests."""
 
 import pytest
+from django.test import override_settings
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
@@ -138,6 +139,24 @@ def test_get_container_request(activation):
     assert cmdline.heartbeat is not None
     assert not cmdline.skip_audit_events
     assert "--skip-audit-events" not in cmdline.get_args()
+
+
+@override_settings(
+    K8S_MEM_REQUEST="100Mi",
+    K8S_CPU_REQUEST="250m",
+    K8S_MEM_LIMIT="200Mi",
+    K8S_CPU_LIMIT="500m",
+)
+@pytest.mark.django_db
+def test_get_container_request_includes_k8s_resource_requirements(
+    activation,
+):
+    request = activation.get_container_request()
+
+    assert request.k8s_mem_request == "100Mi"
+    assert request.k8s_cpu_request == "250m"
+    assert request.k8s_mem_limit == "200Mi"
+    assert request.k8s_cpu_limit == "500m"
 
 
 @pytest.mark.django_db

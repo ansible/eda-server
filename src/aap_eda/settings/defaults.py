@@ -132,12 +132,16 @@ PODMAN_MOUNTS: Optional[list] = []
 PODMAN_EXTRA_ARGS: Optional[dict] = {}
 CONTAINER_NAME_PREFIX: str = "eda"
 
-# Kubernetes pod resource limits for activation job containers.
+# Kubernetes pod resource requirements for activation job containers.
 # Uses Kubernetes quantity syntax (e.g. "200Mi", "1Gi", "500m", "2").
-# None (default) means no limit is set; the namespace's LimitRange or
-# ResourceQuota defaults apply.
+# None (default) means no request or limit is set; the namespace's LimitRange
+# or ResourceQuota defaults apply.
+#   export EDA_K8S_MEM_REQUEST="100Mi"
+#   export EDA_K8S_CPU_REQUEST="100m"
 #   export EDA_K8S_MEM_LIMIT="200Mi"
 #   export EDA_K8S_CPU_LIMIT="500m"
+K8S_MEM_REQUEST: Optional[str] = None
+K8S_CPU_REQUEST: Optional[str] = None
 K8S_MEM_LIMIT: Optional[str] = None
 K8S_CPU_LIMIT: Optional[str] = None
 

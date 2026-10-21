@@ -334,33 +334,41 @@ def test_engine_start_applies_k8s_pod_metadata(
 
 
 @pytest.mark.parametrize(
-    "mem,cpu,expect_mem,expect_cpu",
+    "mem_request,cpu_request,mem_limit,cpu_limit",
     [
-        ("200Mi", "500m", "200Mi", "500m"),
-        ("200Mi", None, "200Mi", None),
-        (None, "500m", None, "500m"),
+        ("100Mi", "250m", "200Mi", "500m"),
+        ("100Mi", None, None, None),
+        (None, "250m", None, None),
+        (None, None, "200Mi", "500m"),
     ],
-    ids=["both", "memory-only", "cpu-only"],
+    ids=[
+        "requests-and-limits",
+        "memory-request-only",
+        "cpu-request-only",
+        "limits-only",
+    ],
 )
 @pytest.mark.django_db
-def test_engine_start_applies_k8s_resource_limits(
+def test_engine_start_applies_k8s_resource_requirements(
     init_kubernetes_data,
     kubernetes_engine,
     default_organization: models.Organization,
-    mem,
-    cpu,
-    expect_mem,
-    expect_cpu,
+    mem_request,
+    cpu_request,
+    mem_limit,
+    cpu_limit,
 ):
-    """Assert Job container sets the configured resource limits."""
+    """Assert Job container sets the configured resource requirements."""
     engine = kubernetes_engine
     request = get_request(
         init_kubernetes_data,
         "admin",
         default_organization,
         k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
-        k8s_mem_limit=mem,
-        k8s_cpu_limit=cpu,
+        k8s_mem_request=mem_request,
+        k8s_cpu_request=cpu_request,
+        k8s_mem_limit=mem_limit,
+        k8s_cpu_limit=cpu_limit,
     )
     log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
     created_body = None
@@ -387,30 +395,41 @@ def test_engine_start_applies_k8s_resource_limits(
 
     container = created_body.spec.template.spec.containers[0]
     assert container.resources is not None
-    limits = container.resources.limits
-    if expect_mem:
-        assert limits["memory"] == expect_mem
-    else:
-        assert "memory" not in limits
-    if expect_cpu:
-        assert limits["cpu"] == expect_cpu
-    else:
-        assert "cpu" not in limits
+    expected_requests = {
+        key: value
+        for key, value in {
+            "memory": mem_request,
+            "cpu": cpu_request,
+        }.items()
+        if value
+    } or None
+    expected_limits = {
+        key: value
+        for key, value in {
+            "memory": mem_limit,
+            "cpu": cpu_limit,
+        }.items()
+        if value
+    } or None
+    assert container.resources.requests == expected_requests
+    assert container.resources.limits == expected_limits
 
 
 @pytest.mark.django_db
-def test_engine_start_no_resource_limits_by_default(
+def test_engine_start_no_resource_requirements_by_default(
     init_kubernetes_data,
     kubernetes_engine,
     default_organization: models.Organization,
 ):
-    """Assert no resource limits when settings are None."""
+    """Assert no resource requirements when settings are None."""
     engine = kubernetes_engine
     request = get_request(
         init_kubernetes_data,
         "admin",
         default_organization,
         k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+        k8s_mem_request=None,
+        k8s_cpu_request=None,
         k8s_mem_limit=None,
         k8s_cpu_limit=None,
     )
