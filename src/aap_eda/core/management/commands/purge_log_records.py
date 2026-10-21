@@ -14,6 +14,7 @@
 
 from datetime import datetime, timedelta
 
+import isodate
 from django.conf import settings
 from django.core.management.base import (
     BaseCommand,
@@ -34,9 +35,9 @@ class Command(BaseCommand):
 
     help = (
         "Purge log records from rulebook processes. "
-        "Uses --date for a specific cutoff or defaults to "
-        "ACTIVATION_DB_LOG_RETENTION_DAYS. Use --audit-trail to record "
-        "the purge in activation logs."
+        "Uses --date for a specific cutoff, --retention-duration for "
+        "ISO8601 duration, or defaults to ACTIVATION_DB_LOG_RETENTION_DAYS. "
+        "Use --audit-trail to record the purge in activation logs."
     )
 
     def add_arguments(self, parser: CommandParser) -> None:
@@ -70,6 +71,17 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--retention-duration",
+            dest="retention_duration",
+            action="store",
+            help=(
+                "Purge records older than this ISO8601 retention duration "
+                "(e.g., P30D for 30 days, P1M for 1 month, "
+                "PT24H for 24 hours). "
+                "Cannot be used with --date."
+            ),
+        )
+        parser.add_argument(
             "--audit-trail",
             dest="audit_trail",
             action="store_true",
@@ -80,6 +92,14 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         cutoff_date = options.get("date")
+        retention_duration = options.get("retention_duration")
+
+        # Validate that only one option is provided
+        if cutoff_date and retention_duration:
+            raise CommandError(
+                "Cannot specify both --date and --retention-duration. "
+                "Please use only one."
+            )
 
         if cutoff_date:
             try:
@@ -88,6 +108,15 @@ class Command(BaseCommand):
                 )
             except ValueError as e:
                 raise CommandError(f"{e}") from e
+        elif retention_duration:
+            try:
+                # Parse ISO8601 duration and calculate cutoff
+                parsed_duration = isodate.parse_duration(retention_duration)
+                cutoff = timezone.now() - parsed_duration
+            except (isodate.ISO8601Error, ValueError) as e:
+                raise CommandError(
+                    f"Invalid ISO8601 retention duration format: {e}"
+                ) from e
         else:
             retention_days = settings.ACTIVATION_DB_LOG_RETENTION_DAYS
             if retention_days <= 0:

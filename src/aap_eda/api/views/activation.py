@@ -39,11 +39,11 @@ from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
 from aap_eda.core.health import check_dispatcherd_workers_health
 from aap_eda.core.utils import logging_utils
 from aap_eda.core.utils.delete_log_util import (
-    delete_all_logs,
     delete_logs_for_activation,
     delete_logs_for_activation_instance,
     delete_logs_older_than,
 )
+from aap_eda.tasks.management import aap_eda_manage_commands
 from aap_eda.tasks.orchestrator import (
     delete_rulebook_process,
     restart_rulebook_process,
@@ -997,11 +997,40 @@ class LogPurgeViewSet(viewsets.ViewSet):
             data=request.data,
         )
         request_serializer.is_valid(raise_exception=True)
-        before_date = request_serializer.validated_data.get("before_date")
+        validated_data = request_serializer.validated_data
 
-        deleted = delete_all_logs(cutoff=before_date)
+        # Build arguments for the management command
+        args = {}
+
+        # Handle date parameter (convert datetime to date string)
+        before_date = validated_data.get("before_date")
+        if before_date:
+            args["date"] = before_date.strftime("%Y-%m-%d")
+
+        # Handle retention_duration parameter
+        retention_duration = validated_data.get("retention_duration")
+        if retention_duration:
+            args["retention_duration"] = retention_duration
+
+        # Handle activation_ids parameter
+        activation_ids = validated_data.get("activation_ids")
+        if activation_ids:
+            args["activation-ids"] = activation_ids
+
+        # Handle activation_names parameter
+        activation_names = validated_data.get("activation_names")
+        if activation_names:
+            args["activation-names"] = activation_names
+
+        # Handle audit_trail parameter
+        audit_trail = validated_data.get("audit_trail", False)
+        if audit_trail:
+            args["audit_trail"] = True
+
+        # Submit the task to the default worker queue
+        job_id = aap_eda_manage_commands("purge_log_records", **args)
 
         return Response(
-            serializers.LogPurgeResponseSerializer({"deleted": deleted}).data,
-            status=status.HTTP_200_OK,
+            serializers.LogPurgeResponseSerializer({"job_id": job_id}).data,
+            status=status.HTTP_202_ACCEPTED,
         )
