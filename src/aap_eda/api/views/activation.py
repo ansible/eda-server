@@ -31,7 +31,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
-from aap_eda.api.pagination import LogPagination
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
@@ -816,10 +815,7 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
         return super().filter_queryset(queryset)
 
     @extend_schema(
-        description=(
-            "List Activation instance logs. "
-            "Results are paginated with a maximum page_size of 5000."
-        ),
+        description="List Activation instance logs",
         request=None,
         responses={
             status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer(
@@ -838,18 +834,16 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
             "x-ai-description": (
                 "List logs for an activation instance by ID. "
                 "Returns log records with timestamps and levels. "
-                "Supports filtering and pagination. "
-                "Maximum page_size is 5000."
+                "Supports filtering and pagination."
             )
         },
     )
     @action(
         detail=False,
-        queryset=models.RulebookProcessLog.objects.order_by("-id"),
+        queryset=models.RulebookProcessLog.objects.order_by("id"),
         filterset_class=filters.ActivationInstanceLogFilter,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/logs",
-        pagination_class=LogPagination,
     )
     def logs(self, request, id):
         instance_exists = (
@@ -865,7 +859,7 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
 
         activation_instance_logs = models.RulebookProcessLog.objects.filter(
             activation_instance_id=id
-        ).order_by("-id")
+        ).order_by("id")
         activation_instance_logs = self.filter_queryset(
             activation_instance_logs
         )
