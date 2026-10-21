@@ -12,11 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .activation import (
-    ActivationInstanceViewSet,
-    ActivationViewSet,
-    LogPurgeViewSet,
-)
+from .activation import ActivationInstanceViewSet, ActivationViewSet
 from .auth import SessionLoginView, SessionLogoutView, TokenRefreshView
 from .config import ConfigView
 from .credential_input_source import CredentialInputSourceViewSet
@@ -44,8 +40,6 @@ __all__ = (
     # activations
     "ActivationViewSet",
     "ActivationInstanceViewSet",
-    # logs
-    "LogPurgeViewSet",
     # user
     "CurrentUserView",
     "CurrentUserAwxTokenViewSet",
