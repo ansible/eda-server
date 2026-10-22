@@ -798,10 +798,9 @@ def test_retention_failure_reports_committed_batch_count(
         return original_delete(queryset)
 
     monkeypatch.setattr(QuerySet, "delete", fail_second_delete)
+    cutoff = datetime(1970, 1, 1, 0, 0, 2, tzinfo=datetime_timezone.utc)
     with pytest.raises(delete_log_util.LogPurgeError) as error:
-        delete_log_util.delete_logs_older_than(
-            datetime(1970, 1, 1, 0, 0, 2, tzinfo=datetime_timezone.utc)
-        )
+        delete_log_util.delete_logs_older_than(cutoff)
 
     assert error.value.deleted_count == 1
     assert models.RulebookProcessLog.objects.count() == 2
