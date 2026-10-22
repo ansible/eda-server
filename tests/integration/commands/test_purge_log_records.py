@@ -260,7 +260,8 @@ def test_purge_log_records(
         )
         assert original_logs.count() == 4
 
-    assert "Purged" in captured.out and "globally" in captured.out
+    assert "Purged" in captured.out
+    assert "globally" in captured.out
 
 
 @pytest.fixture
@@ -388,7 +389,8 @@ def test_purge_without_activation_filter_handles_null_correctly(
     assert (
         remaining_test_logs.count() == 0
     ), "All test logs should be purged when no activation filter is used"
-    assert "Purged" in captured.out and "globally" in captured.out
+    assert "Purged" in captured.out
+    assert "globally" in captured.out
 
 
 @pytest.mark.django_db
@@ -449,9 +451,9 @@ def test_purge_with_activation_filter_now_includes_null_fix(
     ), "Normal activation logs should have been purged"
 
     # Verify that the command output mentions orphaned records
+    assert "Audit trail will include" in captured.out
     assert (
-        "Audit trail will include" in captured.out
-        and "orphaned" in captured.out
+        "orphaned" in captured.out
     ), "Should mention orphaned records in output"
 
 
@@ -503,7 +505,7 @@ def test_purge_with_activation_name_filter_also_includes_null_fix(
     )
 
     # Verify that the command output mentions orphaned records
+    assert "Audit trail will include" in captured.out
     assert (
-        "Audit trail will include" in captured.out
-        and "orphaned" in captured.out
+        "orphaned" in captured.out
     ), "Should mention orphaned records in output"
