@@ -30,9 +30,9 @@ class Command(BaseCommand):
 
     help = (
         "Purge log records from rulebook processes. "
-        "Always purges ALL log records older than the cutoff date globally. "
-        "If activation ids or names are specified, detailed reporting is "
-        "provided for those activations and orphaned records."
+        "Always purges all log records older than --date globally. "
+        "Activation ids or names only control detailed reporting for those "
+        "activations and orphaned records; they do not limit deletion."
     )
 
     def add_arguments(self, parser: CommandParser) -> None:
@@ -42,8 +42,9 @@ class Command(BaseCommand):
             type=int,
             dest="activation-ids",
             help=(
-                "Specify the activation ids which you want to clear their "
-                "records (e.g., ActivationID1 ActivationID2)"
+                "Activation ids to include in detailed reporting only. "
+                "This does not limit deletion: all log records older than "
+                "--date are purged globally (e.g., 123 456)."
             ),
         )
         parser.add_argument(
@@ -52,8 +53,10 @@ class Command(BaseCommand):
             type=str,
             dest="activation-names",
             help=(
-                "Specify the activation names which you want to clear their "
-                "records (e.g., ActivationName1 ActivationName2)"
+                "Activation names to include in detailed reporting only. "
+                "This does not limit deletion: all log records older than "
+                "--date are purged globally (e.g., ActivationName1 "
+                "ActivationName2)."
             ),
         )
         parser.add_argument(
