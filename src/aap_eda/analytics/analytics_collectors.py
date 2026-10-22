@@ -533,9 +533,7 @@ def rulebook_processes_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ) -> list[str]:
     args = {"started_at": True}
-    queryset = _get_query(
-        models.RulebookProcess.objects, since, until, **args
-    ).defer("stored_lines_since_cap_check")
+    queryset = _get_query(models.RulebookProcess.objects, since, until, **args)
 
     return _copy_table("rulebook_processes", queryset, full_path)
 

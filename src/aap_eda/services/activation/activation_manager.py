@@ -14,7 +14,6 @@
 """Module for Activation Manager."""
 
 import contextlib
-import functools
 import logging
 import typing as tp
 from datetime import timedelta
@@ -77,10 +76,7 @@ class ActivationManager(StatusManager):
                 db_instance.id, self.db_instance_type
             )
 
-        self.container_logger_class = functools.partial(
-            container_logger_class,
-            store_debug_logs=getattr(db_instance, "store_debug_logs", False),
-        )
+        self.container_logger_class = container_logger_class
 
     def _update_started_time(self) -> None:
         """Update latest instance's started_at to now."""

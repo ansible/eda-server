@@ -94,7 +94,3 @@ class DefaultPagination(pagination.PageNumberPagination):
                 "results": schema,
             },
         }
-
-
-class LogPagination(DefaultPagination):
-    max_page_size = 5000
