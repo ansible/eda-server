@@ -134,30 +134,36 @@ class LogPurgeRequestSerializer(serializers.Serializer):
         )
         return fields
 
+    @staticmethod
+    def _validate_full_purge(attrs):
+        if (
+            attrs.get("before_date") is not None
+            or attrs.get("retention_duration") is not None
+        ):
+            raise serializers.ValidationError(
+                "purge-all-logs cannot be combined with a cutoff."
+            )
+        if "activation_ids" in attrs or "activation_names" in attrs:
+            raise serializers.ValidationError(
+                "purge-all-logs cannot be combined with activation selectors."
+            )
+        if not attrs["audit_trail"]:
+            raise serializers.ValidationError(
+                "purge-all-logs requires audit_trail=true."
+            )
+
     def validate(self, attrs):
         unknown_fields = set(self.initial_data) - set(self.fields)
         if unknown_fields:
             raise serializers.ValidationError(
-                {field: "Unknown field." for field in sorted(unknown_fields)}
+                dict.fromkeys(sorted(unknown_fields), "Unknown field.")
             )
 
+        if attrs["purge_all_logs"]:
+            self._validate_full_purge(attrs)
+            return attrs
         before_date = attrs.get("before_date")
         duration = attrs.get("retention_duration")
-        if attrs["purge_all_logs"]:
-            if before_date is not None or duration is not None:
-                raise serializers.ValidationError(
-                    "purge-all-logs cannot be combined with a cutoff."
-                )
-            if "activation_ids" in attrs or "activation_names" in attrs:
-                raise serializers.ValidationError(
-                    "purge-all-logs cannot be combined with activation "
-                    "selectors."
-                )
-            if not attrs["audit_trail"]:
-                raise serializers.ValidationError(
-                    "purge-all-logs requires audit_trail=true."
-                )
-            return attrs
         if (before_date is None) == (duration is None):
             raise serializers.ValidationError(
                 "Exactly one of before_date or retention_duration is required."

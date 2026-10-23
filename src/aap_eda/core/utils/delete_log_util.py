@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from math import ceil
 
@@ -49,6 +50,16 @@ class LogPurgeError(Exception):
     def __init__(self, message: str, deleted_count: int):
         self.deleted_count = deleted_count
         super().__init__(message)
+
+
+@dataclass(frozen=True)
+class _PurgeOptions:
+    cutoff: datetime | None
+    cutoff_timestamp: float | None
+    selected_ids: set[int] | None
+    audit_trail: bool
+    internal_job_uuid: str | None
+    purge_all_logs: bool
 
 
 def resolve_activation_ids(
@@ -145,16 +156,15 @@ def _marker_text(
     return text
 
 
-def delete_logs_older_than(
+def _validate_purge_options(
     cutoff: datetime | None,
     *,
-    activation_ids: list[int] | None = None,
-    activation_names: list[str] | None = None,
-    audit_trail: bool = True,
-    internal_job_uuid: str | None = None,
-    purge_all_logs: bool = False,
-) -> int:
-    """Purge logs per process in committed, bounded ID batches."""
+    activation_ids: list[int] | None,
+    activation_names: list[str] | None,
+    audit_trail: bool,
+    internal_job_uuid: str | None,
+    purge_all_logs: bool,
+) -> _PurgeOptions:
     if not isinstance(purge_all_logs, bool):
         raise ValueError("purge_all_logs must be a boolean.")
     if purge_all_logs:
@@ -175,16 +185,134 @@ def delete_logs_older_than(
             raise ValueError("A cutoff is required unless purging all logs.")
         selected_ids = resolve_activation_ids(activation_ids, activation_names)
         cutoff_timestamp = cutoff.timestamp()
+    return _PurgeOptions(
+        cutoff,
+        cutoff_timestamp,
+        selected_ids,
+        audit_trail,
+        internal_job_uuid,
+        purge_all_logs,
+    )
+
+
+def _write_audit_marker(
+    process_id: int,
+    activation_id: int | None,
+    tracking_id: str | None,
+    marker_id: int | None,
+    deleted_count: int,
+    options: _PurgeOptions,
+) -> int:
+    purge_time = datetime.now(timezone.utc)
+    marker_timestamp = max(
+        ceil(purge_time.timestamp()),
+        ceil(options.cutoff_timestamp)
+        if options.cutoff_timestamp is not None
+        else 0,
+    )
+    marker_text = _marker_text(
+        options.cutoff,
+        purge_time,
+        deleted_count,
+        tracking_id,
+        activation_id is None,
+        options.internal_job_uuid,
+    )
+    if marker_id is None:
+        marker = models.RulebookProcessLog.objects.create(
+            activation_instance_id=process_id,
+            log=marker_text,
+            log_timestamp=marker_timestamp,
+            log_created_at=PURGE_MARKER_CREATED_AT,
+        )
+        return marker.id
+    updated = models.RulebookProcessLog.objects.filter(pk=marker_id).update(
+        log=marker_text,
+        log_timestamp=marker_timestamp,
+    )
+    if updated != 1:
+        raise RuntimeError("The current purge marker disappeared.")
+    return marker_id
+
+
+def _purge_process_logs(process: tuple, options: _PurgeOptions):
+    """Yield each committed batch count so failures retain partial totals."""
+    process_id, activation_id, tracking_id = process
+    qualifying = _logs_to_purge(
+        process_id,
+        options.cutoff_timestamp,
+        options.selected_ids,
+        options.purge_all_logs,
+    )
+    highest_log_id = qualifying.aggregate(max_id=Max("id"))["max_id"]
+    if highest_log_id is None:
+        return
+
+    last_log_id = 0
+    process_deleted = 0
+    marker_id = None
+    model_label = models.RulebookProcessLog._meta.label
+    while last_log_id < highest_log_id:
+        batch_ids = list(
+            qualifying.filter(id__gt=last_log_id, id__lte=highest_log_id)
+            .order_by("id")
+            .values_list("id", flat=True)[:DELETE_BATCH_SIZE]
+        )
+        if not batch_ids:
+            break
+        with transaction.atomic():
+            _, per_model_counts = (
+                _logs_to_purge(
+                    process_id,
+                    options.cutoff_timestamp,
+                    options.selected_ids,
+                    options.purge_all_logs,
+                )
+                .filter(id__in=batch_ids)
+                .delete()
+            )
+            batch_deleted = per_model_counts.get(model_label, 0)
+            if options.audit_trail and batch_deleted:
+                marker_id = _write_audit_marker(
+                    process_id,
+                    activation_id,
+                    tracking_id,
+                    marker_id,
+                    process_deleted + batch_deleted,
+                    options,
+                )
+        process_deleted += batch_deleted
+        last_log_id = batch_ids[-1]
+        yield batch_deleted
+
+
+def delete_logs_older_than(
+    cutoff: datetime | None,
+    *,
+    activation_ids: list[int] | None = None,
+    activation_names: list[str] | None = None,
+    audit_trail: bool = True,
+    internal_job_uuid: str | None = None,
+    purge_all_logs: bool = False,
+) -> int:
+    """Purge logs per process in committed, bounded ID batches."""
+    options = _validate_purge_options(
+        cutoff,
+        activation_ids=activation_ids,
+        activation_names=activation_names,
+        audit_trail=audit_trail,
+        internal_job_uuid=internal_job_uuid,
+        purge_all_logs=purge_all_logs,
+    )
     processes = models.RulebookProcess.objects.all()
-    if selected_ids is not None:
-        processes = processes.filter(activation_id__in=selected_ids)
+    if options.selected_ids is not None:
+        processes = processes.filter(activation_id__in=options.selected_ids)
     highest_process_id = processes.aggregate(max_id=Max("id"))["max_id"]
     if highest_process_id is None:
         return 0
 
     deleted_count = 0
     last_process_id = 0
-    model_label = models.RulebookProcessLog._meta.label
     try:
         while last_process_id < highest_process_id:
             process_batch = list(
@@ -198,83 +326,9 @@ def delete_logs_older_than(
             )
             if not process_batch:
                 break
-            for process_id, activation_id, tracking_id in process_batch:
-                qualifying = _logs_to_purge(
-                    process_id, cutoff_timestamp, selected_ids, purge_all_logs
-                )
-                highest_log_id = qualifying.aggregate(max_id=Max("id"))[
-                    "max_id"
-                ]
-                if highest_log_id is None:
-                    continue
-
-                last_log_id = 0
-                process_deleted = 0
-                marker_id = None
-                while last_log_id < highest_log_id:
-                    batch_ids = list(
-                        qualifying.filter(
-                            id__gt=last_log_id, id__lte=highest_log_id
-                        )
-                        .order_by("id")
-                        .values_list("id", flat=True)[:DELETE_BATCH_SIZE]
-                    )
-                    if not batch_ids:
-                        break
-                    with transaction.atomic():
-                        _, per_model_counts = (
-                            _logs_to_purge(
-                                process_id,
-                                cutoff_timestamp,
-                                selected_ids,
-                                purge_all_logs,
-                            )
-                            .filter(id__in=batch_ids)
-                            .delete()
-                        )
-                        batch_deleted = per_model_counts.get(model_label, 0)
-                        if audit_trail and batch_deleted:
-                            purge_time = datetime.now(timezone.utc)
-                            marker_timestamp = max(
-                                ceil(purge_time.timestamp()),
-                                ceil(cutoff_timestamp)
-                                if cutoff_timestamp is not None
-                                else 0,
-                            )
-                            marker_text = _marker_text(
-                                cutoff,
-                                purge_time,
-                                process_deleted + batch_deleted,
-                                tracking_id,
-                                activation_id is None,
-                                internal_job_uuid,
-                            )
-                            if marker_id is None:
-                                marker = (
-                                    models.RulebookProcessLog.objects.create(
-                                        activation_instance_id=process_id,
-                                        log=marker_text,
-                                        log_timestamp=marker_timestamp,
-                                        log_created_at=PURGE_MARKER_CREATED_AT,
-                                    )
-                                )
-                                marker_id = marker.id
-                            else:
-                                updated = (
-                                    models.RulebookProcessLog.objects.filter(
-                                        pk=marker_id
-                                    ).update(
-                                        log=marker_text,
-                                        log_timestamp=marker_timestamp,
-                                    )
-                                )
-                                if updated != 1:
-                                    raise RuntimeError(
-                                        "The current purge marker disappeared."
-                                    )
-                    process_deleted += batch_deleted
+            for process in process_batch:
+                for batch_deleted in _purge_process_logs(process, options):
                     deleted_count += batch_deleted
-                    last_log_id = batch_ids[-1]
             last_process_id = process_batch[-1][0]
     except Exception as exc:
         raise LogPurgeError(
