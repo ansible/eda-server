@@ -461,15 +461,23 @@ task docker:purge && EDA_SECRET_KEY=insecure task docker:up
 Do **not** confuse the two — see the command docstring in
 `src/aap_eda/core/management/commands/rotate_db_encryption_key.py`.
 
-## Global log purge
+## Log purge
 
-The global log purge endpoint is `POST /api/eda/v1/logs/purge/`. Only a
-superuser can submit it. A successful request returns HTTP 202 with a `job_id`;
-this confirms that dispatcherd accepted the job, not that deletion has
-completed. The endpoint deletes qualifying log rows across all activations.
-Optional `activation_ids` and `activation_names` select audit-trail targets
-only; they never limit deletion. Audit entries are disabled by default for
-both API and CLI requests.
+- **Submit a job:** A superuser sends `POST /api/eda/v1/logs/purge/`. HTTP 202
+  with a `job_id` means dispatcherd accepted the job; deletion may still be
+  running.
+- **Choose a cutoff:** Supply exactly one of `before_date` (midnight UTC in
+  `YYYY-MM-DD` format) or a positive ISO 8601 `retention_duration`. Only rows
+  with `log_timestamp` strictly before the cutoff qualify. Future UTC cutoffs
+  are rejected.
+- **Choose the scope:** With no selectors, qualifying ordinary logs from every
+  process are included, including processes without an activation.
+  `activation_ids` and `activation_names` select the union of matching
+  activations. Empty or unknown selectors are rejected before queueing.
+- **Choose audit behavior:** Audit markers are enabled by default. Set API
+  `audit_trail` to `false` to disable them.
+
+For example, this request queues a purge for the named activation:
 
 ```http
 POST /api/eda/v1/logs/purge/
@@ -479,17 +487,39 @@ Content-Type: application/json
  "activation_names": ["production-rules"]}
 ```
 
-`retention_duration` is an optional ISO 8601 duration such as `P30D` or
-`P1M`. If omitted, the worker reads
-`ACTIVATION_DB_LOG_RETENTION_DAYS`; its default is `0`, which disables
-deletion. Calendar months and years are subtracted in UTC, clamping a day that
-does not exist in the target month to that month's final day. The CLI also
-supports `--date YYYY-MM-DD` (interpreted as midnight UTC) and
-`--retention-duration P30D`; those options are mutually exclusive. The API
-does not accept `before_date`.
+**CLI options**
 
-Inspect default-worker logs by the returned job ID to see started, completed,
-skipped, and failed outcomes, including `deleted_count`:
+- Use either `--date YYYY-MM-DD` or `--retention-duration P30D`. Calendar
+  months and years in a duration are subtracted in UTC. If the target month
+  lacks the original day, the cutoff uses that month's final day.
+- Use `--activation-ids 123 456`, `--activation-names name1 name2`, or both to
+  limit deletion to the selected activations. Omit both for a global purge.
+- Use `--audit-trail=true` or `--audit-trail=false`. A bare `--audit-trail` is
+  invalid.
+- The optional `--internal-job-uuid` adds the EDA purge task UUID to markers.
+  The API supplies this UUID automatically.
+
+**Deletion and audit markers**
+
+- Deletion commits in batches. If a later batch fails, worker logs record the
+  count already deleted, and the job reports failure. Audit markers record the
+  partial count when audit is enabled.
+- When audit is enabled, each process that loses ordinary log rows gets one
+  marker with its count for this invocation.
+- This change makes no schema or data migration. New markers use a reserved
+  `log_created_at` value to exclude them from later purges. Earlier markers
+  with `log_created_at` set to null are excluded by an exact regular expression
+  matching the old fixed message format. No broad update of existing logs is
+  run.
+- An ordinary log with that exact legacy text or the reserved timestamp is
+  indistinguishable from a marker and will also be retained. The regular
+  expression adds work to candidate and DELETE queries; measure performance
+  on a representative PostgreSQL database before drawing conclusions.
+
+**Check the outcome**
+
+- Inspect default-worker logs by the returned job ID for started, completed,
+  skipped, and failed outcomes, including `deleted_count`:
 
 ```shell
 JOB_ID=<job-id-from-response>
@@ -498,8 +528,8 @@ kubectl logs -n "${NAMESPACE:-aap-eda}" \
   | grep "job_id=${JOB_ID}"
 ```
 
-The dispatcherd `running` view only reports in-flight work; the structured
-worker log lines are the supported completion and deletion-count record.
+- The dispatcherd `running` view reports only in-flight work. Structured
+  worker log lines are the completion and deletion-count record.
 
 ### Running linters
 

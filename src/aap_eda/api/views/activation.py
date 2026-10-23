@@ -873,16 +873,19 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class LogPurgeViewSet(viewsets.GenericViewSet):
-    """Global, superuser-only log purge scheduling endpoint."""
+    """Superuser-only log purge scheduling endpoint."""
 
     permission_classes = (IsSystemAdmin,)
     serializer_class = serializers.LogPurgeRequestSerializer
 
     @extend_schema(
         description=(
-            "Queue a global deletion of old activation logs. The activation "
-            "IDs and names select audit-trail targets only. The returned job "
-            "ID acknowledges scheduling; it does not mean deletion is done."
+            "Queue deletion of process logs older than one UTC cutoff: "
+            "before_date (YYYY-MM-DD) or retention_duration (positive ISO "
+            "8601). Without activation selectors, all processes, including "
+            "orphaned ones, are included. Activation IDs and names limit "
+            "deletion to their union. Audit markers default to enabled. "
+            "The returned job ID acknowledges scheduling only."
         ),
         request=serializers.LogPurgeRequestSerializer,
         responses={
@@ -905,7 +908,7 @@ class LogPurgeViewSet(viewsets.GenericViewSet):
         try:
             job_id = submit_log_purge(**serializer.validated_data)
         except Exception:
-            logger.exception("Unable to queue global log purge")
+            logger.exception("Unable to queue log purge")
             return Response(
                 {"detail": "Unable to queue log purge job."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
