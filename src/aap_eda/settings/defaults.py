@@ -161,6 +161,9 @@ DEFAULT_RULEBOOK_QUEUE_TIMEOUT: int = 120
 
 RULEBOOK_QUEUE_NAME: str = "activation"
 
+# Nonpositive values disable scheduled/default log deletion.
+ACTIVATION_DB_LOG_RETENTION_DAYS: int = 0
+
 API_PREFIX: str = "api/eda"
 
 APP_LOG_LEVEL: str = "INFO"

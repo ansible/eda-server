@@ -42,6 +42,12 @@ from tests.integration.utils import ThreadSafeList
             "fn_call": "_sync_project",
             "fn_args": [1],
         },
+        {
+            "module_path": "aap_eda.tasks.management",
+            "fn_mock": "call_command",
+            "fn_call": "_aap_eda_manage",
+            "fn_args": ["parallel-job", "test_management_command", {}],
+        },
     ],
     ids=[
         "gather_analytics",
@@ -49,6 +55,7 @@ from tests.integration.utils import ThreadSafeList
         "monitor_project_tasks",
         "_import_project",
         "_sync_project",
+        "_aap_eda_manage",
     ],
 )
 @pytest.mark.django_db
@@ -84,7 +91,7 @@ def test_job_uniqueness(module_data):
             mocks = [stack.enter_context(patch) for patch in patches]
             fn_mock = mocks[0]
 
-            def record_call(void=None):
+            def record_call(void=None, **kwargs):
                 time.sleep(1)
                 shared_list.append("called")
 

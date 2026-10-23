@@ -12,15 +12,22 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as datetime_timezone
+from math import ceil
+from unittest import mock
+from uuid import uuid4
 
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import connection, transaction
+from django.db.models.query import QuerySet
+from django.test import override_settings
 from django.utils import timezone
 
 from aap_eda.core import enums, models
+from aap_eda.core.utils import delete_log_util
+from aap_eda.core.utils.log_retention import retention_cutoff
 
 
 @pytest.fixture
@@ -158,36 +165,33 @@ def prepare_log_records(
 
 
 @pytest.mark.django_db
-def test_purge_log_records_missing_required_params():
-    with pytest.raises(
-        CommandError,
-        match="Error: the following arguments are required: --date",
-    ):
-        call_command("purge_log_records")
+def test_purge_log_records_requires_explicit_cutoff_even_with_setting():
+    with override_settings(ACTIVATION_DB_LOG_RETENTION_DAYS=0):
+        with pytest.raises(CommandError, match="Exactly one"):
+            call_command("purge_log_records")
 
 
 @pytest.mark.django_db
-def test_purge_log_records_with_nonexist_activation(capsys):
-    # With global purging, even non-existent activation filters will
-    # still purge old logs globally (if any exist)
-    args = ("--activation-ids", "42", "--date", "2024-10-01")
-    call_command("purge_log_records", args)
-    captured = capsys.readouterr()
-
-    # Should report either no old logs found, or global purge count
-    assert (
-        "No log records found older than 2024-10-01" in captured.out
-        or "Purged" in captured.out
+@pytest.mark.parametrize(
+    "selector, expected",
+    [
+        (("--activation-ids", "999999999"), "Unknown activation IDs"),
+        (("--activation-names", "missing-name"), "Unknown activation names"),
+    ],
+)
+def test_unknown_selector_rejects_before_deleting(
+    prepare_log_records, selector, expected
+):
+    original_ids = set(
+        models.RulebookProcessLog.objects.values_list("id", flat=True)
     )
 
-    args = ("--activation-names", "na", "--date", "2024-10-01")
-    call_command("purge_log_records", args)
-    captured = capsys.readouterr()
+    with pytest.raises(CommandError, match=expected):
+        call_command("purge_log_records", *selector, "--date", "2024-10-01")
 
-    assert (
-        "No log records found older than 2024-10-01" in captured.out
-        or "Purged" in captured.out
-    )
+    assert set(
+        models.RulebookProcessLog.objects.values_list("id", flat=True)
+    ) == (original_ids)
 
 
 @pytest.mark.parametrize(
@@ -210,8 +214,8 @@ def test_purge_log_records(
     if identifiers == "ids":
         args = (
             "--activation-ids",
-            activations[0].id,
-            activations[1].id,
+            str(activations[0].id),
+            str(activations[1].id),
             "--date",
             date_str,
         )
@@ -229,30 +233,26 @@ def test_purge_log_records(
             date_str,
         )
 
-    call_command(command, args)
+    call_command(command, *args)
 
     captured = capsys.readouterr()
 
     if cutoff_days < 10:
-        # Global purge: all original logs deleted, audit logs created for
-        # all 4 RulebookProcess instances
+        # All four processes lose rows and receive their own marker.
         assert models.RulebookProcessLog.objects.count() == 4
 
         for log_record in models.RulebookProcessLog.objects.all():
-            assert (
-                f"All log records older than {date_str} were purged at"
-                in log_record.log
-            )
+            assert f"All log records older than {date_str}" in log_record.log
+            assert "Deleted 2 log rows." in log_record.log
     else:
-        # Global purge: only 30-day logs deleted, 10-day logs remain,
-        # audit logs created for all 4 RulebookProcess instances
-        assert models.RulebookProcessLog.objects.count() == 8
+        # Only the two older processes lose rows and receive markers.
+        assert models.RulebookProcessLog.objects.count() == 6
 
-        # Check audit logs exist for all instances
         audit_logs = models.RulebookProcessLog.objects.filter(
-            log__contains=f"All log records older than {date_str} were purged"
+            log__contains=f"All log records older than {date_str}"
         )
-        assert audit_logs.count() == 4
+        assert audit_logs.count() == 2
+        assert all("Deleted 2 log rows." in row.log for row in audit_logs)
 
         # Check that 10-day logs still exist (not purged)
         original_logs = models.RulebookProcessLog.objects.exclude(
@@ -261,7 +261,9 @@ def test_purge_log_records(
         assert original_logs.count() == 4
 
     assert "Purged" in captured.out
-    assert "globally" in captured.out
+    assert (
+        "globally" if identifiers == "none" else "for selected activations"
+    ) in captured.out
 
 
 @pytest.fixture
@@ -361,151 +363,821 @@ def null_activation_test_data(
 
 
 @pytest.mark.django_db
-def test_purge_without_activation_filter_handles_null_correctly(
-    null_activation_test_data, capsys
+def test_global_purge_includes_orphan_and_marks_each_process(
+    null_activation_test_data,
 ):
-    """Test purge without activation filter includes NULL records.
-    This tests the customer scenario."""
-
-    # Get initial counts
-    initial_log_count = models.RulebookProcessLog.objects.filter(
-        log__contains="for null test"
-    ).count()
-    assert initial_log_count == 4, "Should have 4 test log records"
-
-    # Test purge without activation filtering (customer's command scenario)
     cutoff_date = (timezone.now() - timedelta(days=10)).strftime("%Y-%m-%d")
+    output = call_command("purge_log_records", "--date", cutoff_date)
 
-    call_command("purge_log_records", "--date", cutoff_date, verbosity=3)
-
-    captured = capsys.readouterr()
-
-    # Check that logs were purged
-    remaining_test_logs = models.RulebookProcessLog.objects.filter(
+    assert output.startswith("Purged 4 log records")
+    assert "globally" in output
+    assert not models.RulebookProcessLog.objects.filter(
         log__contains="for null test"
-    ).exclude(log__contains="purged")
-
-    # Both NULL and normal activation logs should be purged in this scenario
-    assert (
-        remaining_test_logs.count() == 0
-    ), "All test logs should be purged when no activation filter is used"
-    assert "Purged" in captured.out
-    assert "globally" in captured.out
+    ).exists()
+    markers = models.RulebookProcessLog.objects.filter(
+        log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT
+    )
+    assert markers.count() == 2
+    orphan_marker = markers.get(
+        activation_instance=null_activation_test_data["null_process"]
+    )
+    assert "Deleted 2 log rows." in orphan_marker.log
+    assert "Log Tracking id unavailable (orphaned process)." in (
+        orphan_marker.log
+    )
 
 
 @pytest.mark.django_db
-def test_purge_with_activation_filter_now_includes_null_fix(
-    null_activation_test_data, capsys
-):
-    """Purge includes NULL records with filters."""
-
-    # Get initial counts
-    initial_log_count = models.RulebookProcessLog.objects.filter(
-        log__contains="for null test"
-    ).count()
-    assert initial_log_count == 4, "Should have 4 test log records"
-
-    # Test purge WITH activation filtering - this should now include
-    # NULL records
+@pytest.mark.parametrize("selector", ["id", "name"])
+def test_scoped_purge_preserves_orphan(null_activation_test_data, selector):
     cutoff_date = (timezone.now() - timedelta(days=10)).strftime("%Y-%m-%d")
-    activation_id = null_activation_test_data["activation"].id
+    activation = null_activation_test_data["activation"]
+    option, value = (
+        ("--activation-ids", str(activation.id))
+        if selector == "id"
+        else ("--activation-names", activation.name)
+    )
 
-    call_command(
+    output = call_command(
+        "purge_log_records", option, value, "--date", cutoff_date
+    )
+
+    assert output.startswith("Purged 2 log records")
+    assert "for selected activations" in output
+    assert (
+        models.RulebookProcessLog.objects.filter(
+            activation_instance=null_activation_test_data["null_process"],
+            log__contains="for null test",
+        ).count()
+        == 2
+    )
+    assert not models.RulebookProcessLog.objects.filter(
+        activation_instance=null_activation_test_data["normal_process"],
+        log__contains="for null test",
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_purge_without_audit_trail_does_not_create_audit_logs(
+    prepare_log_records, capsys
+):
+    cutoff = (timezone.now() - timedelta(days=15)).strftime("%Y-%m-%d")
+    output = call_command(
+        "purge_log_records", "--date", cutoff, "--audit-trail=false"
+    )
+
+    assert output.startswith("Purged 4 log records")
+    assert models.RulebookProcessLog.objects.count() == 4
+    assert not models.RulebookProcessLog.objects.filter(
+        log__contains="were purged at"
+    ).exists()
+    assert "Purged 4 log records" in capsys.readouterr().out
+
+
+@pytest.mark.django_db
+def test_purge_retention_setting_does_not_supply_cutoff(prepare_log_records):
+    with override_settings(ACTIVATION_DB_LOG_RETENTION_DAYS=15):
+        with pytest.raises(CommandError, match="Exactly one"):
+            call_command("purge_log_records")
+
+    assert models.RulebookProcessLog.objects.count() == 8
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("--date", "2026-01-01", "--retention-duration", "P1D"),
+        ("--retention-duration", "P0D"),
+        ("--retention-duration", "-P1D"),
+        ("--retention-duration", "not-a-duration"),
+        ("--date", "not-a-date"),
+        ("--date", "2999-01-01"),
+    ],
+)
+def test_purge_rejects_invalid_retention_arguments(args):
+    with pytest.raises(CommandError):
+        call_command("purge_log_records", *args)
+
+
+@pytest.mark.parametrize(
+    "now, duration, expected",
+    [
+        (
+            datetime(2026, 3, 31, 12, tzinfo=datetime_timezone.utc),
+            "P1M",
+            datetime(2026, 2, 28, 12, tzinfo=datetime_timezone.utc),
+        ),
+        (
+            datetime(2024, 3, 31, 12, tzinfo=datetime_timezone.utc),
+            "P1M",
+            datetime(2024, 2, 29, 12, tzinfo=datetime_timezone.utc),
+        ),
+        (
+            datetime(2024, 2, 29, 12, tzinfo=datetime_timezone.utc),
+            "P1Y",
+            datetime(2023, 2, 28, 12, tzinfo=datetime_timezone.utc),
+        ),
+        (
+            datetime(
+                2026,
+                10,
+                1,
+                0,
+                30,
+                tzinfo=timezone.get_fixed_timezone(120),
+            ),
+            "P1D",
+            datetime(2026, 9, 29, 22, 30, tzinfo=datetime_timezone.utc),
+        ),
+        (
+            datetime(2026, 10, 21, 12, tzinfo=datetime_timezone.utc),
+            "PT30S",
+            datetime(2026, 10, 21, 11, 59, 30, tzinfo=datetime_timezone.utc),
+        ),
+        (
+            datetime(2026, 10, 21, 12, tzinfo=datetime_timezone.utc),
+            "PT5M",
+            datetime(2026, 10, 21, 11, 55, tzinfo=datetime_timezone.utc),
+        ),
+        (
+            datetime(2026, 10, 21, 12, tzinfo=datetime_timezone.utc),
+            "PT2H",
+            datetime(2026, 10, 21, 10, tzinfo=datetime_timezone.utc),
+        ),
+        (
+            datetime(2026, 10, 21, 12, tzinfo=datetime_timezone.utc),
+            "P2W",
+            datetime(2026, 10, 7, 12, tzinfo=datetime_timezone.utc),
+        ),
+    ],
+)
+def test_retention_cutoff_calendar_and_timezone_policy(
+    now, duration, expected
+):
+    assert retention_cutoff(duration, now=now) == expected
+
+
+@pytest.mark.parametrize("filter_by", ["ids", "names"])
+@pytest.mark.django_db
+def test_activation_filter_limits_deletion_and_markers(
+    prepare_log_records, filter_by
+):
+    selected_activation = prepare_log_records[0]
+    cutoff = (timezone.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+    option = "--activation-ids" if filter_by == "ids" else "--activation-names"
+    value = (
+        str(selected_activation.id)
+        if filter_by == "ids"
+        else selected_activation.name
+    )
+
+    output = call_command(
+        "purge_log_records",
+        option,
+        value,
+        "--date",
+        cutoff,
+    )
+
+    audit_logs = models.RulebookProcessLog.objects.filter(
+        log__contains="were purged at"
+    )
+    assert output.startswith("Purged 4 log records")
+    assert audit_logs.count() == 2
+    assert set(
+        audit_logs.values_list("activation_instance__activation_id", flat=True)
+    ) == {selected_activation.id}
+    cutoff_timestamp = (
+        datetime.strptime(cutoff, "%Y-%m-%d")
+        .replace(tzinfo=datetime_timezone.utc)
+        .timestamp()
+    )
+    assert all(
+        log_timestamp >= cutoff_timestamp
+        for log_timestamp in audit_logs.values_list("log_timestamp", flat=True)
+    )
+    assert (
+        models.RulebookProcessLog.objects.filter(
+            activation_instance__activation_id=prepare_log_records[1].id,
+            log__startswith="activation-instance-",
+        ).count()
+        == 4
+    )
+
+
+@pytest.mark.django_db
+def test_retention_duration_deletes_strictly_older_rows_across_activations(
+    default_activation_instances,
+):
+    cutoff = datetime(2026, 1, 1, tzinfo=datetime_timezone.utc)
+    older, equal, newer = [
+        models.RulebookProcessLog.objects.create(
+            log=f"boundary-{timestamp}",
+            activation_instance=default_activation_instances[index % 2],
+            log_timestamp=timestamp,
+        )
+        for index, timestamp in enumerate(
+            (
+                cutoff.timestamp() - 1,
+                cutoff.timestamp(),
+                cutoff.timestamp() + 1,
+            )
+        )
+    ]
+
+    deleted = delete_log_util.delete_logs_older_than(cutoff)
+
+    assert deleted == 1
+    assert not models.RulebookProcessLog.objects.filter(pk=older.pk).exists()
+    assert (
+        models.RulebookProcessLog.objects.filter(
+            pk__in=[equal.pk, newer.pk]
+        ).count()
+        == 2
+    )
+
+
+@pytest.mark.django_db
+def test_retention_batches_continue_after_more_than_one_batch(
+    default_activation_instance, monkeypatch
+):
+    monkeypatch.setattr(delete_log_util, "DELETE_BATCH_SIZE", 2)
+    logs = models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                log=f"batch-{index}",
+                activation_instance=default_activation_instance,
+                log_timestamp=1,
+            )
+            for index in range(5)
+        ]
+    )
+
+    assert (
+        delete_log_util.delete_logs_older_than(
+            datetime(1970, 1, 1, 0, 0, 2, tzinfo=datetime_timezone.utc)
+        )
+        == 5
+    )
+    assert not models.RulebookProcessLog.objects.filter(
+        pk__in=[log.pk for log in logs]
+    ).exists()
+    marker = models.RulebookProcessLog.objects.get(
+        log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT
+    )
+    assert "Deleted 5 log rows." in marker.log
+
+
+@pytest.mark.django_db
+def test_retention_stops_at_initial_highest_qualifying_id(
+    default_activation_instance, monkeypatch
+):
+    monkeypatch.setattr(delete_log_util, "DELETE_BATCH_SIZE", 1)
+    models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                log=f"snapshot-{index}",
+                activation_instance=default_activation_instance,
+                log_timestamp=1,
+            )
+            for index in range(2)
+        ]
+    )
+    original_delete = QuerySet.delete
+    new_log = []
+    calls = 0
+
+    def insert_after_first_batch(queryset):
+        nonlocal calls
+        result = original_delete(queryset)
+        calls += 1
+        if calls == 1:
+            new_log.append(
+                models.RulebookProcessLog.objects.create(
+                    log="arrived-during-purge",
+                    activation_instance=default_activation_instance,
+                    log_timestamp=1,
+                )
+            )
+        return result
+
+    monkeypatch.setattr(QuerySet, "delete", insert_after_first_batch)
+    deleted = delete_log_util.delete_logs_older_than(
+        datetime(1970, 1, 1, 0, 0, 2, tzinfo=datetime_timezone.utc)
+    )
+
+    assert deleted == 2
+    assert models.RulebookProcessLog.objects.filter(pk=new_log[0].pk).exists()
+
+
+@pytest.mark.django_db
+def test_batch_delete_rechecks_cutoff_after_candidate_selection(
+    default_activation_instance, monkeypatch
+):
+    log = models.RulebookProcessLog.objects.create(
+        log="changed-between-selection-and-delete",
+        activation_instance=default_activation_instance,
+        log_timestamp=1,
+    )
+    original_delete = QuerySet.delete
+
+    def move_log_past_cutoff_before_delete(queryset):
+        models.RulebookProcessLog.objects.filter(pk=log.pk).update(
+            log_timestamp=3
+        )
+        return original_delete(queryset)
+
+    monkeypatch.setattr(QuerySet, "delete", move_log_past_cutoff_before_delete)
+    cutoff = datetime(1970, 1, 1, 0, 0, 2, tzinfo=datetime_timezone.utc)
+
+    assert delete_log_util.delete_logs_older_than(cutoff) == 0
+    log.refresh_from_db()
+    assert log.log_timestamp == 3
+    assert models.RulebookProcessLog.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_retention_with_no_matching_rows_returns_zero(
+    default_activation_instance,
+):
+    models.RulebookProcessLog.objects.create(
+        log="new",
+        activation_instance=default_activation_instance,
+        log_timestamp=2,
+    )
+    assert (
+        delete_log_util.delete_logs_older_than(
+            datetime(1970, 1, 1, 0, 0, 2, tzinfo=datetime_timezone.utc)
+        )
+        == 0
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_retention_failure_reports_committed_batch_count(
+    default_activation_instance, monkeypatch
+):
+    monkeypatch.setattr(delete_log_util, "DELETE_BATCH_SIZE", 1)
+    models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                log=f"partial-{index}",
+                activation_instance=default_activation_instance,
+                log_timestamp=1,
+            )
+            for index in range(3)
+        ]
+    )
+    original_delete = QuerySet.delete
+    calls = 0
+
+    def fail_second_delete(queryset):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("injected batch failure")
+        return original_delete(queryset)
+
+    monkeypatch.setattr(QuerySet, "delete", fail_second_delete)
+    cutoff = datetime(1970, 1, 1, 0, 0, 2, tzinfo=datetime_timezone.utc)
+    with pytest.raises(delete_log_util.LogPurgeError) as error:
+        delete_log_util.delete_logs_older_than(cutoff)
+
+    assert error.value.deleted_count == 1
+    assert models.RulebookProcessLog.objects.count() == 3
+    marker = models.RulebookProcessLog.objects.get(
+        log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT
+    )
+    assert "Deleted 1 log rows." in marker.log
+    assert (
+        models.RulebookProcessLog.objects.filter(
+            log__startswith="partial-"
+        ).count()
+        == 2
+    )
+
+
+@pytest.mark.django_db
+def test_retention_duration_cli_uses_execution_time_cutoff(
+    default_activation_instance,
+):
+    cutoff_epoch = datetime(
+        2026, 10, 20, tzinfo=datetime_timezone.utc
+    ).timestamp()
+    logs = models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                log=f"duration-{index}",
+                activation_instance=default_activation_instance,
+                log_timestamp=timestamp,
+            )
+            for index, timestamp in enumerate(
+                (cutoff_epoch - 1, cutoff_epoch, cutoff_epoch + 1)
+            )
+        ]
+    )
+
+    with mock.patch(
+        "aap_eda.core.utils.log_retention.datetime"
+    ) as mocked_datetime:
+        mocked_datetime.now.return_value = datetime(
+            2026, 10, 21, tzinfo=datetime_timezone.utc
+        )
+        mocked_datetime.timezone = datetime_timezone
+        output = call_command(
+            "purge_log_records", "--retention-duration", "P1D"
+        )
+
+    assert output.startswith("Purged 1 log records")
+    assert not models.RulebookProcessLog.objects.filter(pk=logs[0].pk).exists()
+    assert (
+        models.RulebookProcessLog.objects.filter(
+            pk__in=[logs[1].pk, logs[2].pk]
+        ).count()
+        == 2
+    )
+
+
+@pytest.mark.django_db
+def test_mixed_selectors_form_union_and_validate_all_before_delete(
+    prepare_log_records,
+):
+    first, second = prepare_log_records
+    cutoff = (timezone.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+    original_ids = set(
+        models.RulebookProcessLog.objects.values_list("id", flat=True)
+    )
+
+    with pytest.raises(CommandError, match="Unknown activation names"):
+        call_command(
+            "purge_log_records",
+            "--activation-ids",
+            str(first.id),
+            "--activation-names",
+            second.name,
+            "missing-name",
+            "--date",
+            cutoff,
+        )
+    assert set(
+        models.RulebookProcessLog.objects.values_list("id", flat=True)
+    ) == (original_ids)
+
+    output = call_command(
         "purge_log_records",
         "--activation-ids",
-        str(activation_id),
+        str(first.id),
+        "--activation-names",
+        second.name,
         "--date",
-        cutoff_date,
-        verbosity=3,
+        cutoff,
+        "--audit-trail=false",
     )
-
-    captured = capsys.readouterr()
-
-    # Check what logs remain
-    remaining_test_logs = models.RulebookProcessLog.objects.filter(
-        log__contains="for null test"
-    ).exclude(log__contains="purged")
-
-    # Verify the fix: NULL activation logs should now be purged
-    null_activation_logs = [
-        log
-        for log in remaining_test_logs
-        if log.activation_instance.activation_id is None
-    ]
-
-    # This validates the fix: NULL activation logs should now be
-    # included in purge
-    assert len(null_activation_logs) == 0, (
-        "All NULL activation logs should be purged "
-        "when using --activation-ids filter"
-    )
-
-    # Also verify that normal activation logs WERE purged
-    normal_activation_logs = [
-        log
-        for log in remaining_test_logs
-        if log.activation_instance.activation_id is not None
-    ]
-    assert (
-        len(normal_activation_logs) == 0
-    ), "Normal activation logs should have been purged"
-
-    # Verify that the command output mentions orphaned records
-    assert "Audit trail will include" in captured.out
-    assert (
-        "orphaned" in captured.out
-    ), "Should mention orphaned records in output"
+    assert output.startswith("Purged 8 log records")
+    assert "for selected activations" in output
+    assert not models.RulebookProcessLog.objects.exists()
 
 
 @pytest.mark.django_db
-def test_purge_with_activation_name_filter_also_includes_null_fix(
-    null_activation_test_data, capsys
+@pytest.mark.parametrize(
+    "options, error",
+    [
+        ({"activation-ids": []}, "Activation IDs must"),
+        ({"activation-ids": [0]}, "Activation IDs must"),
+        ({"activation-names": [" "]}, "Activation names cannot"),
+    ],
+)
+def test_invalid_programmatic_selectors_never_delete(
+    prepare_log_records, options, error
 ):
-    """Test that the fix also works when using --activation-names parameter."""
+    with pytest.raises(CommandError, match=error):
+        call_command("purge_log_records", date="2024-10-01", **options)
+    assert models.RulebookProcessLog.objects.count() == 8
 
-    # Get initial counts
-    initial_log_count = models.RulebookProcessLog.objects.filter(
-        log__contains="for null test"
-    ).count()
-    assert initial_log_count == 4, "Should have 4 test log records"
 
-    # Test purge with activation NAME filtering - should now include
-    # NULL records (fix)
-    cutoff_date = (timezone.now() - timedelta(days=10)).strftime("%Y-%m-%d")
-    activation_name = null_activation_test_data["activation"].name
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("--audit-trail",),
+        ("--no-audit-trail",),
+        ("--audit-trail=maybe",),
+    ],
+)
+def test_audit_cli_rejects_unsupported_forms(prepare_log_records, args):
+    with pytest.raises(CommandError):
+        call_command("purge_log_records", "--date", "2024-10-01", *args)
+    assert models.RulebookProcessLog.objects.count() == 8
 
-    call_command(
+
+@pytest.mark.django_db
+def test_zero_row_result_creates_no_marker(default_activation_instance):
+    log = models.RulebookProcessLog.objects.create(
+        log="newer-than-cutoff",
+        activation_instance=default_activation_instance,
+        log_timestamp=int(timezone.now().timestamp()),
+    )
+    output = call_command(
+        "purge_log_records", "--date", "2024-01-01", "--audit-trail=true"
+    )
+
+    assert output.startswith("Purged 0 log records")
+    assert "globally" in output
+    assert models.RulebookProcessLog.objects.get(pk=log.pk).log == (
+        "newer-than-cutoff"
+    )
+    assert models.RulebookProcessLog.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_invalid_internal_uuid_rejected_before_deletion(
+    default_activation_instance,
+):
+    log = models.RulebookProcessLog.objects.create(
+        log="old",
+        activation_instance=default_activation_instance,
+        log_timestamp=1,
+    )
+    with pytest.raises(CommandError, match="must be a UUID"):
+        call_command(
+            "purge_log_records",
+            date="2024-01-01",
+            **{"internal-job-uuid": "not-a-uuid"},
+        )
+    assert models.RulebookProcessLog.objects.filter(pk=log.pk).exists()
+
+
+@pytest.mark.django_db
+def test_cli_valid_internal_uuid_is_in_default_audit_marker(
+    default_activation_instance,
+):
+    models.RulebookProcessLog.objects.create(
+        log="old",
+        activation_instance=default_activation_instance,
+        log_timestamp=1,
+    )
+    job_id = uuid4()
+
+    output = call_command(
         "purge_log_records",
-        "--activation-names",
-        activation_name,
         "--date",
-        cutoff_date,
-        verbosity=3,
+        "2024-01-01",
+        "--audit-trail=true",
+        "--internal-job-uuid",
+        str(job_id),
     )
 
-    captured = capsys.readouterr()
+    assert output.startswith("Purged 1 log records")
+    marker = models.RulebookProcessLog.objects.get(
+        log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT
+    )
+    assert f"Job ID: {job_id}." in marker.log
+    assert "Deleted 1 log rows." in marker.log
 
-    # Check what logs remain
-    remaining_test_logs = models.RulebookProcessLog.objects.filter(
-        log__contains="for null test"
-    ).exclude(log__contains="purged")
 
-    # Verify the fix: NULL activation logs should now be purged
-    # with name filtering too
-    null_activation_logs = [
-        log
-        for log in remaining_test_logs
-        if log.activation_instance.activation_id is None
-    ]
+@pytest.mark.django_db
+def test_prior_and_legacy_markers_are_never_counted_or_deleted(
+    default_activation_instance,
+):
+    process = default_activation_instance
+    old_marker = models.RulebookProcessLog.objects.create(
+        activation_instance=process,
+        log=(
+            "All log records older than 2024-01-01 00:00:00 UTC were "
+            "purged at 2024-02-01 00:00:00 UTC."
+        ),
+        log_timestamp=1,
+    )
+    ordinary = models.RulebookProcessLog.objects.create(
+        activation_instance=process, log="ordinary", log_timestamp=1
+    )
+    cutoff = datetime(2024, 3, 1, tzinfo=datetime_timezone.utc)
 
-    # This validates the fix works with activation name filtering
-    assert len(null_activation_logs) == 0, (
-        "All NULL activation logs should be purged "
-        "when using --activation-names filter"
+    assert delete_log_util.delete_logs_older_than(cutoff) == 1
+    first_marker = models.RulebookProcessLog.objects.get(
+        log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT
+    )
+    assert not models.RulebookProcessLog.objects.filter(
+        pk=ordinary.pk
+    ).exists()
+    assert models.RulebookProcessLog.objects.filter(pk=old_marker.pk).exists()
+    assert "Deleted 1 log rows." in first_marker.log
+
+    models.RulebookProcessLog.objects.filter(pk=first_marker.pk).update(
+        log_timestamp=1
+    )
+    assert delete_log_util.delete_logs_older_than(cutoff) == 0
+    assert models.RulebookProcessLog.objects.filter(
+        pk=first_marker.pk
+    ).exists()
+    assert models.RulebookProcessLog.objects.count() == 2
+
+
+@pytest.mark.django_db
+def test_marker_uses_invocation_count_job_uuid_tracking_and_ceiled_timestamp(
+    default_activation_instance,
+):
+    process = default_activation_instance
+    activation = process.activation
+    activation.log_tracking_id = " tracking-123 "
+    activation.save(update_fields=["log_tracking_id"])
+    models.RulebookProcessLog.objects.create(
+        activation_instance=process, log="old", log_timestamp=1
+    )
+    job_id = uuid4()
+    cutoff = datetime(
+        2024, 1, 1, 0, 0, 0, 500000, tzinfo=datetime_timezone.utc
     )
 
-    # Verify that the command output mentions orphaned records
-    assert "Audit trail will include" in captured.out
+    before_purge = timezone.now()
     assert (
-        "orphaned" in captured.out
-    ), "Should mention orphaned records in output"
+        delete_log_util.delete_logs_older_than(
+            cutoff, internal_job_uuid=str(job_id)
+        )
+        == 1
+    )
+    after_purge = timezone.now()
+    marker = models.RulebookProcessLog.objects.get(
+        log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT
+    )
+    assert (
+        max(ceil(before_purge.timestamp()), ceil(cutoff.timestamp()))
+        <= marker.log_timestamp
+        <= max(ceil(after_purge.timestamp()), ceil(cutoff.timestamp()))
+    )
+    assert "2024-01-01 00:00:00.500000 UTC" in marker.log
+    assert "Deleted 1 log rows." in marker.log
+    assert f"Job ID: {job_id}." in marker.log
+    assert "Log Tracking id tracking-123." in marker.log
+
+    models.RulebookProcessLog.objects.create(
+        activation_instance=process, log="another old row", log_timestamp=1
+    )
+    assert delete_log_util.delete_logs_older_than(cutoff) == 1
+    markers = list(
+        models.RulebookProcessLog.objects.filter(
+            log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT
+        )
+    )
+    assert len(markers) == 2
+    assert all("Deleted 1 log rows." in row.log for row in markers)
+    assert (
+        "Job ID:"
+        not in next(row for row in markers if row.pk != marker.pk).log
+    )
+
+
+@pytest.mark.django_db
+def test_purge_all_logs_replaces_old_rows_and_markers_per_process(
+    null_activation_test_data, monkeypatch
+):
+    monkeypatch.setattr(delete_log_util, "DELETE_BATCH_SIZE", 2)
+    normal = null_activation_test_data["normal_process"]
+    orphan = null_activation_test_data["null_process"]
+    models.RulebookProcessLog.objects.create(
+        activation_instance=normal,
+        log="old purge marker",
+        log_timestamp=1,
+        log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT,
+    )
+    models.RulebookProcessLog.objects.create(
+        activation_instance=normal,
+        log="future ordinary log",
+        log_timestamp=int(timezone.now().timestamp()) + 10000,
+    )
+    models.RulebookProcessLog.objects.create(
+        activation_instance=orphan,
+        log=(
+            "All log records older than 2024-01-01 00:00:00 UTC were "
+            "purged at 2024-02-01 00:00:00 UTC."
+        ),
+        log_timestamp=1,
+    )
+    old_ids = set(
+        models.RulebookProcessLog.objects.values_list("id", flat=True)
+    )
+    job_id = uuid4()
+
+    output = call_command(
+        "purge_log_records",
+        "--purge-all-logs",
+        "--internal-job-uuid",
+        str(job_id),
+    )
+
+    assert output.startswith("Purged 7 log records globally")
+    assert not models.RulebookProcessLog.objects.filter(
+        pk__in=old_ids
+    ).exists()
+    markers = models.RulebookProcessLog.objects.all()
+    assert markers.count() == 2
+    normal_marker = markers.get(activation_instance=normal)
+    orphan_marker = markers.get(activation_instance=orphan)
+    assert "Global log purge ran at" in normal_marker.log
+    assert "Deleted 4 log rows." in normal_marker.log
+    assert "Deleted 3 log rows." in orphan_marker.log
+    assert f"Job ID: {job_id}." in normal_marker.log
+    assert "Log Tracking id unavailable (orphaned process)." in (
+        orphan_marker.log
+    )
+    assert all(
+        marker.log_created_at == delete_log_util.PURGE_MARKER_CREATED_AT
+        for marker in markers
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "conflicting_options",
+    [
+        ("--date", "2024-01-01"),
+        ("--retention-duration", "P1D"),
+        ("--activation-ids", "1"),
+        ("--activation-names", "example"),
+        ("--audit-trail=false",),
+    ],
+)
+def test_purge_all_logs_rejects_other_modes_before_deletion(
+    default_activation_instance, conflicting_options
+):
+    log = models.RulebookProcessLog.objects.create(
+        activation_instance=default_activation_instance,
+        log="must remain",
+        log_timestamp=1,
+    )
+
+    with pytest.raises(CommandError, match="purge-all-logs"):
+        call_command(
+            "purge_log_records", "--purge-all-logs", *conflicting_options
+        )
+
+    assert models.RulebookProcessLog.objects.filter(pk=log.pk).exists()
+
+
+@pytest.mark.django_db
+def test_purge_all_logs_rejects_programmatic_non_boolean_flag(
+    default_activation_instance,
+):
+    log = models.RulebookProcessLog.objects.create(
+        activation_instance=default_activation_instance,
+        log="must remain",
+        log_timestamp=1,
+    )
+
+    with pytest.raises(CommandError, match="must be a boolean flag"):
+        call_command("purge_log_records", **{"purge-all-logs": "false"})
+
+    assert models.RulebookProcessLog.objects.filter(pk=log.pk).exists()
+
+
+@pytest.mark.django_db
+def test_purge_all_logs_with_no_rows_creates_no_marker(
+    default_activation_instance,
+):
+    output = call_command("purge_log_records", "--purge-all-logs")
+
+    assert output.startswith("Purged 0 log records globally")
+    assert "No audit markers created." in output
+    assert not models.RulebookProcessLog.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_purge_all_logs_failure_keeps_committed_marker_count(
+    default_activation_instance, monkeypatch
+):
+    monkeypatch.setattr(delete_log_util, "DELETE_BATCH_SIZE", 1)
+    models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                activation_instance=default_activation_instance,
+                log=f"old-{index}",
+                log_timestamp=1,
+            )
+            for index in range(2)
+        ]
+    )
+    original_delete = QuerySet.delete
+    calls = 0
+
+    def fail_second_delete(queryset):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("injected batch failure")
+        return original_delete(queryset)
+
+    monkeypatch.setattr(QuerySet, "delete", fail_second_delete)
+    with pytest.raises(CommandError, match="failed after 1 committed rows"):
+        call_command("purge_log_records", "--purge-all-logs")
+
+    assert (
+        models.RulebookProcessLog.objects.filter(
+            log__startswith="old-"
+        ).count()
+        == 1
+    )
+    marker = models.RulebookProcessLog.objects.get(
+        log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT
+    )
+    assert "Deleted 1 log rows." in marker.log
