@@ -880,12 +880,16 @@ class LogPurgeViewSet(viewsets.GenericViewSet):
 
     @extend_schema(
         description=(
-            "Queue deletion of process logs older than one UTC cutoff: "
+            "Queue deletion of process logs using one UTC cutoff: "
             "before_date (YYYY-MM-DD) or retention_duration (positive ISO "
-            "8601). Without activation selectors, all processes, including "
+            "8601). Alternatively, purge-all-logs=true deletes every "
+            "existing log, including prior audit markers, and leaves one "
+            "new audit marker per affected process. This mode cannot be "
+            "combined with a cutoff, activation selectors, or disabled "
+            "audit. Without activation selectors, all processes, including "
             "orphaned ones, are included. Activation IDs and names limit "
-            "deletion to their union. Audit markers default to enabled. "
-            "The returned job ID acknowledges scheduling only."
+            "cutoff deletion to their union. The returned job ID "
+            "acknowledges scheduling only."
         ),
         request=serializers.LogPurgeRequestSerializer,
         responses={

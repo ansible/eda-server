@@ -13,7 +13,10 @@ from dispatcherd.worker.exceptions import DispatcherCancel
 from django.core.management.base import CommandError
 
 from aap_eda.core import models
-from aap_eda.core.utils.delete_log_util import LogPurgeError
+from aap_eda.core.utils.delete_log_util import (
+    PURGE_MARKER_CREATED_AT,
+    LogPurgeError,
+)
 from aap_eda.tasks.management import (
     LOG_PURGE_TASK_TIMEOUT_SECONDS,
     _aap_eda_manage,
@@ -81,6 +84,53 @@ def test_submit_log_purge_forwards_scope_when_audit_is_disabled():
         "activation-names": ["production"],
         "internal-job-uuid": job_id,
     }
+
+
+@pytest.mark.django_db
+def test_submitted_purge_all_logs_uses_same_command_and_job_id(
+    default_activation_instance, new_activation_instance
+):
+    models.RulebookProcessLog.objects.create(
+        activation_instance=default_activation_instance,
+        log="old marker",
+        log_timestamp=1,
+        log_created_at=PURGE_MARKER_CREATED_AT,
+    )
+    models.RulebookProcessLog.objects.create(
+        activation_instance=default_activation_instance,
+        log="current log",
+        log_timestamp=9999999999,
+    )
+    models.RulebookProcessLog.objects.create(
+        activation_instance=new_activation_instance,
+        log="another log",
+        log_timestamp=1,
+    )
+    job_id = "712beb16-b7dd-40c9-aa29-a7f734376c7a"
+    with mock.patch(
+        "aap_eda.tasks.management.uuid4", return_value=job_id
+    ), mock.patch(
+        "aap_eda.tasks.management.submit_task",
+        return_value=({"uuid": job_id}, "default"),
+    ) as submit_task:
+        assert submit_log_purge(purge_all_logs=True) == job_id
+
+    worker_args = submit_task.call_args.kwargs["args"]
+    assert worker_args[2] == {
+        "audit_trail": True,
+        "purge-all-logs": True,
+        "internal-job-uuid": job_id,
+    }
+    result = _aap_eda_manage(*worker_args)
+
+    assert result["status"] == "completed"
+    assert result["deleted"] == 3
+    markers = models.RulebookProcessLog.objects.all()
+    assert markers.count() == 2
+    assert all(f"Job ID: {job_id}." in marker.log for marker in markers)
+    assert all(
+        marker.log_created_at == PURGE_MARKER_CREATED_AT for marker in markers
+    )
 
 
 @pytest.mark.django_db
