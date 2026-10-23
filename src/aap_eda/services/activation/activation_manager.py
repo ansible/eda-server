@@ -39,6 +39,10 @@ from aap_eda.services.activation.restart_helper import (
 from .drools_cleanup import drools_cleanup
 from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
+from .engine.kubernetes import (
+    Engine as KubernetesEngine,
+    get_service_account_namespace,
+)
 from .status_manager import StatusManager, run_with_lock
 from .tee_system_logger import TeeSystemLogger
 
@@ -77,6 +81,38 @@ class ActivationManager(StatusManager):
             )
 
         self.container_logger_class = container_logger_class
+
+    @contextlib.contextmanager
+    def _instance_engine(self, instance):
+        """Use the Job's persisted namespace for operations on that Job.
+
+        When the process has a recorded namespace, temporarily swap the
+        engine's namespace for the duration of the block.  A process without
+        one was created before this field existed, so persist and use the
+        legacy namespace rather than the current default for new Jobs.
+        """
+        if not isinstance(self.container_engine, KubernetesEngine):
+            yield
+            return
+
+        namespace = instance.activation_job_namespace
+        if not namespace:
+            namespace = get_service_account_namespace()
+            instance.activation_job_namespace = namespace
+            instance.save(update_fields=["activation_job_namespace"])
+            LOGGER.info(
+                "Process %s has no recorded Job namespace, "
+                "recording legacy namespace %s",
+                instance.id,
+                namespace,
+            )
+
+        configured_namespace = self.container_engine.namespace
+        self.container_engine.namespace = namespace
+        try:
+            yield
+        finally:
+            self.container_engine.namespace = configured_namespace
 
     def _update_started_time(self) -> None:
         """Update latest instance's started_at to now."""
@@ -186,6 +222,11 @@ class ActivationManager(StatusManager):
         # the previous instance should be previously managed.
         # This is a safety check.
         self._check_non_finalized_instances()
+        previous_instance = (
+            self.latest_instance
+            if isinstance(self.container_engine, KubernetesEngine)
+            else None
+        )
 
         # create a new instance
         LOGGER.info(
@@ -254,6 +295,23 @@ class ActivationManager(StatusManager):
 
         self._set_activation_pod_id(pod_id=container_id)
         self._update_started_time()
+        if isinstance(self.container_engine, KubernetesEngine):
+            msg = (
+                f"Activation {self.db_instance.id} "
+                f"(name={self.db_instance.name!r}), "
+                f"instance {self.latest_instance.id}: Job started in "
+                f"namespace {self.latest_instance.activation_job_namespace!r}"
+            )
+            if (
+                previous_instance
+                and previous_instance.activation_job_namespace
+            ):
+                msg += (
+                    f"; previous instance {previous_instance.id} recorded "
+                    "Job namespace "
+                    f"{previous_instance.activation_job_namespace!r}"
+                )
+            log_handler.write(f"{msg}.", flush=True)
 
         # update logs
         LOGGER.info(
@@ -282,15 +340,16 @@ class ActivationManager(StatusManager):
         log_handler = self.container_logger_class(latest_instance.id)
 
         try:
-            self.container_engine.cleanup(
-                latest_instance.activation_pod_id,
-                log_handler,
-            )
+            with self._instance_engine(latest_instance):
+                self.container_engine.cleanup(
+                    latest_instance.activation_pod_id,
+                    log_handler,
+                )
 
-        # We don't have identified cases where we want to stop the workflow
-        # because of a cleanup error.
-        # We are just logging the error and continue.
-        except engine_exceptions.ContainerCleanupError as exc:
+        # Kubernetes replacements must not proceed if the previous Job could
+        # still exist; preserve the Job reference when cleanup is uncertain.
+        # Other engines retain their existing best-effort cleanup behavior.
+        except engine_exceptions.ContainerEngineError as exc:
             pod_id = latest_instance.activation_pod_id
             msg = (
                 f"Activation {self.db_instance.id} failed to cleanup its "
@@ -299,8 +358,10 @@ class ActivationManager(StatusManager):
             )
             LOGGER.error(msg)
             log_handler.write(msg, flush=True)
-            if raise_on_error:
-                raise
+            if raise_on_error or isinstance(
+                self.container_engine, KubernetesEngine
+            ):
+                raise engine_exceptions.ContainerCleanupError(msg) from exc
             return
 
     def _is_in_status(self, status: ActivationStatus) -> bool:
@@ -318,7 +379,10 @@ class ActivationManager(StatusManager):
         latest_instance = self.latest_instance
 
         if pod_id:
-            with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
+            with (
+                contextlib.suppress(engine_exceptions.ContainerNotFoundError),
+                self._instance_engine(latest_instance),
+            ):
                 container_status = self.container_engine.get_status(
                     container_id=latest_instance.activation_pod_id,
                 )
@@ -413,20 +477,29 @@ class ActivationManager(StatusManager):
     def _handle_unresponsive_activation(self, check_type: str):
         """Clean up and fail an unresponsive activation.
 
-        Attempts cleanup of the container, then marks the activation
-        as FAILED regardless of cleanup outcome. If cleanup raises
-        ContainerCleanupError, the exception propagates to the caller
-        after the activation is marked FAILED.
+        Leave the process intact if Kubernetes Job cleanup fails so it can
+        be retried. Other engines retain FAILED handling on cleanup errors.
         """
+        user_msg = (
+            "Activation is unresponsive. "
+            f"{check_type} check for ansible-rulebook timed out."
+        )
         try:
             self._cleanup(raise_on_error=True)
-        finally:
-            user_msg = (
-                "Activation is unresponsive. "
-                f"{check_type} check for ansible-rulebook timed out."
-            )
+        except engine_exceptions.ContainerCleanupError as exc:
+            if isinstance(self.container_engine, KubernetesEngine):
+                msg = (
+                    f"Activation {self.db_instance.id} is unresponsive. "
+                    f"Cleanup failed. Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                raise
             self._fail_instance(msg=user_msg, cleanup_already_done=True)
             self.set_status(ActivationStatus.FAILED, user_msg)
+            raise
+
+        self._fail_instance(msg=user_msg, cleanup_already_done=True)
+        self.set_status(ActivationStatus.FAILED, user_msg)
 
     def _missing_container_policy(self):
         LOGGER.info(
@@ -524,7 +597,9 @@ class ActivationManager(StatusManager):
                 user_msg,
             )
 
-    def _failed_policy(self, container_msg: str):
+    def _failed_policy(
+        self, container_msg: str, cleanup_already_done: bool = False
+    ):
         container_logger = self.container_logger_class(self.latest_instance.id)
         """Apply the failed restart policy."""
         LOGGER.info(
@@ -543,7 +618,9 @@ class ActivationManager(StatusManager):
                 user_msg = f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             try:
-                self._fail_instance(user_msg)
+                self._fail_instance(
+                    user_msg, cleanup_already_done=cleanup_already_done
+                )
                 self.set_status(
                     ActivationStatus.FAILED,
                     user_msg,
@@ -578,7 +655,9 @@ class ActivationManager(StatusManager):
                 user_msg = f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             try:
-                self._fail_instance(user_msg)
+                self._fail_instance(
+                    user_msg, cleanup_already_done=cleanup_already_done
+                )
                 self.set_status(
                     ActivationStatus.FAILED,
                     user_msg,
@@ -610,7 +689,9 @@ class ActivationManager(StatusManager):
                 user_msg = f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             try:
-                self._fail_instance(user_msg)
+                self._fail_instance(
+                    user_msg, cleanup_already_done=cleanup_already_done
+                )
                 self.set_status(
                     ActivationStatus.FAILED,
                     user_msg,
@@ -653,18 +734,20 @@ class ActivationManager(StatusManager):
         self._set_activation_pod_id(pod_id=None)
         self._increase_failure_count()
 
-    def _error_instance(self, msg: tp.Optional[str] = None):
+    def _error_instance(
+        self, msg: tp.Optional[str] = None, cleanup_already_done=False
+    ):
         """Error the latest activation instance."""
         kwargs = {}
         if msg:
             kwargs["status_message"] = msg
-        self._cleanup()
+        if not cleanup_already_done:
+            self._cleanup()
         self.set_latest_instance_status(ActivationStatus.ERROR, **kwargs)
         self._set_activation_pod_id(pod_id=None)
 
     def _stop_instance(self):
         """Stop the latest activation instance."""
-        self.set_latest_instance_status(ActivationStatus.STOPPING)
         self._cleanup()
         self.set_latest_instance_status(ActivationStatus.STOPPED)
         self._set_activation_pod_id(pod_id=None)
@@ -705,7 +788,15 @@ class ActivationManager(StatusManager):
                 "were found, recreating.",
             )
 
-        self._start_activation_instance()
+        try:
+            self._start_activation_instance()
+        except engine_exceptions.ContainerCleanupError as exc:
+            msg = (
+                f"Activation {self.db_instance.id} failed to start because "
+                f"cleanup failed. Reason: {exc}"
+            )
+            self._error_activation(msg)
+            raise exceptions.ActivationStartError(msg) from exc
         if is_restart:
             self._increase_restart_count()
 
@@ -754,8 +845,7 @@ class ActivationManager(StatusManager):
                 f"Activation {self.db_instance.id} failed to stop. "
                 f"Reason: {exc}"
             )
-            # Alex: Not sure if we want to change the status here.
-            self._error_activation(msg)
+            LOGGER.error(msg)
             raise exceptions.ActivationStopError(msg) from exc
         user_msg = "Stop requested by user."
         if self.db_instance.status != ActivationStatus.ERROR:
@@ -886,7 +976,10 @@ class ActivationManager(StatusManager):
                 "Activation is disabled. "
                 "Applicable stop policy will be applied.",
             )
-            self.stop()
+            try:
+                self.stop()
+            except exceptions.ActivationStopError as exc:
+                raise exceptions.ActivationMonitorError(str(exc)) from exc
             return
 
         if self.db_instance.status not in [
@@ -922,13 +1015,28 @@ class ActivationManager(StatusManager):
 
         self.update_logs()
 
+        if container_status.status in (
+            ActivationStatus.COMPLETED,
+            ActivationStatus.FAILED,
+            ActivationStatus.ERROR,
+        ):
+            try:
+                self._cleanup()
+            except engine_exceptions.ContainerCleanupError as exc:
+                msg = (
+                    f"Monitor operation: activation {self.db_instance.id} "
+                    f"failed to cleanup its Job. Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                raise exceptions.ActivationMonitorError(msg) from exc
+
         if container_status.status == ActivationStatus.COMPLETED:  # RC == 0
-            self._cleanup()
             self._completed_policy(container_status.message)
             return
         if container_status.status == ActivationStatus.FAILED:  # RC != 0
-            self._cleanup()
-            self._failed_policy(container_status.message)
+            self._failed_policy(
+                container_status.message, cleanup_already_done=True
+            )
             return
 
         # Detect unresponsive activation instance
@@ -977,8 +1085,7 @@ class ActivationManager(StatusManager):
                 f"Container is in an error state. {container_status.message}"
             )
             LOGGER.error(msg)
-            self._cleanup()
-            self._error_instance(msg)
+            self._error_instance(msg, cleanup_already_done=True)
             self._error_activation(msg)
             raise exceptions.ActivationMonitorError(msg)
 
@@ -998,10 +1105,12 @@ class ActivationManager(StatusManager):
         exit early.
         """
         try:
-            return (
-                self.container_engine.get_status(
+            with self._instance_engine(self.latest_instance):
+                container_status = self.container_engine.get_status(
                     container_id=self.latest_instance.activation_pod_id,
-                ),
+                )
+            return (
+                container_status,
                 False,
             )
         except engine_exceptions.ContainerNotFoundError:
@@ -1052,10 +1161,11 @@ class ActivationManager(StatusManager):
             return
 
         try:
-            self.container_engine.update_logs(
-                container_id=self.latest_instance.activation_pod_id,
-                log_handler=log_handler,
-            )
+            with self._instance_engine(self.latest_instance):
+                self.container_engine.update_logs(
+                    container_id=self.latest_instance.activation_pod_id,
+                    log_handler=log_handler,
+                )
 
         # We don't have identified cases where we want to stop the workflow
         # because of a log error.
@@ -1086,6 +1196,8 @@ class ActivationManager(StatusManager):
             "organization": self.db_instance.organization,
         }
         args[f"{self.db_instance_type}"] = self.db_instance
+        if isinstance(self.container_engine, KubernetesEngine):
+            args["activation_job_namespace"] = self.container_engine.namespace
         try:
             rulebook_process = models.RulebookProcess.objects.create(**args)
         except IntegrityError as exc:

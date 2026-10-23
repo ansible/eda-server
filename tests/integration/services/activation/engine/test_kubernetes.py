@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os
 from unittest import mock
 
 import pytest
@@ -35,6 +36,7 @@ from aap_eda.services.activation.engine.kubernetes import (
     IMAGE_PULL_BACK_OFF,
     IMAGE_PULL_ERROR,
     INVALID_IMAGE_NAME,
+    JOB_DELETE_VERIFY_TIMEOUT,
     K8S_API_RETRIES,
     Engine,
     get_k8s_client,
@@ -246,8 +248,9 @@ def test_engine_init_with_exception(init_kubernetes_data):
     with pytest.raises(
         ContainerEngineInitError,
         match=(
-            "Namespace file /var/run/secrets/kubernetes.io/serviceaccount"
-            "/namespace does not exist."
+            "Cannot determine control-plane namespace: "
+            "/var/run/secrets/kubernetes.io/serviceaccount/namespace "
+            "does not exist."
         ),
     ):
         Engine(
@@ -731,7 +734,9 @@ def test_delete_job(mock_watch, init_kubernetes_data, kubernetes_engine):
     job_mock = mock.Mock()
     job_mock.metadata.name = job_name
 
-    with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
+    with mock.patch.object(
+        engine.client, "batch_api"
+    ) as batch_api_mock, mock.patch.object(engine, "_verify_job_deleted"):
         batch_api_mock.list_namespaced_job.return_value.items = [job_mock]
         mock_watch.return_value.stream.return_value = [{"type": "DELETED"}]
         with mock.patch.object(
@@ -741,7 +746,9 @@ def test_delete_job(mock_watch, init_kubernetes_data, kubernetes_engine):
 
         batch_api_mock.delete_namespaced_job.assert_called_once()
 
-    with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
+    with mock.patch.object(
+        engine.client, "batch_api"
+    ) as batch_api_mock, mock.patch.object(engine, "_verify_job_deleted"):
         batch_api_mock.list_namespaced_job.return_value.items = None
         engine._delete_job(log_handler)
 
@@ -750,7 +757,9 @@ def test_delete_job(mock_watch, init_kubernetes_data, kubernetes_engine):
         )
 
     event = {"type": "DELETED"}
-    with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
+    with mock.patch.object(
+        engine.client, "batch_api"
+    ) as batch_api_mock, mock.patch.object(engine, "_verify_job_deleted"):
         batch_api_mock.list_namespaced_job.return_value.items = [job_mock]
         mock_watch.return_value.stream.return_value = [event]
         with mock.patch.object(
@@ -792,6 +801,60 @@ def test_delete_job_with_exception(init_kubernetes_data, kubernetes_engine):
 
 
 @pytest.mark.django_db
+def test_get_resource_version_without_pods(kubernetes_engine):
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    engine.client.core_api.list_namespaced_pod.return_value.items = []
+
+    assert engine._get_resource_version() is None
+
+
+@pytest.mark.django_db
+def test_verify_job_deleted_waits_for_resources(kubernetes_engine):
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    engine.client.batch_api.list_namespaced_job.side_effect = [
+        mock.Mock(items=[mock.Mock()]),
+        mock.Mock(items=[]),
+    ]
+    engine.client.core_api.list_namespaced_pod.return_value.items = []
+
+    with mock.patch(
+        "aap_eda.services.activation.engine.kubernetes.time.sleep"
+    ) as sleep:
+        engine._verify_job_deleted()
+
+    sleep.assert_called_once_with(1)
+    assert engine.client.batch_api.list_namespaced_job.call_count == 2
+
+
+@pytest.mark.parametrize("remaining_resource", ["job", "pod"])
+@pytest.mark.django_db
+def test_verify_job_deleted_times_out_on_remaining_resource(
+    kubernetes_engine, remaining_resource
+):
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    engine.client.batch_api.list_namespaced_job.return_value.items = (
+        [mock.Mock()] if remaining_resource == "job" else []
+    )
+    engine.client.core_api.list_namespaced_pod.return_value.items = (
+        [mock.Mock()] if remaining_resource == "pod" else []
+    )
+
+    with mock.patch(
+        "aap_eda.services.activation.engine.kubernetes.time.monotonic",
+        side_effect=[0, JOB_DELETE_VERIFY_TIMEOUT],
+    ), mock.patch(
+        "aap_eda.services.activation.engine.kubernetes.time.sleep"
+    ) as sleep:
+        with pytest.raises(ContainerCleanupError, match="still exists"):
+            engine._verify_job_deleted()
+
+    sleep.assert_not_called()
+
+
+@pytest.mark.django_db
 def test_cleanup_orig(init_kubernetes_data, kubernetes_engine):
     engine = kubernetes_engine
     log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
@@ -819,7 +882,9 @@ def test_pod_cleanup_exception_handling(
     job_mock = mock.Mock()
     job_mock.metadata.name = job_name
 
-    with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
+    with mock.patch.object(
+        engine.client, "batch_api"
+    ) as batch_api_mock, mock.patch.object(engine, "_verify_job_deleted"):
         batch_api_mock.list_namespaced_job.return_value.items = [job_mock]
 
         # Test 404 handling
@@ -1190,6 +1255,61 @@ def test_watch_pod_deletion_retries_on_transient(
 
 
 @mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@pytest.mark.django_db
+def test_delete_job_verifies_when_pods_disappear_before_watch_retry(
+    mock_watch, init_kubernetes_data, kubernetes_engine
+):
+    """No retry watch is needed, but Job and Pod deletion is verified."""
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+    job = mock.Mock(metadata=mock.Mock(name="test-job"))
+    engine.client.batch_api.list_namespaced_job.side_effect = [
+        mock.Mock(items=[job]),
+        mock.Mock(items=[]),
+    ]
+    engine.client.core_api.list_namespaced_pod.return_value.items = []
+    mock_watch.return_value.stream.return_value = iter([])
+
+    with mock.patch.object(
+        engine, "_get_resource_version", side_effect=["1", None]
+    ) as get_version:
+        engine._delete_job(log_handler)
+
+    assert get_version.call_count == 2
+    assert mock_watch.return_value.stream.call_count == 1
+    assert mock_watch.return_value.stop.call_count == 2
+    assert engine.client.batch_api.list_namespaced_job.call_count == 2
+    engine.client.core_api.list_namespaced_pod.assert_called_once()
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@pytest.mark.django_db
+def test_watch_pod_deletion_retries_with_available_resource_version(
+    mock_watch, init_kubernetes_data, kubernetes_engine
+):
+    engine = kubernetes_engine
+    engine.job_name = "test-job"
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+    mock_watch.return_value.stream.side_effect = [
+        iter([]),
+        iter([{"type": "DELETED"}]),
+    ]
+
+    with mock.patch.object(engine, "_get_resource_version", return_value="2"):
+        engine._watch_pod_deletion(log_handler, resource_version="1")
+
+    assert mock_watch.return_value.stream.call_count == 2
+    assert (
+        mock_watch.return_value.stream.call_args_list[1].kwargs[
+            "resource_version"
+        ]
+        == "2"
+    )
+    assert mock_watch.return_value.stop.call_count == 2
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
 @mock.patch("aap_eda.services.activation.engine.kubernetes.time.sleep")
 @pytest.mark.django_db
 def test_wait_for_pod_to_start_retries_on_transient(
@@ -1356,3 +1476,148 @@ def test_process_pod_start_event_unrecognized(kubernetes_engine):
     )
     event = {"object": pod}
     assert engine._process_pod_start_event(event) is False
+
+
+# --- Namespace-aware engine tests ---
+
+
+@pytest.mark.django_db
+def test_set_namespace_with_env_override_defers_access_check(
+    init_kubernetes_data,
+):
+    """An override does not block lifecycle operations at construction."""
+    mock_client = mock.Mock()
+    mock_client.batch_api.list_namespaced_job.return_value = None
+
+    with mock.patch.dict(
+        "os.environ",
+        {"EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "eda-activations"},
+    ):
+        engine = Engine(
+            activation_id=str(init_kubernetes_data.activation.id),
+            resource_prefix="activation",
+            client=mock_client,
+        )
+        assert engine.namespace == "eda-activations"
+        mock_client.batch_api.list_namespaced_job.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_set_namespace_without_env_skips_verification(init_kubernetes_data):
+    """Without env override, _set_namespace does not probe K8s."""
+    mock_client = mock.Mock()
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k != "EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE"
+    }
+    with mock.patch.dict("os.environ", env, clear=True):
+        with mock.patch("builtins.open", mock.mock_open(read_data="aap-eda")):
+            engine = Engine(
+                activation_id=str(init_kubernetes_data.activation.id),
+                resource_prefix="activation",
+                client=mock_client,
+            )
+            assert engine.namespace == "aap-eda"
+            mock_client.batch_api.list_namespaced_job.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_start_with_env_override_verifies_access(
+    init_kubernetes_data, mock_log_handler, default_organization
+):
+    """Starting a new Job verifies the configured target namespace."""
+    request = get_request(
+        init_kubernetes_data,
+        "tester",
+        default_organization,
+    )
+    mock_client = mock.Mock()
+    mock_client.batch_api.list_namespaced_job.return_value = None
+    with mock.patch.dict(
+        "os.environ",
+        {"EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "eda-activations"},
+    ):
+        engine = Engine(
+            activation_id=str(init_kubernetes_data.activation.id),
+            resource_prefix="activation",
+            client=mock_client,
+        )
+
+    with mock.patch.object(engine, "_create_job"), mock.patch.object(
+        engine, "_wait_for_pod_to_start"
+    ), mock.patch.object(engine, "_create_service"):
+        engine.start(request, mock_log_handler)
+
+    mock_client.batch_api.list_namespaced_job.assert_called_once_with(
+        namespace="eda-activations",
+        limit=1,
+    )
+
+
+@pytest.mark.django_db
+def test_start_with_inaccessible_env_override_raises(
+    init_kubernetes_data, mock_log_handler, default_organization
+):
+    """An inaccessible configured target fails before Job creation."""
+    request = get_request(
+        init_kubernetes_data,
+        "tester",
+        default_organization,
+    )
+    mock_client = mock.Mock()
+    mock_client.batch_api.list_namespaced_job.side_effect = ApiException(
+        status=403, reason="Forbidden"
+    )
+    with mock.patch.dict(
+        "os.environ",
+        {"EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "forbidden-ns"},
+    ):
+        engine = Engine(
+            activation_id=str(init_kubernetes_data.activation.id),
+            resource_prefix="activation",
+            client=mock_client,
+        )
+        with mock.patch.object(engine, "_create_job") as create_job:
+            with pytest.raises(
+                ContainerEngineInitError, match="not accessible"
+            ):
+                engine.start(request, mock_log_handler)
+
+    create_job.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_start_uses_make_job_name(
+    init_kubernetes_data, mock_log_handler, default_organization
+):
+    """Engine.start() builds deterministic Job name."""
+    mock_client = mock.Mock()
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k != "EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE"
+    }
+    with mock.patch.dict("os.environ", env, clear=True):
+        with mock.patch("builtins.open", mock.mock_open(read_data="aap-eda")):
+            engine = Engine(
+                activation_id=str(init_kubernetes_data.activation.id),
+                resource_prefix="activation",
+                client=mock_client,
+            )
+
+    request = get_request(
+        init_kubernetes_data,
+        "tester",
+        default_organization,
+    )
+
+    with mock.patch.object(engine, "_create_job"), mock.patch.object(
+        engine, "_wait_for_pod_to_start"
+    ), mock.patch.object(engine, "_create_service"):
+        engine.start(request, mock_log_handler)
+
+    act_id = init_kubernetes_data.activation.id
+    proc_id = init_kubernetes_data.activation_instance.id
+    expected_name = f"activation-job-{act_id}-{proc_id}"
+    assert engine.job_name == expected_name
