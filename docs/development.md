@@ -469,7 +469,8 @@ Do **not** confuse the two — see the command docstring in
 - **Choose a cutoff:** Supply exactly one of `before_date` (midnight UTC in
   `YYYY-MM-DD` format) or a positive ISO 8601 `retention_duration`. Only rows
   with `log_timestamp` strictly before the cutoff qualify. Future UTC cutoffs
-  are rejected.
+  are rejected. A request without a cutoff returns HTTP 400 before a job is
+  queued; no logs are deleted.
 - **Choose the scope:** With no selectors, qualifying ordinary logs from every
   process are included, including processes without an activation.
   `activation_ids` and `activation_names` select the union of matching
@@ -491,9 +492,11 @@ Content-Type: application/json
 
 - Use either `--date YYYY-MM-DD` or `--retention-duration P30D`. Calendar
   months and years in a duration are subtracted in UTC. If the target month
-  lacks the original day, the cutoff uses that month's final day.
+  lacks the original day, the cutoff uses that month's final day. Omitting both
+  options raises a command error before deletion
 - Use `--activation-ids 123 456`, `--activation-names name1 name2`, or both to
-  limit deletion to the selected activations. Omit both for a global purge.
+  limit deletion to the selected activations. Omit both to delete logs across 
+  all activations.
 - Use `--audit-trail=true` or `--audit-trail=false`. A bare `--audit-trail` is
   invalid.
 - The optional `--internal-job-uuid` adds the EDA purge task UUID to markers.
@@ -506,15 +509,6 @@ Content-Type: application/json
   partial count when audit is enabled.
 - When audit is enabled, each process that loses ordinary log rows gets one
   marker with its count for this invocation.
-- This change makes no schema or data migration. New markers use a reserved
-  `log_created_at` value to exclude them from later purges. Earlier markers
-  with `log_created_at` set to null are excluded by an exact regular expression
-  matching the old fixed message format. No broad update of existing logs is
-  run.
-- An ordinary log with that exact legacy text or the reserved timestamp is
-  indistinguishable from a marker and will also be retained. The regular
-  expression adds work to candidate and DELETE queries; measure performance
-  on a representative PostgreSQL database before drawing conclusions.
 
 **Check the outcome**
 

@@ -122,6 +122,12 @@ class LogPurgeRequestSerializer(serializers.Serializer):
     )
 
     def validate(self, attrs):
+        unknown_fields = set(self.initial_data) - set(self.fields)
+        if unknown_fields:
+            raise serializers.ValidationError(
+                {field: "Unknown field." for field in sorted(unknown_fields)}
+            )
+
         before_date = attrs.get("before_date")
         duration = attrs.get("retention_duration")
         if (before_date is None) == (duration is None):
@@ -146,12 +152,15 @@ class LogPurgeRequestSerializer(serializers.Serializer):
                 ) from exc
         if "activation_ids" in attrs or "activation_names" in attrs:
             try:
-                resolve_activation_ids(
-                    attrs.get("activation_ids"),
-                    attrs.get("activation_names"),
+                attrs["activation_ids"] = sorted(
+                    resolve_activation_ids(
+                        attrs.get("activation_ids"),
+                        attrs.get("activation_names"),
+                    )
                 )
             except ValueError as exc:
                 raise serializers.ValidationError(str(exc)) from exc
+            attrs.pop("activation_names", None)
         return attrs
 
 
