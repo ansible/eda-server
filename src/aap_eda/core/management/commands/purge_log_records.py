@@ -12,9 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from datetime import datetime, time, timedelta, timezone
+from argparse import ArgumentTypeError
+from datetime import datetime, time, timezone
+from uuid import UUID
 
-from django.conf import settings
 from django.core.management.base import (
     BaseCommand,
     CommandError,
@@ -23,20 +24,19 @@ from django.core.management.base import (
 
 from aap_eda.core.utils.delete_log_util import (
     LogPurgeError,
-    create_audit_trail,
     delete_logs_older_than,
 )
 from aap_eda.core.utils.log_retention import retention_cutoff
 
 
 class Command(BaseCommand):
-    """Purge old logs globally, optionally writing audit trail entries."""
+    """Purge old logs globally or for selected activations."""
 
     help = (
-        "Purge log records from rulebook processes. "
-        "Always purges all log records older than --date globally. "
-        "Activation ids or names only control detailed reporting for those "
-        "activations and orphaned records; they do not limit deletion."
+        "Purge log records older than exactly one cutoff. Without activation "
+        "selectors, include every process (including orphaned processes). "
+        "Activation IDs and names limit deletion to their union. "
+        "One audit marker per affected process is enabled by default."
     )
 
     def add_arguments(self, parser: CommandParser) -> None:
@@ -45,11 +45,7 @@ class Command(BaseCommand):
             nargs="+",
             type=int,
             dest="activation-ids",
-            help=(
-                "Activation ids to include in detailed reporting only. "
-                "This does not limit deletion: all log records older than "
-                "--date are purged globally (e.g., 123 456)."
-            ),
+            help=("Limit deletion to these activation IDs (e.g., 123 456)."),
         )
         parser.add_argument(
             "--activation-names",
@@ -57,10 +53,8 @@ class Command(BaseCommand):
             type=str,
             dest="activation-names",
             help=(
-                "Activation names to include in detailed reporting only. "
-                "This does not limit deletion: all log records older than "
-                "--date are purged globally (e.g., ActivationName1 "
-                "ActivationName2)."
+                "Limit deletion to these activation names (e.g., "
+                "ActivationName1 ActivationName2)."
             ),
         )
         parser.add_argument(
@@ -85,12 +79,28 @@ class Command(BaseCommand):
         parser.add_argument(
             "--audit-trail",
             dest="audit_trail",
-            action="store_true",
-            help="Create audit log entries for affected processes.",
+            type=self._audit_trail_value,
+            default=True,
+            metavar="true|false",
+            help="Create a marker for each affected process (default: true).",
+        )
+        parser.add_argument(
+            "--internal-job-uuid",
+            dest="internal-job-uuid",
+            default=None,
+            help="EDA purge task UUID to include in audit markers.",
         )
 
     @staticmethod
-    def _cutoff(options: dict) -> datetime | None:
+    def _audit_trail_value(value: str) -> bool:
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        raise ArgumentTypeError("--audit-trail must be true or false.")
+
+    @staticmethod
+    def _cutoff(options: dict) -> datetime:
         cutoff_date = options.get("date")
         retention_duration = options.get("retention_duration")
         if cutoff_date is not None and retention_duration is not None:
@@ -115,52 +125,50 @@ class Command(BaseCommand):
             except ValueError as exc:
                 raise CommandError(str(exc)) from exc
 
-        retention_days = settings.ACTIVATION_DB_LOG_RETENTION_DAYS
-        if retention_days <= 0:
-            return None
-        return datetime.now(timezone.utc) - timedelta(days=retention_days)
+        raise CommandError(
+            "Exactly one of --date or --retention-duration is required."
+        )
 
     def handle(self, *args, **options):
-        ids = options.get("activation-ids") or []
-        names = options.get("activation-names") or []
-        if any(activation_id <= 0 for activation_id in ids):
-            raise CommandError("Activation IDs must be positive integers.")
-        if any(not name.strip() for name in names):
-            raise CommandError("Activation names cannot be blank.")
-
+        ids = options.get("activation-ids")
+        names = options.get("activation-names")
         cutoff = self._cutoff(options)
-        if cutoff is None:
-            return self.style.WARNING(
-                "No logs purged: configured retention is not positive."
-            )
+        if cutoff > datetime.now(timezone.utc):
+            raise CommandError("--date must not be in the future.")
+        job_uuid = options.get("internal-job-uuid")
+        if job_uuid is not None:
+            try:
+                job_uuid = str(UUID(str(job_uuid)))
+            except (TypeError, ValueError, AttributeError) as exc:
+                raise CommandError(
+                    "--internal-job-uuid must be a UUID."
+                ) from exc
+        audit_trail = options["audit_trail"]
+        if isinstance(audit_trail, str):
+            try:
+                audit_trail = self._audit_trail_value(audit_trail)
+            except ArgumentTypeError as exc:
+                raise CommandError(str(exc)) from exc
+        elif not isinstance(audit_trail, bool):
+            raise CommandError("--audit-trail must be true or false.")
 
         try:
-            deleted_count = delete_logs_older_than(cutoff)
-        except LogPurgeError as exc:
+            deleted_count = delete_logs_older_than(
+                cutoff,
+                activation_ids=ids,
+                activation_names=names,
+                audit_trail=audit_trail,
+                internal_job_uuid=job_uuid,
+            )
+        except (LogPurgeError, ValueError) as exc:
             raise CommandError(str(exc)) from exc
 
-        if deleted_count == 0:
-            return self.style.SUCCESS(
-                f"No log records found older than "
-                f"{cutoff.strftime('%Y-%m-%d %H:%M:%S UTC')}; 0 rows "
-                "deleted."
-            )
-
-        output = (
-            f"Purged {deleted_count} log records older than "
-            f"{cutoff.strftime('%Y-%m-%d %H:%M:%S UTC')} globally."
+        scope = (
+            "globally"
+            if ids is None and names is None
+            else "for selected activations"
         )
-        if options.get("audit_trail"):
-            try:
-                audit_count = create_audit_trail(
-                    cutoff,
-                    activation_ids=ids,
-                    activation_names=names,
-                )
-            except Exception as exc:
-                raise CommandError(
-                    f"Deleted {deleted_count} logs, but audit trail failed: "
-                    f"{exc}"
-                ) from exc
-            output += f" Created {audit_count} audit trail entries."
-        return self.style.SUCCESS(output)
+        return self.style.SUCCESS(
+            f"Purged {deleted_count} log records older than "
+            f"{cutoff.strftime('%Y-%m-%d %H:%M:%S UTC')} {scope}."
+        )

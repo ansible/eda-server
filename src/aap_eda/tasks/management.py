@@ -22,6 +22,7 @@ from django.conf import settings
 from django.core.management import call_command
 
 from aap_eda import utils
+from aap_eda.core.utils.delete_log_util import LogPurgeError
 
 logger = logging.getLogger(__name__)
 
@@ -32,21 +33,22 @@ _DELETED_COUNT = re.compile(r"^Purged (\d+) log records")
 
 def submit_log_purge(
     *,
+    before_date: str | None = None,
     retention_duration: str | None = None,
-    audit_trail: bool = False,
+    audit_trail: bool = True,
     activation_ids: list[int] | None = None,
     activation_names: list[str] | None = None,
 ) -> str:
-    """Submit a fixed-purpose global log purge task."""
-    command_options = {}
+    """Submit a fixed-purpose log purge task."""
+    command_options = {"audit_trail": audit_trail}
+    if before_date is not None:
+        command_options["date"] = before_date
     if retention_duration is not None:
         command_options["retention_duration"] = retention_duration
-    if audit_trail:
-        command_options["audit_trail"] = True
-        if activation_ids:
-            command_options["activation-ids"] = activation_ids
-        if activation_names:
-            command_options["activation-names"] = activation_names
+    if activation_ids is not None:
+        command_options["activation-ids"] = activation_ids
+    if activation_names is not None:
+        command_options["activation-names"] = activation_names
 
     return aap_eda_manage_commands(
         "purge_log_records",
@@ -64,6 +66,8 @@ def aap_eda_manage_commands(
     This generic entry point remains available to internal callers.
     """
     job_id = str(uuid4())
+    if command == "purge_log_records":
+        command_options["internal-job-uuid"] = job_id
     job_data, _ = submit_task(
         _aap_eda_manage,
         args=(job_id, command, command_options),
@@ -104,13 +108,25 @@ def _aap_eda_manage(job_id: str, command: str, command_options: dict) -> dict:
             command_output = call_command(
                 command, no_color=True, **command_options
             )
-        except Exception:
-            logger.exception(
-                "Management command failed job_id=%s command=%s "
-                "status=failed",
-                job_id,
-                command,
-            )
+        except Exception as exc:
+            cause = exc.__cause__
+            if command == "purge_log_records" and isinstance(
+                cause, LogPurgeError
+            ):
+                logger.exception(
+                    "Management command failed job_id=%s command=%s "
+                    "status=failed deleted_count=%d",
+                    job_id,
+                    command,
+                    cause.deleted_count,
+                )
+            else:
+                logger.exception(
+                    "Management command failed job_id=%s command=%s "
+                    "status=failed",
+                    job_id,
+                    command,
+                )
             raise
 
         result = {
