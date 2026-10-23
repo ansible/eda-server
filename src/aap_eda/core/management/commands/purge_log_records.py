@@ -142,7 +142,7 @@ class Command(BaseCommand):
             "Exactly one of --date or --retention-duration is required."
         )
 
-    def handle(self, *args, **options):
+    def _purge_mode(self, options: dict) -> tuple[bool, datetime | None]:
         ids = options.get("activation-ids")
         names = options.get("activation-names")
         purge_all_logs = options.get("purge-all-logs", False)
@@ -161,6 +161,24 @@ class Command(BaseCommand):
         cutoff = None if purge_all_logs else self._cutoff(options)
         if cutoff is not None and cutoff > datetime.now(timezone.utc):
             raise CommandError("--date must not be in the future.")
+        return purge_all_logs, cutoff
+
+    def _validated_audit_trail(self, value, purge_all_logs: bool) -> bool:
+        if isinstance(value, str):
+            try:
+                value = self._audit_trail_value(value)
+            except ArgumentTypeError as exc:
+                raise CommandError(str(exc)) from exc
+        elif not isinstance(value, bool):
+            raise CommandError("--audit-trail must be true or false.")
+        if purge_all_logs and not value:
+            raise CommandError("--purge-all-logs requires audit trail.")
+        return value
+
+    def handle(self, *args, **options):
+        ids = options.get("activation-ids")
+        names = options.get("activation-names")
+        purge_all_logs, cutoff = self._purge_mode(options)
         job_uuid = options.get("internal-job-uuid")
         if job_uuid is not None:
             try:
@@ -169,16 +187,9 @@ class Command(BaseCommand):
                 raise CommandError(
                     "--internal-job-uuid must be a UUID."
                 ) from exc
-        audit_trail = options["audit_trail"]
-        if isinstance(audit_trail, str):
-            try:
-                audit_trail = self._audit_trail_value(audit_trail)
-            except ArgumentTypeError as exc:
-                raise CommandError(str(exc)) from exc
-        elif not isinstance(audit_trail, bool):
-            raise CommandError("--audit-trail must be true or false.")
-        if purge_all_logs and not audit_trail:
-            raise CommandError("--purge-all-logs requires audit trail.")
+        audit_trail = self._validated_audit_trail(
+            options["audit_trail"], purge_all_logs
+        )
 
         try:
             deleted_count = delete_logs_older_than(
