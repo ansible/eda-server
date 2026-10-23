@@ -55,6 +55,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.EDA_QA_PATH }}
+        env:
+          PIP_ONLY_BINARY: ":all:"
+          PIP_NO_BINARY: "eda-qa"
         run: pip install .
 
       - name: Run tests

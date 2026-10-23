@@ -177,9 +177,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.EDA_QA_PATH }}
+        env:
+          PIP_ONLY_BINARY: ":all:"
+          PIP_NO_BINARY: "eda-qa"
         run: |
           pip install .
-          pip install pytest-rerunfailures
+          pip install pytest-rerunfailures==16.4
 
       - name: Run tests
         working-directory: ${{ env.EDA_QA_PATH }}
@@ -196,8 +199,10 @@ jobs:
           fi
 
       - name: Setup jUnit reporter
+        env:
+          PIP_ONLY_BINARY: ":all:"
         run: |
-          pip install httpie
+          pip install httpie==3.2.4
           echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
       - name: Upload jUnit test results (APDE CI)
@@ -280,9 +285,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.EDA_QA_PATH }}
+        env:
+          PIP_ONLY_BINARY: ":all:"
+          PIP_NO_BINARY: "eda-qa"
         run: |
           pip install .
-          pip install pytest-rerunfailures
+          pip install pytest-rerunfailures==16.4
 
       - name: Build eda-server images
         working-directory: .
@@ -302,8 +310,10 @@ jobs:
           pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml --reruns ${{ env.PYTEST_RETRIES }}
 
       - name: Setup jUnit reporter
+        env:
+          PIP_ONLY_BINARY: ":all:"
         run: |
-          pip install httpie
+          pip install httpie==3.2.4
           echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
       - name: Upload jUnit test results (APDE CI)
