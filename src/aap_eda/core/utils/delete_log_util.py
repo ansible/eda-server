@@ -97,15 +97,18 @@ def resolve_activation_ids(
     return existing_ids
 
 
-def _ordinary_logs(
+def _logs_to_purge(
     process_id: int,
-    cutoff_timestamp: float,
+    cutoff_timestamp: float | None,
     selected_ids: set[int] | None,
+    purge_all_logs: bool,
 ):
     logs = models.RulebookProcessLog.objects.filter(
-        activation_instance_id=process_id,
-        log_timestamp__lt=cutoff_timestamp,
+        activation_instance_id=process_id
     )
+    if purge_all_logs:
+        return logs
+    logs = logs.filter(log_timestamp__lt=cutoff_timestamp)
     if selected_ids is not None:
         logs = logs.filter(activation_instance__activation_id__in=selected_ids)
     return logs.exclude(log_created_at=PURGE_MARKER_CREATED_AT).exclude(
@@ -115,19 +118,24 @@ def _ordinary_logs(
 
 
 def _marker_text(
-    cutoff: datetime,
+    cutoff: datetime | None,
     purge_time: datetime,
     count: int,
     tracking_id: str | None,
     orphaned: bool,
     internal_job_uuid: str | None,
 ) -> str:
-    cutoff_text = _utc_text(cutoff)
     purge_text = _utc_text(purge_time)
-    text = (
-        f"All log records older than {cutoff_text} were purged at "
-        f"{purge_text}. Deleted {count} log rows."
-    )
+    if cutoff is None:
+        text = (
+            f"Global log purge ran at {purge_text}. "
+            f"Deleted {count} log rows."
+        )
+    else:
+        text = (
+            f"All log records older than {_utc_text(cutoff)} were purged at "
+            f"{purge_text}. Deleted {count} log rows."
+        )
     if internal_job_uuid is not None:
         text += f" Job ID: {internal_job_uuid}."
     if tracking_id and tracking_id.strip():
@@ -138,16 +146,35 @@ def _marker_text(
 
 
 def delete_logs_older_than(
-    cutoff: datetime,
+    cutoff: datetime | None,
     *,
     activation_ids: list[int] | None = None,
     activation_names: list[str] | None = None,
     audit_trail: bool = True,
     internal_job_uuid: str | None = None,
+    purge_all_logs: bool = False,
 ) -> int:
-    """Purge ordinary logs per process in committed, bounded ID batches."""
-    selected_ids = resolve_activation_ids(activation_ids, activation_names)
-    cutoff_timestamp = cutoff.timestamp()
+    """Purge logs per process in committed, bounded ID batches."""
+    if not isinstance(purge_all_logs, bool):
+        raise ValueError("purge_all_logs must be a boolean.")
+    if purge_all_logs:
+        if cutoff is not None or any(
+            selector is not None
+            for selector in (activation_ids, activation_names)
+        ):
+            raise ValueError(
+                "--purge-all-logs cannot be combined with a cutoff or "
+                "activation selectors."
+            )
+        if not audit_trail:
+            raise ValueError("--purge-all-logs requires audit trail.")
+        selected_ids = None
+        cutoff_timestamp = None
+    else:
+        if cutoff is None:
+            raise ValueError("A cutoff is required unless purging all logs.")
+        selected_ids = resolve_activation_ids(activation_ids, activation_names)
+        cutoff_timestamp = cutoff.timestamp()
     processes = models.RulebookProcess.objects.all()
     if selected_ids is not None:
         processes = processes.filter(activation_id__in=selected_ids)
@@ -172,8 +199,8 @@ def delete_logs_older_than(
             if not process_batch:
                 break
             for process_id, activation_id, tracking_id in process_batch:
-                qualifying = _ordinary_logs(
-                    process_id, cutoff_timestamp, selected_ids
+                qualifying = _logs_to_purge(
+                    process_id, cutoff_timestamp, selected_ids, purge_all_logs
                 )
                 highest_log_id = qualifying.aggregate(max_id=Max("id"))[
                     "max_id"
@@ -196,8 +223,11 @@ def delete_logs_older_than(
                         break
                     with transaction.atomic():
                         _, per_model_counts = (
-                            _ordinary_logs(
-                                process_id, cutoff_timestamp, selected_ids
+                            _logs_to_purge(
+                                process_id,
+                                cutoff_timestamp,
+                                selected_ids,
+                                purge_all_logs,
                             )
                             .filter(id__in=batch_ids)
                             .delete()
@@ -207,7 +237,9 @@ def delete_logs_older_than(
                             purge_time = datetime.now(timezone.utc)
                             marker_timestamp = max(
                                 ceil(purge_time.timestamp()),
-                                ceil(cutoff_timestamp),
+                                ceil(cutoff_timestamp)
+                                if cutoff_timestamp is not None
+                                else 0,
                             )
                             marker_text = _marker_text(
                                 cutoff,

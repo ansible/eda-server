@@ -93,7 +93,7 @@ def _update_event_stream_source(validated_data: dict) -> str:
 
 
 class LogPurgeRequestSerializer(serializers.Serializer):
-    """Validate cutoff and activation scope before scheduling a purge."""
+    """Validate the cutoff or full purge before scheduling a job."""
 
     before_date = serializers.DateField(
         required=False,
@@ -121,6 +121,19 @@ class LogPurgeRequestSerializer(serializers.Serializer):
         help_text="Limit deletion to these activation names.",
     )
 
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["purge-all-logs"] = serializers.BooleanField(
+            source="purge_all_logs",
+            required=False,
+            default=False,
+            help_text=(
+                "Delete all existing process logs and replace them with "
+                "audit markers. Cannot be combined with a cutoff or scope."
+            ),
+        )
+        return fields
+
     def validate(self, attrs):
         unknown_fields = set(self.initial_data) - set(self.fields)
         if unknown_fields:
@@ -130,6 +143,21 @@ class LogPurgeRequestSerializer(serializers.Serializer):
 
         before_date = attrs.get("before_date")
         duration = attrs.get("retention_duration")
+        if attrs["purge_all_logs"]:
+            if before_date is not None or duration is not None:
+                raise serializers.ValidationError(
+                    "purge-all-logs cannot be combined with a cutoff."
+                )
+            if "activation_ids" in attrs or "activation_names" in attrs:
+                raise serializers.ValidationError(
+                    "purge-all-logs cannot be combined with activation "
+                    "selectors."
+                )
+            if not attrs["audit_trail"]:
+                raise serializers.ValidationError(
+                    "purge-all-logs requires audit_trail=true."
+                )
+            return attrs
         if (before_date is None) == (duration is None):
             raise serializers.ValidationError(
                 "Exactly one of before_date or retention_duration is required."
