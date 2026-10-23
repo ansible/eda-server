@@ -54,11 +54,35 @@ def test_superuser_queues_scoped_purge_with_one_eda_job_id(
         {
             "retention_duration": "P30D",
             "audit_trail": True,
-            "activation-ids": [default_activation.id],
-            "activation-names": [new_activation.name],
+            "activation-ids": sorted(
+                [default_activation.id, new_activation.id]
+            ),
             "internal-job-uuid": str(JOB_ID),
         },
     )
+
+
+@pytest.mark.django_db
+def test_name_only_scope_is_queued_as_activation_id(
+    superuser_client, default_activation
+):
+    with mock.patch(
+        "aap_eda.tasks.management.submit_task",
+        return_value=({"uuid": str(JOB_ID)}, "default"),
+    ) as submit_task:
+        response = superuser_client.post(
+            PURGE_URL,
+            {
+                "before_date": "2020-01-01",
+                "activation_names": [default_activation.name],
+            },
+            format="json",
+        )
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    options = submit_task.call_args.kwargs["args"][2]
+    assert options["activation-ids"] == [default_activation.id]
+    assert "activation-names" not in options
 
 
 @pytest.mark.django_db
@@ -139,6 +163,10 @@ def test_anonymous_purge_uses_api_permission_denial(base_client):
         {"before_date": "2020-01-01", "activation_names": [""]},
         {"before_date": "2020-01-01", "activation_names": ["   "]},
         {"before_date": "2020-01-01", "activation_ids": [99999999]},
+        {"before_date": "2020-01-01", "activation_id": 1},
+        {"before_date": "2020-01-01", "activation_id": "invalid"},
+        {"before_date": "2020-01-01", "activation_id": None},
+        {"before_date": "2020-01-01", "activation_namess": ["demo"]},
         {
             "before_date": "2020-01-01",
             "activation_names": ["missing-activation"],
