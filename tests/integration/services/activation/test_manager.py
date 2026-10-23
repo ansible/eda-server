@@ -1423,6 +1423,44 @@ def test_create_activation_instance_records_k8s_namespace(
     assert process.activation_job_namespace == "eda-activations"
 
 
+@pytest.mark.django_db
+@patch(
+    "aap_eda.services.activation.activation_manager."
+    "resolve_legacy_activation_namespace",
+    return_value="eda-control-plane",
+)
+def test_start_replaces_legacy_job_in_control_plane_namespace(
+    resolve_legacy_namespace,
+    running_activation: models.Activation,
+    preseed_credential_types,
+):
+    """Clean up a legacy Job before creating a target-namespace replacement."""
+    legacy_process = running_activation.latest_instance
+    assert legacy_process.activation_job_namespace is None
+
+    engine = MagicMock(spec=KubernetesEngine)
+    engine.namespace = "eda-activation-jobs"
+    cleanup_namespaces = []
+    engine.cleanup.side_effect = lambda *_: cleanup_namespaces.append(
+        engine.namespace
+    )
+    engine.start.return_value = "replacement-job"
+    manager = ActivationManager(running_activation, container_engine=engine)
+
+    manager.start()
+
+    legacy_process.refresh_from_db()
+    replacement_process = running_activation.latest_instance
+    assert cleanup_namespaces == ["eda-control-plane"]
+    assert legacy_process.activation_job_namespace == "eda-control-plane"
+    assert replacement_process.id != legacy_process.id
+    assert replacement_process.activation_job_namespace == (
+        "eda-activation-jobs"
+    )
+    assert engine.namespace == "eda-activation-jobs"
+    resolve_legacy_namespace.assert_called_once_with()
+
+
 @pytest.mark.parametrize(
     ("has_previous_instance", "previous_namespace"),
     [(False, None), (True, None), (True, "aap-eda")],

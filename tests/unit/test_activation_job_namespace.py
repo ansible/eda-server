@@ -25,8 +25,10 @@ from aap_eda.services.activation.engine.kubernetes import (
     K8S_API_RETRIES,
     K8S_API_RETRY_BACKOFF,
     Engine,
+    get_service_account_namespace,
     make_job_name,
     resolve_activation_namespace,
+    resolve_legacy_activation_namespace,
     verify_namespace_accessible,
 )
 
@@ -243,6 +245,17 @@ def test_resolve_activation_namespace_no_env_no_file():
             resolve_activation_namespace()
 
 
+def test_get_service_account_namespace_strips_whitespace():
+    with mock.patch("builtins.open", mock.mock_open(read_data="  eda-api\n")):
+        assert get_service_account_namespace() == "eda-api"
+
+
+def test_get_service_account_namespace_empty_file_raises():
+    with mock.patch("builtins.open", mock.mock_open(read_data=" \n")):
+        with pytest.raises(ContainerEngineInitError, match="is empty"):
+            get_service_account_namespace()
+
+
 # --- deprecated env var fallback tests ---
 
 
@@ -256,6 +269,31 @@ def test_resolve_deprecated_env_var_fallback():
     ns, is_override = resolve_activation_namespace()
     assert ns == "legacy-ns"
     assert is_override is True
+
+
+@mock.patch.dict(
+    "os.environ",
+    {
+        "EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "target-ns",
+        "EDA_ACTIVATION_JOB_NAMESPACE": "old-ns",
+    },
+    clear=True,
+)
+def test_resolve_legacy_namespace_ignores_new_default():
+    """Legacy cleanup must not use a configured destination namespace."""
+    assert resolve_legacy_activation_namespace() == "old-ns"
+
+
+@mock.patch.dict(
+    "os.environ",
+    {"EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "target-ns"},
+    clear=True,
+)
+def test_resolve_legacy_namespace_uses_service_account_namespace():
+    with mock.patch(
+        "builtins.open", mock.mock_open(read_data="control-plane-ns")
+    ):
+        assert resolve_legacy_activation_namespace() == "control-plane-ns"
 
 
 @mock.patch.dict(

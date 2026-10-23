@@ -92,6 +92,40 @@ def get_k8s_client() -> Client:
 SA_NAMESPACE_FILE = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
 
+def get_service_account_namespace() -> str:
+    """Return the namespace of the EDA control-plane ServiceAccount."""
+    try:
+        with open(SA_NAMESPACE_FILE, encoding="utf-8") as f:
+            namespace = f.read().strip()
+    except FileNotFoundError as e:
+        raise ContainerEngineInitError(
+            f"Cannot determine control-plane namespace: "
+            f"{SA_NAMESPACE_FILE} does not exist."
+        ) from e
+
+    if not namespace:
+        raise ContainerEngineInitError(
+            "Cannot determine control-plane namespace: "
+            f"{SA_NAMESPACE_FILE} is empty."
+        )
+
+    return namespace
+
+
+def resolve_legacy_activation_namespace() -> str:
+    """Return the namespace used by activation Jobs before this feature.
+
+    ``EDA_ACTIVATION_JOB_NAMESPACE`` was the legacy override.  Do not use
+    ``EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE`` here: that setting selects the
+    destination for new Jobs and may have changed since a legacy Job started.
+    """
+    old_override = os.environ.get("EDA_ACTIVATION_JOB_NAMESPACE", "").strip()
+    if old_override:
+        return old_override
+
+    return get_service_account_namespace()
+
+
 def verify_namespace_accessible(batch_api, namespace: str) -> None:
     """Probe a namespace, retrying transient errors but failing on 4xx."""
     for attempt in range(1, K8S_API_RETRIES + 1):
@@ -146,15 +180,7 @@ def resolve_activation_namespace() -> tuple[str, bool]:
         )
         return old_override, True
 
-    try:
-        with open(SA_NAMESPACE_FILE, encoding="utf-8") as f:
-            return f.read().strip(), False
-    except FileNotFoundError as e:
-        raise ContainerEngineInitError(
-            "Cannot determine activation namespace: "
-            "EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE is not set and "
-            f"{SA_NAMESPACE_FILE} does not exist."
-        ) from e
+    return get_service_account_namespace(), False
 
 
 def make_job_name(
