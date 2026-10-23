@@ -16,6 +16,7 @@ import logging
 import secrets
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, time, timezone as datetime_timezone
 from typing import Optional
 
 import yaml
@@ -54,6 +55,7 @@ from aap_eda.core.utils.credentials import (
     get_resolved_secrets,
     get_secret_fields,
 )
+from aap_eda.core.utils.delete_log_util import resolve_activation_ids
 from aap_eda.core.utils.k8s_service_name import create_k8s_service_name
 from aap_eda.core.utils.log_retention import retention_cutoff
 from aap_eda.core.utils.rulebook import (
@@ -91,38 +93,65 @@ def _update_event_stream_source(validated_data: dict) -> str:
 
 
 class LogPurgeRequestSerializer(serializers.Serializer):
-    """Validate a global log purge request."""
+    """Validate cutoff and activation scope before scheduling a purge."""
 
-    retention_duration = serializers.CharField(required=False)
-    audit_trail = serializers.BooleanField(required=False, default=False)
+    before_date = serializers.DateField(
+        required=False,
+        help_text="Exclusive UTC midnight cutoff (YYYY-MM-DD).",
+    )
+    retention_duration = serializers.CharField(
+        required=False,
+        help_text="Exclusive cutoff as a positive ISO 8601 duration.",
+    )
+    audit_trail = serializers.BooleanField(
+        required=False,
+        default=True,
+        help_text="Write one audit marker per process that loses logs.",
+    )
     activation_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
         required=False,
         allow_empty=False,
+        help_text="Limit deletion to these activation IDs.",
     )
     activation_names = serializers.ListField(
-        child=serializers.CharField(allow_blank=False),
+        child=serializers.CharField(allow_blank=False, trim_whitespace=False),
         required=False,
         allow_empty=False,
+        help_text="Limit deletion to these activation names.",
     )
 
     def validate(self, attrs):
-        if "before_date" in self.initial_data:
-            raise serializers.ValidationError(
-                {"before_date": "This field is not supported."}
-            )
-        if any(not name.strip() for name in attrs.get("activation_names", [])):
-            raise serializers.ValidationError(
-                {"activation_names": "Names cannot be blank."}
-            )
+        before_date = attrs.get("before_date")
         duration = attrs.get("retention_duration")
-        if duration is not None:
+        if (before_date is None) == (duration is None):
+            raise serializers.ValidationError(
+                "Exactly one of before_date or retention_duration is required."
+            )
+        if before_date is not None:
+            cutoff = datetime.combine(
+                before_date, time.min, tzinfo=datetime_timezone.utc
+            )
+            if cutoff > datetime.now(datetime_timezone.utc):
+                raise serializers.ValidationError(
+                    {"before_date": "The UTC cutoff must not be future."}
+                )
+            attrs["before_date"] = before_date.isoformat()
+        else:
             try:
                 retention_cutoff(duration)
             except ValueError as exc:
                 raise serializers.ValidationError(
                     {"retention_duration": str(exc)}
                 ) from exc
+        if "activation_ids" in attrs or "activation_names" in attrs:
+            try:
+                resolve_activation_ids(
+                    attrs.get("activation_ids"),
+                    attrs.get("activation_names"),
+                )
+            except ValueError as exc:
+                raise serializers.ValidationError(str(exc)) from exc
         return attrs
 
 

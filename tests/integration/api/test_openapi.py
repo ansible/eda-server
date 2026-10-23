@@ -107,11 +107,14 @@ def test_log_purge_openapi_contract(admin_client):
     ]
     request_properties = request_schema["properties"]
     assert set(request_properties) == {
+        "before_date",
         "retention_duration",
         "audit_trail",
         "activation_ids",
         "activation_names",
     }
+    assert request_properties["audit_trail"]["default"] is True
+    assert "internal_job_uuid" not in request_properties
 
     responses = operation["responses"]
     assert {"202", "400", "403"}.issubset(responses)
