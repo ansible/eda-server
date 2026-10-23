@@ -248,10 +248,9 @@ def test_engine_init_with_exception(init_kubernetes_data):
     with pytest.raises(
         ContainerEngineInitError,
         match=(
-            "Cannot determine activation namespace: "
-            "EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE is not set and "
-            "/var/run/secrets/kubernetes.io/serviceaccount"
-            "/namespace does not exist."
+            "Cannot determine control-plane namespace: "
+            "/var/run/secrets/kubernetes.io/serviceaccount/namespace "
+            "does not exist."
         ),
     ):
         Engine(

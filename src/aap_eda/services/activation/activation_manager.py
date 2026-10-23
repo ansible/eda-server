@@ -41,7 +41,7 @@ from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
 from .engine.kubernetes import (
     Engine as KubernetesEngine,
-    resolve_legacy_activation_namespace,
+    get_service_account_namespace,
 )
 from .status_manager import StatusManager, run_with_lock
 from .tee_system_logger import TeeSystemLogger
@@ -97,7 +97,7 @@ class ActivationManager(StatusManager):
 
         namespace = instance.activation_job_namespace
         if not namespace:
-            namespace = resolve_legacy_activation_namespace()
+            namespace = get_service_account_namespace()
             instance.activation_job_namespace = namespace
             instance.save(update_fields=["activation_job_namespace"])
             LOGGER.info(
@@ -480,26 +480,26 @@ class ActivationManager(StatusManager):
         Leave the process intact if Kubernetes Job cleanup fails so it can
         be retried. Other engines retain FAILED handling on cleanup errors.
         """
-        kubernetes_cleanup_failed = False
+        user_msg = (
+            "Activation is unresponsive. "
+            f"{check_type} check for ansible-rulebook timed out."
+        )
         try:
             self._cleanup(raise_on_error=True)
         except engine_exceptions.ContainerCleanupError as exc:
             if isinstance(self.container_engine, KubernetesEngine):
-                kubernetes_cleanup_failed = True
                 msg = (
                     f"Activation {self.db_instance.id} is unresponsive. "
                     f"Cleanup failed. Reason: {exc}"
                 )
-                self._error_activation(msg)
+                LOGGER.error(msg)
+                raise
+            self._fail_instance(msg=user_msg, cleanup_already_done=True)
+            self.set_status(ActivationStatus.FAILED, user_msg)
             raise
-        finally:
-            if not kubernetes_cleanup_failed:
-                user_msg = (
-                    "Activation is unresponsive. "
-                    f"{check_type} check for ansible-rulebook timed out."
-                )
-                self._fail_instance(msg=user_msg, cleanup_already_done=True)
-                self.set_status(ActivationStatus.FAILED, user_msg)
+
+        self._fail_instance(msg=user_msg, cleanup_already_done=True)
+        self.set_status(ActivationStatus.FAILED, user_msg)
 
     def _missing_container_policy(self):
         LOGGER.info(
@@ -1029,7 +1029,7 @@ class ActivationManager(StatusManager):
                     f"Monitor operation: activation {self.db_instance.id} "
                     f"failed to cleanup its Job. Reason: {exc}"
                 )
-                self._error_activation(msg)
+                LOGGER.error(msg)
                 raise exceptions.ActivationMonitorError(msg) from exc
 
         if container_status.status == ActivationStatus.COMPLETED:  # RC == 0

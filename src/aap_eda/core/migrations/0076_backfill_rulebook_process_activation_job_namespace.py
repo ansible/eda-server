@@ -1,5 +1,3 @@
-import os
-
 from django.conf import settings
 from django.db import migrations
 
@@ -9,15 +7,10 @@ SA_NAMESPACE_FILE = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 def legacy_activation_namespace() -> str:
     """Return the namespace used by Kubernetes Jobs before this feature.
 
-    The deprecated override is the only pre-feature setting that could place
-    activation Jobs outside the control-plane namespace.  The new default
-    namespace setting is intentionally ignored because it may be configured
-    while this migration is running and applies only to new Jobs.
+    Before this feature, Kubernetes activation Jobs ran in the EDA
+    control-plane namespace. The configured default namespace is intentionally
+    ignored because it applies only to new Jobs.
     """
-    old_override = os.environ.get("EDA_ACTIVATION_JOB_NAMESPACE", "").strip()
-    if old_override:
-        return old_override
-
     try:
         with open(SA_NAMESPACE_FILE, encoding="utf-8") as namespace_file:
             namespace = namespace_file.read().strip()
@@ -43,9 +36,13 @@ def backfill_rulebook_process_activation_job_namespace(apps, schema_editor):
 
     RulebookProcess = apps.get_model("core", "RulebookProcess")  # noqa: N806
     db_alias = schema_editor.connection.alias
-    RulebookProcess.objects.using(db_alias).filter(
+    processes = RulebookProcess.objects.using(db_alias).filter(
         activation_job_namespace__isnull=True
-    ).update(activation_job_namespace=legacy_activation_namespace())
+    )
+    if not processes.exists():
+        return
+
+    processes.update(activation_job_namespace=legacy_activation_namespace())
 
 
 class Migration(migrations.Migration):

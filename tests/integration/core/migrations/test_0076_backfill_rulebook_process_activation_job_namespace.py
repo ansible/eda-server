@@ -58,3 +58,24 @@ def test_migration_records_control_plane_namespace(
 
     migrated_process = models.RulebookProcess.objects.get(pk=process.pk)
     assert migrated_process.activation_job_namespace == "eda-control-plane"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_migration_skips_namespace_lookup_without_legacy_processes(
+    rollback_migration,
+):
+    """An empty installation does not need the ServiceAccount namespace."""
+    migration_module = import_module(
+        "aap_eda.core.migrations."
+        "0076_backfill_rulebook_process_activation_job_namespace"
+    )
+
+    with (
+        mock.patch.object(settings, "DEPLOYMENT_TYPE", "k8s"),
+        mock.patch.object(
+            migration_module, "legacy_activation_namespace"
+        ) as legacy_activation_namespace,
+    ):
+        call_command("migrate", "core", "0076")
+
+    legacy_activation_namespace.assert_not_called()
