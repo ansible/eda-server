@@ -28,7 +28,6 @@ from aap_eda.services.activation.engine.kubernetes import (
     get_service_account_namespace,
     make_job_name,
     resolve_activation_namespace,
-    resolve_legacy_activation_namespace,
     verify_namespace_accessible,
 )
 
@@ -221,17 +220,8 @@ def test_resolve_activation_namespace_env_override():
 
 
 def test_resolve_activation_namespace_sa_file():
-    """SA file returns (namespace, False) when both overrides are unset."""
-    env = {
-        k: v
-        for k, v in os.environ.items()
-        if k
-        not in {
-            "EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE",
-            "EDA_ACTIVATION_JOB_NAMESPACE",
-        }
-    }
-    with mock.patch.dict("os.environ", env, clear=True):
+    """SA file returns (namespace, False) when no default is configured."""
+    with mock.patch.dict("os.environ", {}, clear=True):
         with mock.patch("builtins.open", mock.mock_open(read_data="sa-ns")):
             ns, is_override = resolve_activation_namespace()
             assert ns == "sa-ns"
@@ -254,75 +244,6 @@ def test_get_service_account_namespace_empty_file_raises():
     with mock.patch("builtins.open", mock.mock_open(read_data=" \n")):
         with pytest.raises(ContainerEngineInitError, match="is empty"):
             get_service_account_namespace()
-
-
-# --- deprecated env var fallback tests ---
-
-
-@mock.patch.dict(
-    "os.environ",
-    {"EDA_ACTIVATION_JOB_NAMESPACE": "legacy-ns"},
-    clear=True,
-)
-def test_resolve_deprecated_env_var_fallback():
-    """Old env var works as fallback with is_override=True."""
-    ns, is_override = resolve_activation_namespace()
-    assert ns == "legacy-ns"
-    assert is_override is True
-
-
-@mock.patch.dict(
-    "os.environ",
-    {
-        "EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "target-ns",
-        "EDA_ACTIVATION_JOB_NAMESPACE": "old-ns",
-    },
-    clear=True,
-)
-def test_resolve_legacy_namespace_ignores_new_default():
-    """Legacy cleanup must not use a configured destination namespace."""
-    assert resolve_legacy_activation_namespace() == "old-ns"
-
-
-@mock.patch.dict(
-    "os.environ",
-    {"EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "target-ns"},
-    clear=True,
-)
-def test_resolve_legacy_namespace_uses_service_account_namespace():
-    with mock.patch(
-        "builtins.open", mock.mock_open(read_data="control-plane-ns")
-    ):
-        assert resolve_legacy_activation_namespace() == "control-plane-ns"
-
-
-@mock.patch.dict(
-    "os.environ",
-    {
-        "EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "new-ns",
-        "EDA_ACTIVATION_JOB_NAMESPACE": "old-ns",
-    },
-)
-def test_resolve_new_env_var_takes_precedence():
-    """New env var takes precedence over old."""
-    ns, is_override = resolve_activation_namespace()
-    assert ns == "new-ns"
-    assert is_override is True
-
-
-@mock.patch.dict(
-    "os.environ",
-    {"EDA_ACTIVATION_JOB_NAMESPACE": "legacy-ns"},
-    clear=True,
-)
-def test_set_namespace_deprecated_env_override():
-    """Engine uses deprecated env var when new one is not set."""
-    engine = Engine(
-        activation_id="1",
-        resource_prefix="activation",
-        client=mock.Mock(),
-    )
-    assert engine.namespace == "legacy-ns"
 
 
 # --- make_job_name tests ---

@@ -70,11 +70,11 @@ class TestInstanceEngine:
 
     @patch(
         "aap_eda.services.activation.activation_manager."
-        "resolve_legacy_activation_namespace",
+        "get_service_account_namespace",
         return_value="control-plane-ns",
     )
     def test_null_namespace_records_and_uses_legacy_namespace(
-        self, resolve_legacy_namespace
+        self, get_control_plane_namespace
     ):
         """A legacy process never uses the configured namespace as source."""
         engine = MagicMock(spec=KubernetesEngine)
@@ -94,15 +94,15 @@ class TestInstanceEngine:
         instance.save.assert_called_once_with(
             update_fields=["activation_job_namespace"]
         )
-        resolve_legacy_namespace.assert_called_once_with()
+        get_control_plane_namespace.assert_called_once_with()
 
     @patch(
         "aap_eda.services.activation.activation_manager."
-        "resolve_legacy_activation_namespace",
+        "get_service_account_namespace",
         return_value="control-plane-ns",
     )
     def test_empty_namespace_records_and_uses_legacy_namespace(
-        self, resolve_legacy_namespace
+        self, get_control_plane_namespace
     ):
         """An empty legacy value is treated the same as a null value."""
         engine = MagicMock(spec=KubernetesEngine)
@@ -122,7 +122,7 @@ class TestInstanceEngine:
         instance.save.assert_called_once_with(
             update_fields=["activation_job_namespace"]
         )
-        resolve_legacy_namespace.assert_called_once_with()
+        get_control_plane_namespace.assert_called_once_with()
 
     def test_non_k8s_engine_yields_without_swap(self):
         """Non-Kubernetes engine yields without any namespace logic."""

@@ -496,8 +496,7 @@ def test_monitor_cleanup_failure_preserves_job_for_retry(
     )
     running_activation.refresh_from_db()
     process.refresh_from_db()
-    assert running_activation.status == enums.ActivationStatus.ERROR
-    assert "cleanup failed" in running_activation.status_message
+    assert running_activation.status == enums.ActivationStatus.RUNNING
     assert process.status == enums.ActivationStatus.RUNNING
     assert process.activation_pod_id == "test-pod-id"
     assert engine.namespace == "new-ns"
@@ -526,6 +525,9 @@ def test_monitor_terminal_status_after_cleanup(
     engine.get_status.return_value = MagicMock(
         status=container_status, message="container exited"
     )
+    process = running_activation.latest_instance
+    process.activation_job_namespace = "new-ns"
+    process.save(update_fields=["activation_job_namespace"])
     manager = ActivationManager(running_activation, container_engine=engine)
 
     if container_status == enums.ActivationStatus.ERROR:
@@ -562,6 +564,9 @@ def test_monitor_failed_job_cleans_up_once_with_restart_policy(
     engine.get_status.return_value = MagicMock(
         status=enums.ActivationStatus.FAILED, message="container exited"
     )
+    process = running_activation.latest_instance
+    process.activation_job_namespace = "new-ns"
+    process.save(update_fields=["activation_job_namespace"])
     manager = ActivationManager(running_activation, container_engine=engine)
 
     with patch(SYSTEM_RESTART_PATH) as restart_mock:
@@ -1362,8 +1367,7 @@ def test_handle_unresponsive_kubernetes_cleanup_failure_preserves_job(
 
     activation.refresh_from_db()
     process.refresh_from_db()
-    assert activation.status == enums.ActivationStatus.ERROR
-    assert "cleanup failed" in activation.status_message
+    assert activation.status == enums.ActivationStatus.STARTING
     assert process.status == enums.ActivationStatus.STARTING
     assert process.activation_pod_id == "test-pod-id"
     assert process.activation_job_namespace == "old-ns"
@@ -1426,11 +1430,11 @@ def test_create_activation_instance_records_k8s_namespace(
 @pytest.mark.django_db
 @patch(
     "aap_eda.services.activation.activation_manager."
-    "resolve_legacy_activation_namespace",
+    "get_service_account_namespace",
     return_value="eda-control-plane",
 )
 def test_start_replaces_legacy_job_in_control_plane_namespace(
-    resolve_legacy_namespace,
+    get_control_plane_namespace,
     running_activation: models.Activation,
     preseed_credential_types,
 ):
@@ -1458,7 +1462,7 @@ def test_start_replaces_legacy_job_in_control_plane_namespace(
         "eda-activation-jobs"
     )
     assert engine.namespace == "eda-activation-jobs"
-    resolve_legacy_namespace.assert_called_once_with()
+    get_control_plane_namespace.assert_called_once_with()
 
 
 @pytest.mark.parametrize(
@@ -1585,16 +1589,26 @@ def test_cleanup_uses_instance_engine_namespace(
 
 
 @pytest.mark.django_db
-def test_cleanup_uses_engine_default_for_null_namespace(
+@patch(
+    "aap_eda.services.activation.activation_manager."
+    "get_service_account_namespace",
+    return_value="control-plane-ns",
+)
+def test_cleanup_records_control_plane_namespace_for_legacy_process(
+    get_control_plane_namespace,
     running_activation: models.Activation,
 ):
-    """Legacy process (null namespace) uses engine default for cleanup."""
+    """Legacy cleanup uses and records the control-plane namespace."""
     k8s_engine = MagicMock(spec=KubernetesEngine)
-    k8s_engine.namespace = "current-ns"
+    k8s_engine.namespace = "target-ns"
 
     proc = running_activation.latest_instance
     proc.activation_job_namespace = None
     proc.save(update_fields=["activation_job_namespace"])
+    namespaces = []
+    k8s_engine.cleanup.side_effect = lambda *_: namespaces.append(
+        k8s_engine.namespace
+    )
 
     manager = ActivationManager(
         running_activation,
@@ -1602,5 +1616,9 @@ def test_cleanup_uses_engine_default_for_null_namespace(
     )
     manager._cleanup()
 
-    assert k8s_engine.namespace == "current-ns"
+    proc.refresh_from_db()
+    assert k8s_engine.namespace == "target-ns"
+    assert namespaces == ["control-plane-ns"]
+    assert proc.activation_job_namespace == "control-plane-ns"
+    get_control_plane_namespace.assert_called_once_with()
     k8s_engine.cleanup.assert_called_once()

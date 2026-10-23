@@ -112,20 +112,6 @@ def get_service_account_namespace() -> str:
     return namespace
 
 
-def resolve_legacy_activation_namespace() -> str:
-    """Return the namespace used by activation Jobs before this feature.
-
-    ``EDA_ACTIVATION_JOB_NAMESPACE`` was the legacy override.  Do not use
-    ``EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE`` here: that setting selects the
-    destination for new Jobs and may have changed since a legacy Job started.
-    """
-    old_override = os.environ.get("EDA_ACTIVATION_JOB_NAMESPACE", "").strip()
-    if old_override:
-        return old_override
-
-    return get_service_account_namespace()
-
-
 def verify_namespace_accessible(batch_api, namespace: str) -> None:
     """Probe a namespace, retrying transient errors but failing on 4xx."""
     for attempt in range(1, K8S_API_RETRIES + 1):
@@ -171,14 +157,6 @@ def resolve_activation_namespace() -> tuple[str, bool]:
     ).strip()
     if ns_override:
         return ns_override, True
-
-    old_override = os.environ.get("EDA_ACTIVATION_JOB_NAMESPACE", "").strip()
-    if old_override:
-        LOGGER.warning(
-            "EDA_ACTIVATION_JOB_NAMESPACE is deprecated; "
-            "use EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE instead."
-        )
-        return old_override, True
 
     return get_service_account_namespace(), False
 
