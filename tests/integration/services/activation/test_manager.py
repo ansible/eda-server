@@ -617,9 +617,10 @@ def test_error_instance_cleans_up_job_when_not_already_done(
 
 
 @pytest.mark.django_db
-def test_monitor_disabled_cleanup_failure_maps_to_monitor_error(
+def test_monitor_disabled_cleanup_failure_retries_until_stopped(
     running_activation: models.Activation,
 ):
+    """Disabled activations retry cleanup until the Job is removed."""
     running_activation.is_enabled = False
     running_activation.save(update_fields=["is_enabled"])
     engine = MagicMock(spec=KubernetesEngine)
@@ -627,6 +628,9 @@ def test_monitor_disabled_cleanup_failure_maps_to_monitor_error(
     engine.cleanup.side_effect = engine_exceptions.ContainerCleanupError(
         "cleanup failed"
     )
+    process = running_activation.latest_instance
+    process.activation_job_namespace = "old-ns"
+    process.save(update_fields=["activation_job_namespace"])
     manager = ActivationManager(running_activation, container_engine=engine)
 
     with pytest.raises(exceptions.ActivationMonitorError) as exc:
@@ -634,13 +638,26 @@ def test_monitor_disabled_cleanup_failure_maps_to_monitor_error(
 
     assert isinstance(exc.value.__cause__, exceptions.ActivationStopError)
     running_activation.refresh_from_db()
-    assert running_activation.status == enums.ActivationStatus.ERROR
-    assert running_activation.latest_instance.status == (
-        enums.ActivationStatus.STOPPING
+    assert running_activation.status == enums.ActivationStatus.RUNNING
+    assert (
+        running_activation.latest_instance.status
+        == enums.ActivationStatus.RUNNING
     )
     assert (
         running_activation.latest_instance.activation_pod_id == "test-pod-id"
     )
+
+    engine.cleanup.side_effect = None
+    manager.monitor()
+
+    running_activation.refresh_from_db()
+    assert running_activation.status == enums.ActivationStatus.STOPPED
+    assert (
+        running_activation.latest_instance.status
+        == enums.ActivationStatus.STOPPED
+    )
+    assert running_activation.latest_instance.activation_pod_id is None
+    assert engine.cleanup.call_count == 2
 
 
 @pytest.mark.django_db

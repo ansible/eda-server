@@ -1482,10 +1482,10 @@ def test_process_pod_start_event_unrecognized(kubernetes_engine):
 
 
 @pytest.mark.django_db
-def test_set_namespace_with_env_override_verifies_access(
+def test_set_namespace_with_env_override_defers_access_check(
     init_kubernetes_data,
 ):
-    """When env var is set, _set_namespace probes the target namespace."""
+    """An override does not block lifecycle operations at construction."""
     mock_client = mock.Mock()
     mock_client.batch_api.list_namespaced_job.return_value = None
 
@@ -1499,10 +1499,7 @@ def test_set_namespace_with_env_override_verifies_access(
             client=mock_client,
         )
         assert engine.namespace == "eda-activations"
-        mock_client.batch_api.list_namespaced_job.assert_called_once_with(
-            namespace="eda-activations",
-            limit=1,
-        )
+        mock_client.batch_api.list_namespaced_job.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -1526,10 +1523,48 @@ def test_set_namespace_without_env_skips_verification(init_kubernetes_data):
 
 
 @pytest.mark.django_db
-def test_set_namespace_env_override_inaccessible_raises(
-    init_kubernetes_data,
+def test_start_with_env_override_verifies_access(
+    init_kubernetes_data, mock_log_handler, default_organization
 ):
-    """Inaccessible override namespace raises during init."""
+    """Starting a new Job verifies the configured target namespace."""
+    request = get_request(
+        init_kubernetes_data,
+        "tester",
+        default_organization,
+    )
+    mock_client = mock.Mock()
+    mock_client.batch_api.list_namespaced_job.return_value = None
+    with mock.patch.dict(
+        "os.environ",
+        {"EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "eda-activations"},
+    ):
+        engine = Engine(
+            activation_id=str(init_kubernetes_data.activation.id),
+            resource_prefix="activation",
+            client=mock_client,
+        )
+
+    with mock.patch.object(engine, "_create_job"), mock.patch.object(
+        engine, "_wait_for_pod_to_start"
+    ), mock.patch.object(engine, "_create_service"):
+        engine.start(request, mock_log_handler)
+
+    mock_client.batch_api.list_namespaced_job.assert_called_once_with(
+        namespace="eda-activations",
+        limit=1,
+    )
+
+
+@pytest.mark.django_db
+def test_start_with_inaccessible_env_override_raises(
+    init_kubernetes_data, mock_log_handler, default_organization
+):
+    """An inaccessible configured target fails before Job creation."""
+    request = get_request(
+        init_kubernetes_data,
+        "tester",
+        default_organization,
+    )
     mock_client = mock.Mock()
     mock_client.batch_api.list_namespaced_job.side_effect = ApiException(
         status=403, reason="Forbidden"
@@ -1538,12 +1573,18 @@ def test_set_namespace_env_override_inaccessible_raises(
         "os.environ",
         {"EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "forbidden-ns"},
     ):
-        with pytest.raises(ContainerEngineInitError, match="not accessible"):
-            Engine(
-                activation_id=str(init_kubernetes_data.activation.id),
-                resource_prefix="activation",
-                client=mock_client,
-            )
+        engine = Engine(
+            activation_id=str(init_kubernetes_data.activation.id),
+            resource_prefix="activation",
+            client=mock_client,
+        )
+        with mock.patch.object(engine, "_create_job") as create_job:
+            with pytest.raises(
+                ContainerEngineInitError, match="not accessible"
+            ):
+                engine.start(request, mock_log_handler)
+
+    create_job.assert_not_called()
 
 
 @pytest.mark.django_db

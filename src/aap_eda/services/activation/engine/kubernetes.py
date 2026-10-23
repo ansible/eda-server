@@ -199,6 +199,9 @@ class Engine(ContainerEngine):
             f"-{request.rulebook_process_id}"
         )
 
+        if self._namespace_is_override:
+            verify_namespace_accessible(self.client.batch_api, self.namespace)
+
         try:
             log_handler.write("Creating Job")
             log_handler.write(f"Log tracking id: {request.log_tracking_id}")
@@ -878,8 +881,8 @@ class Engine(ContainerEngine):
                 "Activation Job namespace override from environment: %s",
                 namespace,
             )
-            verify_namespace_accessible(self.client.batch_api, namespace)
         self.namespace = namespace
+        self._namespace_is_override = is_override
 
     def _create_secret(
         self,
