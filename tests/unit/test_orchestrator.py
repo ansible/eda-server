@@ -683,6 +683,38 @@ def test_manage_monitor_runs_on_matching_queue(
 
 
 @pytest.mark.django_db
+def test_manage_monitor_runs_for_disabled_stopping_activation(
+    process_parent, mock_get_parent, mock_requests_queue
+):
+    """Retry cleanup for the state produced by the disable endpoint."""
+    process_parent.is_enabled = False
+    process_parent.status = ActivationStatus.STOPPING
+    mock_get_parent.return_value = process_parent
+    mock_requests_queue.peek_all.return_value = []
+    manager_mock = mock.Mock()
+
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.ActivationManager"
+        ) as mock_manager,
+        mock.patch("aap_eda.tasks.orchestrator.assign_request_id"),
+        mock.patch("aap_eda.tasks.orchestrator.assign_log_tracking_id"),
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+            return_value="eda-local-node-queue",
+        ),
+        mock.patch(
+            "aap_eda.tasks.orchestrator.settings.RULEBOOK_QUEUE_NAME",
+            "eda-local-node-queue",
+        ),
+    ):
+        mock_manager.return_value = manager_mock
+        _manage(ProcessParentType.ACTIVATION, 1, "x_request_id")
+
+    manager_mock.monitor.assert_called_once()
+
+
+@pytest.mark.django_db
 def test_manage_monitor_runs_when_no_queue_assigned(
     process_parent, mock_get_parent, mock_requests_queue
 ):

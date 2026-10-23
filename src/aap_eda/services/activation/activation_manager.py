@@ -748,7 +748,6 @@ class ActivationManager(StatusManager):
 
     def _stop_instance(self):
         """Stop the latest activation instance."""
-        self.set_latest_instance_status(ActivationStatus.STOPPING)
         self._cleanup()
         self.set_latest_instance_status(ActivationStatus.STOPPED)
         self._set_activation_pod_id(pod_id=None)
@@ -846,8 +845,7 @@ class ActivationManager(StatusManager):
                 f"Activation {self.db_instance.id} failed to stop. "
                 f"Reason: {exc}"
             )
-            # Alex: Not sure if we want to change the status here.
-            self._error_activation(msg)
+            LOGGER.error(msg)
             raise exceptions.ActivationStopError(msg) from exc
         user_msg = "Stop requested by user."
         if self.db_instance.status != ActivationStatus.ERROR:

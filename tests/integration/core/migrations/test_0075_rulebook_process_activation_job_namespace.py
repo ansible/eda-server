@@ -45,7 +45,7 @@ def test_migration_records_control_plane_namespace(
     namespace_file.write_text("eda-control-plane\n", encoding="utf-8")
     migration_module = import_module(
         "aap_eda.core.migrations."
-        "0076_backfill_rulebook_process_activation_job_namespace"
+        "0075_rulebookprocess_activation_job_namespace"
     )
 
     with (
@@ -54,7 +54,7 @@ def test_migration_records_control_plane_namespace(
             migration_module, "SA_NAMESPACE_FILE", str(namespace_file)
         ),
     ):
-        call_command("migrate", "core", "0076")
+        call_command("migrate", "core", "0075")
 
     migrated_process = models.RulebookProcess.objects.get(pk=process.pk)
     assert migrated_process.activation_job_namespace == "eda-control-plane"
@@ -67,7 +67,7 @@ def test_migration_skips_namespace_lookup_without_legacy_processes(
     """An empty installation does not need the ServiceAccount namespace."""
     migration_module = import_module(
         "aap_eda.core.migrations."
-        "0076_backfill_rulebook_process_activation_job_namespace"
+        "0075_rulebookprocess_activation_job_namespace"
     )
 
     with (
@@ -76,6 +76,6 @@ def test_migration_skips_namespace_lookup_without_legacy_processes(
             migration_module, "legacy_activation_namespace"
         ) as legacy_activation_namespace,
     ):
-        call_command("migrate", "core", "0076")
+        call_command("migrate", "core", "0075")
 
     legacy_activation_namespace.assert_not_called()

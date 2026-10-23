@@ -59,24 +59,16 @@ def test_set_namespace_env_override_strips_whitespace():
 @mock.patch.dict(
     "os.environ", {"EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": "eda-jobs"}
 )
-def test_set_namespace_env_override_retries_transient_probe():
+def test_set_namespace_env_override_skips_probe_during_construction():
     client = mock.Mock()
-    client.batch_api.list_namespaced_job.side_effect = [
-        ApiException(status=503, reason="Unavailable"),
-        None,
-    ]
-
-    with mock.patch(
-        "aap_eda.services.activation.engine.kubernetes.time.sleep"
-    ):
-        engine = Engine(
-            activation_id="1",
-            resource_prefix="activation",
-            client=client,
-        )
+    engine = Engine(
+        activation_id="1",
+        resource_prefix="activation",
+        client=client,
+    )
 
     assert engine.namespace == "eda-jobs"
-    assert client.batch_api.list_namespaced_job.call_count == 2
+    client.batch_api.list_namespaced_job.assert_not_called()
 
 
 @mock.patch.dict("os.environ", {"EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE": ""})

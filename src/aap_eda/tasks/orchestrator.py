@@ -122,11 +122,15 @@ def _manage_no_lock(
                 while_condition = False
                 break
 
-    if not has_request_processed and process_parent.status in [
+    should_monitor = process_parent.status in [
         ActivationStatus.STARTING,
         ActivationStatus.RUNNING,
         ActivationStatus.WORKERS_OFFLINE,
-    ]:
+    ] or (
+        not process_parent.is_enabled
+        and process_parent.status == ActivationStatus.STOPPING
+    )
+    if not has_request_processed and should_monitor:
         try:
             queue_name = get_queue_name_by_parent_id(process_parent_type, id)
         except ValueError as exc:

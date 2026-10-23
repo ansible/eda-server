@@ -166,6 +166,47 @@ def test_manage_request(manager_mock, activation, verb):
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
+def test_manage_retries_failed_stop_for_disabled_stopping_activation(
+    manager_mock, activation
+):
+    """Monitor retries cleanup after a failed stop request is consumed."""
+    activation.is_enabled = False
+    activation.status = ActivationStatus.STOPPING
+    activation.save(update_fields=["is_enabled", "status"])
+    process = models.RulebookProcess.objects.create(
+        name="running",
+        activation=activation,
+        status=ActivationStatus.RUNNING,
+        organization=activation.organization,
+    )
+    models.RulebookProcessQueue.objects.create(
+        process=process,
+        queue_name="activation",
+    )
+    queue.push(
+        ProcessParentType.ACTIVATION, activation.id, ActivationRequest.STOP
+    )
+
+    manager_instance_mock = mock.Mock()
+    manager_instance_mock.stop.side_effect = RuntimeError("cleanup failed")
+    manager_mock.return_value = manager_instance_mock
+
+    with mock.patch.object(settings, "RULEBOOK_QUEUE_NAME", "activation"):
+        orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+
+        assert not queue.peek_all(ProcessParentType.ACTIVATION, activation.id)
+        activation.refresh_from_db()
+        assert activation.is_enabled is False
+        assert activation.status == ActivationStatus.STOPPING
+
+        orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+
+    manager_instance_mock.stop.assert_called_once()
+    manager_instance_mock.monitor.assert_called_once()
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "command, queued_request",
     [
