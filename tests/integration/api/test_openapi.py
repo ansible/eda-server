@@ -112,8 +112,10 @@ def test_log_purge_openapi_contract(admin_client):
         "audit_trail",
         "activation_ids",
         "activation_names",
+        "purge-all-logs",
     }
     assert request_properties["audit_trail"]["default"] is True
+    assert request_properties["purge-all-logs"]["default"] is False
     assert "internal_job_uuid" not in request_properties
 
     responses = operation["responses"]

@@ -1026,3 +1026,158 @@ def test_marker_uses_invocation_count_job_uuid_tracking_and_ceiled_timestamp(
         "Job ID:"
         not in next(row for row in markers if row.pk != marker.pk).log
     )
+
+
+@pytest.mark.django_db
+def test_purge_all_logs_replaces_old_rows_and_markers_per_process(
+    null_activation_test_data, monkeypatch
+):
+    monkeypatch.setattr(delete_log_util, "DELETE_BATCH_SIZE", 2)
+    normal = null_activation_test_data["normal_process"]
+    orphan = null_activation_test_data["null_process"]
+    models.RulebookProcessLog.objects.create(
+        activation_instance=normal,
+        log="old purge marker",
+        log_timestamp=1,
+        log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT,
+    )
+    models.RulebookProcessLog.objects.create(
+        activation_instance=normal,
+        log="future ordinary log",
+        log_timestamp=int(timezone.now().timestamp()) + 10000,
+    )
+    models.RulebookProcessLog.objects.create(
+        activation_instance=orphan,
+        log=(
+            "All log records older than 2024-01-01 00:00:00 UTC were "
+            "purged at 2024-02-01 00:00:00 UTC."
+        ),
+        log_timestamp=1,
+    )
+    old_ids = set(
+        models.RulebookProcessLog.objects.values_list("id", flat=True)
+    )
+    job_id = uuid4()
+
+    output = call_command(
+        "purge_log_records",
+        "--purge-all-logs",
+        "--internal-job-uuid",
+        str(job_id),
+    )
+
+    assert output.startswith("Purged 7 log records globally")
+    assert not models.RulebookProcessLog.objects.filter(
+        pk__in=old_ids
+    ).exists()
+    markers = models.RulebookProcessLog.objects.all()
+    assert markers.count() == 2
+    normal_marker = markers.get(activation_instance=normal)
+    orphan_marker = markers.get(activation_instance=orphan)
+    assert "Global log purge ran at" in normal_marker.log
+    assert "Deleted 4 log rows." in normal_marker.log
+    assert "Deleted 3 log rows." in orphan_marker.log
+    assert f"Job ID: {job_id}." in normal_marker.log
+    assert "Log Tracking id unavailable (orphaned process)." in (
+        orphan_marker.log
+    )
+    assert all(
+        marker.log_created_at == delete_log_util.PURGE_MARKER_CREATED_AT
+        for marker in markers
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "conflicting_options",
+    [
+        ("--date", "2024-01-01"),
+        ("--retention-duration", "P1D"),
+        ("--activation-ids", "1"),
+        ("--activation-names", "example"),
+        ("--audit-trail=false",),
+    ],
+)
+def test_purge_all_logs_rejects_other_modes_before_deletion(
+    default_activation_instance, conflicting_options
+):
+    log = models.RulebookProcessLog.objects.create(
+        activation_instance=default_activation_instance,
+        log="must remain",
+        log_timestamp=1,
+    )
+
+    with pytest.raises(CommandError, match="purge-all-logs"):
+        call_command(
+            "purge_log_records", "--purge-all-logs", *conflicting_options
+        )
+
+    assert models.RulebookProcessLog.objects.filter(pk=log.pk).exists()
+
+
+@pytest.mark.django_db
+def test_purge_all_logs_rejects_programmatic_non_boolean_flag(
+    default_activation_instance,
+):
+    log = models.RulebookProcessLog.objects.create(
+        activation_instance=default_activation_instance,
+        log="must remain",
+        log_timestamp=1,
+    )
+
+    with pytest.raises(CommandError, match="must be a boolean flag"):
+        call_command("purge_log_records", **{"purge-all-logs": "false"})
+
+    assert models.RulebookProcessLog.objects.filter(pk=log.pk).exists()
+
+
+@pytest.mark.django_db
+def test_purge_all_logs_with_no_rows_creates_no_marker(
+    default_activation_instance,
+):
+    output = call_command("purge_log_records", "--purge-all-logs")
+
+    assert output.startswith("Purged 0 log records globally")
+    assert "No audit markers created." in output
+    assert not models.RulebookProcessLog.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_purge_all_logs_failure_keeps_committed_marker_count(
+    default_activation_instance, monkeypatch
+):
+    monkeypatch.setattr(delete_log_util, "DELETE_BATCH_SIZE", 1)
+    models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                activation_instance=default_activation_instance,
+                log=f"old-{index}",
+                log_timestamp=1,
+            )
+            for index in range(2)
+        ]
+    )
+    original_delete = QuerySet.delete
+    calls = 0
+
+    def fail_second_delete(queryset):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("injected batch failure")
+        return original_delete(queryset)
+
+    monkeypatch.setattr(QuerySet, "delete", fail_second_delete)
+    with pytest.raises(CommandError, match="failed after 1 committed rows"):
+        call_command("purge_log_records", "--purge-all-logs")
+
+    assert (
+        models.RulebookProcessLog.objects.filter(
+            log__startswith="old-"
+        ).count()
+        == 1
+    )
+    marker = models.RulebookProcessLog.objects.get(
+        log_created_at=delete_log_util.PURGE_MARKER_CREATED_AT
+    )
+    assert "Deleted 1 log rows." in marker.log
