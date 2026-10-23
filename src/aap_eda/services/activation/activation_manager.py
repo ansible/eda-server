@@ -39,7 +39,10 @@ from aap_eda.services.activation.restart_helper import (
 from .drools_cleanup import drools_cleanup
 from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
-from .engine.kubernetes import Engine as KubernetesEngine
+from .engine.kubernetes import (
+    Engine as KubernetesEngine,
+    resolve_legacy_activation_namespace,
+)
 from .status_manager import StatusManager, run_with_lock
 from .tee_system_logger import TeeSystemLogger
 
@@ -84,10 +87,9 @@ class ActivationManager(StatusManager):
         """Use the Job's persisted namespace for operations on that Job.
 
         When the process has a recorded namespace, temporarily swap the
-        engine's namespace for the duration of the block.  When it is
-        None (legacy process created before this field existed), use the
-        engine's current namespace unchanged — that is where pre-feature
-        Jobs were created.
+        engine's namespace for the duration of the block.  A process without
+        one was created before this field existed, so persist and use the
+        legacy namespace rather than the current default for new Jobs.
         """
         if not isinstance(self.container_engine, KubernetesEngine):
             yield
@@ -95,14 +97,15 @@ class ActivationManager(StatusManager):
 
         namespace = instance.activation_job_namespace
         if not namespace:
+            namespace = resolve_legacy_activation_namespace()
+            instance.activation_job_namespace = namespace
+            instance.save(update_fields=["activation_job_namespace"])
             LOGGER.info(
                 "Process %s has no recorded Job namespace, "
-                "using engine default %s",
+                "recording legacy namespace %s",
                 instance.id,
-                self.container_engine.namespace,
+                namespace,
             )
-            yield
-            return
 
         configured_namespace = self.container_engine.namespace
         self.container_engine.namespace = namespace

@@ -14,7 +14,7 @@
 
 """Tests for namespace-aware lifecycle in ActivationManager."""
 
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 
@@ -68,10 +68,17 @@ class TestInstanceEngine:
             raise_inside_instance_engine()
         assert engine.namespace == "current-ns"
 
-    def test_no_swap_for_null_namespace(self):
-        """Legacy process with null namespace uses engine default."""
+    @patch(
+        "aap_eda.services.activation.activation_manager."
+        "resolve_legacy_activation_namespace",
+        return_value="control-plane-ns",
+    )
+    def test_null_namespace_records_and_uses_legacy_namespace(
+        self, resolve_legacy_namespace
+    ):
+        """A legacy process never uses the configured namespace as source."""
         engine = MagicMock(spec=KubernetesEngine)
-        engine.namespace = "current-ns"
+        engine.namespace = "target-ns"
 
         instance = MagicMock()
         instance.activation_job_namespace = None
@@ -81,13 +88,25 @@ class TestInstanceEngine:
         manager = self._make_manager(activation, engine)
 
         with manager._instance_engine(instance):
-            assert engine.namespace == "current-ns"
-        assert engine.namespace == "current-ns"
+            assert engine.namespace == "control-plane-ns"
+        assert engine.namespace == "target-ns"
+        assert instance.activation_job_namespace == "control-plane-ns"
+        instance.save.assert_called_once_with(
+            update_fields=["activation_job_namespace"]
+        )
+        resolve_legacy_namespace.assert_called_once_with()
 
-    def test_no_swap_for_empty_string_namespace(self):
-        """Empty string namespace treated same as None."""
+    @patch(
+        "aap_eda.services.activation.activation_manager."
+        "resolve_legacy_activation_namespace",
+        return_value="control-plane-ns",
+    )
+    def test_empty_namespace_records_and_uses_legacy_namespace(
+        self, resolve_legacy_namespace
+    ):
+        """An empty legacy value is treated the same as a null value."""
         engine = MagicMock(spec=KubernetesEngine)
-        engine.namespace = "current-ns"
+        engine.namespace = "target-ns"
 
         instance = MagicMock()
         instance.activation_job_namespace = ""
@@ -97,8 +116,13 @@ class TestInstanceEngine:
         manager = self._make_manager(activation, engine)
 
         with manager._instance_engine(instance):
-            assert engine.namespace == "current-ns"
-        assert engine.namespace == "current-ns"
+            assert engine.namespace == "control-plane-ns"
+        assert engine.namespace == "target-ns"
+        assert instance.activation_job_namespace == "control-plane-ns"
+        instance.save.assert_called_once_with(
+            update_fields=["activation_job_namespace"]
+        )
+        resolve_legacy_namespace.assert_called_once_with()
 
     def test_non_k8s_engine_yields_without_swap(self):
         """Non-Kubernetes engine yields without any namespace logic."""
