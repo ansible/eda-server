@@ -477,9 +477,10 @@ def test_utility_rejects_invalid_batch_size_before_deletion(
         log_timestamp=1,
     )
 
+    cutoff = datetime(2024, 1, 1, tzinfo=datetime_timezone.utc)
     with pytest.raises(ValueError, match="log_delete_batch_size"):
         delete_log_util.delete_logs_older_than(
-            datetime(2024, 1, 1, tzinfo=datetime_timezone.utc),
+            cutoff,
             log_delete_batch_size=batch_size,
         )
 

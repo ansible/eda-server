@@ -142,6 +142,18 @@ def _marker_text(
     return f"{text} [{' | '.join(details)}]"
 
 
+def _validate_log_delete_batch_size(log_delete_batch_size: int) -> None:
+    if (
+        not isinstance(log_delete_batch_size, int)
+        or isinstance(log_delete_batch_size, bool)
+        or not 1 <= log_delete_batch_size <= MAX_LOG_DELETE_BATCH_SIZE
+    ):
+        raise ValueError(
+            "log_delete_batch_size must be an integer between 1 and "
+            f"{MAX_LOG_DELETE_BATCH_SIZE}."
+        )
+
+
 def _validate_purge_options(
     cutoff: datetime | None,
     *,
@@ -152,15 +164,7 @@ def _validate_purge_options(
     purge_all_logs: bool,
     log_delete_batch_size: int,
 ) -> _PurgeOptions:
-    if (
-        not isinstance(log_delete_batch_size, int)
-        or isinstance(log_delete_batch_size, bool)
-        or not 1 <= log_delete_batch_size <= MAX_LOG_DELETE_BATCH_SIZE
-    ):
-        raise ValueError(
-            "log_delete_batch_size must be an integer between 1 and "
-            f"{MAX_LOG_DELETE_BATCH_SIZE}."
-        )
+    _validate_log_delete_batch_size(log_delete_batch_size)
     if not isinstance(purge_all_logs, bool):
         raise ValueError("purge_all_logs must be a boolean.")
     if purge_all_logs:
