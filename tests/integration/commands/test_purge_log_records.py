@@ -1279,6 +1279,34 @@ def test_purge_all_logs_with_no_rows_creates_no_marker(
     assert not models.RulebookProcessLog.objects.exists()
 
 
+@pytest.mark.django_db
+def test_purge_all_logs_deletes_logs_without_process():
+    assert not models.RulebookProcess.objects.exists()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "ALTER TABLE core_rulebook_process_log "
+            "ALTER COLUMN activation_instance_id DROP NOT NULL"
+        )
+        cursor.execute(
+            "INSERT INTO core_rulebook_process_log "
+            "(activation_instance_id, log, log_timestamp) "
+            "SELECT NULL, 'unattached-' || series.n, 1 "
+            "FROM generate_series(1, 5) AS series(n) RETURNING id"
+        )
+        inserted_ids = [row[0] for row in cursor.fetchall()]
+    assert len(inserted_ids) == 5
+
+    output = call_command(
+        "purge_log_records", "--purge-all-logs", "--log-delete-batch-size", "2"
+    )
+
+    assert output.startswith("Purged 5 log records globally")
+    assert "No audit markers created." in output
+    assert not models.RulebookProcessLog.objects.filter(
+        id__in=inserted_ids
+    ).exists()
+
+
 @pytest.mark.django_db(transaction=True)
 def test_purge_all_logs_failure_keeps_committed_marker_count(
     default_activation_instance, monkeypatch

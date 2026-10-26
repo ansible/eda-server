@@ -301,6 +301,32 @@ def _purge_process_logs(process: tuple, options: _PurgeOptions):
         yield batch_deleted
 
 
+def purge_unattached_logs(log_delete_batch_size: int):
+    """Yield deleted counts for bounded batches of logs without a process."""
+    qualifying = models.RulebookProcessLog.objects.filter(
+        activation_instance_id__isnull=True
+    )
+    highest_log_id = qualifying.aggregate(max_id=Max("id"))["max_id"]
+    if highest_log_id is None:
+        return
+
+    last_log_id = 0
+    model_label = models.RulebookProcessLog._meta.label
+    while last_log_id < highest_log_id:
+        batch_ids = list(
+            qualifying.filter(id__gt=last_log_id, id__lte=highest_log_id)
+            .order_by("id")
+            .values_list("id", flat=True)[:log_delete_batch_size]
+        )
+        if not batch_ids:
+            break
+        with transaction.atomic():
+            _, per_model_counts = qualifying.filter(id__in=batch_ids).delete()
+            batch_deleted = per_model_counts.get(model_label, 0)
+        last_log_id = batch_ids[-1]
+        yield batch_deleted
+
+
 def delete_logs_older_than(
     cutoff: datetime | None,
     *,
