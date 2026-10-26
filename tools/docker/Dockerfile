@@ -67,29 +67,19 @@ ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
 COPY poetry.toml pyproject.toml poetry.lock $SOURCES_DIR/
 
-# Use SSH key to access private git repositories (if provided)
+# Keep dependency files writable by the build user.
 USER 0
-RUN --mount=type=secret,id=git_ssh_key,target=/tmp/git_ssh_key,required=false \
-    mkdir -p /app/.ssh && \
-    if [ -f /tmp/git_ssh_key ]; then \
-        cp /tmp/git_ssh_key /app/.ssh/github_key && \
-        chmod 600 /app/.ssh/github_key && \
-        chown ${USER_ID}:0 /app/.ssh/github_key; \
-    fi && \
-    chown -R ${USER_ID}:0 $SOURCES_DIR
+RUN chown -R ${USER_ID}:0 "$SOURCES_DIR"
 
 USER "$USER_ID"
-RUN if [ -f /app/.ssh/github_key ]; then \
-        export GIT_SSH_COMMAND="ssh -i /app/.ssh/github_key -o StrictHostKeyChecking=accept-new" && \
-        echo "Testing SSH connection to GitHub..." && \
-        ssh -i /app/.ssh/github_key -o StrictHostKeyChecking=accept-new -T git@github.com || echo "SSH test completed (exit code expected)" && \
-        poetry install -E all --no-root --no-cache && \
-        ${PYTHON_BIN} -m pip install gunicorn && \
-        rm -f /app/.ssh/github_key; \
+RUN --mount=type=secret,id=git_ssh_key,target=/run/secrets/git_ssh_key,required=false,uid=${USER_ID},gid=0,mode=0400 \
+    if [ -f /run/secrets/git_ssh_key ]; then \
+        GIT_SSH_COMMAND="ssh -i /run/secrets/git_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+            poetry install -E all --no-root --no-cache; \
     else \
-        poetry install -E all --no-root --no-cache && \
-        ${PYTHON_BIN} -m pip install gunicorn; \
-    fi
+        poetry install -E all --no-root --no-cache; \
+    fi && \
+    ${PYTHON_BIN} -m pip install gunicorn
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
 RUN pip install ansible-core==${ANSIBLE_CORE_VER}
