@@ -24,6 +24,8 @@ from django.core.management.base import (
 )
 
 from aap_eda.core.utils.delete_log_util import (
+    DEFAULT_LOG_DELETE_BATCH_SIZE,
+    MAX_LOG_DELETE_BATCH_SIZE,
     LogPurgeError,
     delete_logs_older_than,
 )
@@ -97,6 +99,18 @@ class Command(BaseCommand):
             default=True,
             metavar="true|false",
             help="Create a marker for each affected process (default: true).",
+        )
+        parser.add_argument(
+            "--log-delete-batch-size",
+            dest="log_delete_batch_size",
+            type=int,
+            default=DEFAULT_LOG_DELETE_BATCH_SIZE,
+            metavar="N",
+            help=(
+                "Delete at most N log rows per transaction "
+                f"(default: {DEFAULT_LOG_DELETE_BATCH_SIZE}; "
+                f"range: 1-{MAX_LOG_DELETE_BATCH_SIZE})."
+            ),
         )
         parser.add_argument(
             "--internal-job-uuid",
@@ -209,6 +223,7 @@ class Command(BaseCommand):
                 audit_trail=audit_trail,
                 internal_job_uuid=job_uuid,
                 purge_all_logs=purge_all_logs,
+                log_delete_batch_size=options["log_delete_batch_size"],
             )
         except (LogPurgeError, ValueError) as exc:
             raise CommandError(str(exc)) from exc

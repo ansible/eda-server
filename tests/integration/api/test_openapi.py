@@ -110,11 +110,18 @@ def test_log_purge_openapi_contract(admin_client):
         "before_date",
         "retention_duration",
         "audit_trail",
+        "log_delete_batch_size",
         "activation_ids",
         "activation_names",
         "purge-all-logs",
     }
     assert request_properties["audit_trail"]["default"] is True
+    assert request_properties["log_delete_batch_size"]["minimum"] == 1
+    assert request_properties["log_delete_batch_size"]["maximum"] == 50_000
+    assert (
+        "default: 10,000"
+        in request_properties["log_delete_batch_size"]["description"]
+    )
     assert request_properties["purge-all-logs"]["default"] is False
     assert "internal_job_uuid" not in request_properties
 

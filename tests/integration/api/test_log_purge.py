@@ -132,6 +132,28 @@ def test_superuser_queues_purge_all_logs_without_cutoff(superuser_client):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    "payload, expected_size",
+    [
+        ({"before_date": "2020-01-01", "log_delete_batch_size": 1}, 1),
+        ({"purge-all-logs": True, "log_delete_batch_size": 50_000}, 50_000),
+    ],
+)
+def test_api_forwards_log_delete_batch_size(
+    superuser_client, payload, expected_size
+):
+    with mock.patch(
+        "aap_eda.tasks.management.submit_task",
+        return_value=({"uuid": str(JOB_ID)}, "default"),
+    ) as submit_task:
+        response = superuser_client.post(PURGE_URL, payload, format="json")
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    command_options = submit_task.call_args.kwargs["args"][2]
+    assert command_options["log_delete_batch_size"] == expected_size
+
+
+@pytest.mark.django_db
 def test_api_keeps_activation_scope_when_audit_is_disabled(
     superuser_client, default_activation
 ):
@@ -199,6 +221,13 @@ def test_anonymous_purge_uses_api_permission_denial(base_client):
         {"before_date": "2020-01-01", "activation_id": "invalid"},
         {"before_date": "2020-01-01", "activation_id": None},
         {"before_date": "2020-01-01", "activation_namess": ["demo"]},
+        {"before_date": "2020-01-01", "log_delete_batch_size": 0},
+        {"before_date": "2020-01-01", "log_delete_batch_size": -1},
+        {"before_date": "2020-01-01", "log_delete_batch_size": 50_001},
+        {"before_date": "2020-01-01", "log_delete_batch_size": True},
+        {"before_date": "2020-01-01", "log_delete_batch_size": 1.5},
+        {"before_date": "2020-01-01", "log_delete_batch_size": "abc"},
+        {"purge-all-logs": True, "log_delete_batch_size": 50_001},
         {
             "before_date": "2020-01-01",
             "activation_names": ["missing-activation"],

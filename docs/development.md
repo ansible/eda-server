@@ -483,6 +483,12 @@ Do **not** confuse the two — see the command docstring in
   activations. Empty or unknown selectors are rejected before queueing.
 - **Choose audit behavior:** Audit markers are enabled by default. Set API
   `audit_trail` to `false` to disable them.
+- **Choose a log-delete batch size:** Optionally send
+  `"log_delete_batch_size": 5000` to delete at most 5,000 log rows per
+  transaction. The default is 10,000 and accepted values are 1–50,000.
+  A very large activation scope can lower the effective batch size to stay
+  within PostgreSQL's query-parameter limit. This setting does not change the
+  1,000-process fetch size.
 
 For example, this request queues a purge for the named activation:
 
@@ -518,6 +524,10 @@ Content-Type: application/json
   activation and processes without an activation.
 - Use `--audit-trail=true` or `--audit-trail=false`. A bare `--audit-trail` is
   invalid.
+- Use `--log-delete-batch-size N` to set the maximum number of log rows
+  deleted per transaction. The default is 10,000 and the accepted range is
+  1–50,000. This works for cutoff and full purges; process fetching stays at
+  1,000 processes per page.
 - The optional `--internal-job-uuid` accepts a UUID or a custom ID of 1-128
   ASCII letters, digits, periods, underscores, or hyphens, starting with a
   letter or digit. Valid UUIDs are normalized. The value appears in audit
@@ -528,6 +538,8 @@ Content-Type: application/json
 - Deletion commits in batches. If a later batch fails, worker logs record the
   count already deleted, and the job reports failure. Audit markers record the
   partial count when audit is enabled.
+- A larger log-delete batch size can reduce database round trips, while each
+  transaction holds more rows and a failed batch can roll back more work.
 - When audit is enabled, each process that loses log rows gets one marker with
   its count for this invocation. Markers use `Recorded at` for the time the
   audit row was written and store that time in `log_created_at`. The API

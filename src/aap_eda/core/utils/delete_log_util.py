@@ -21,7 +21,10 @@ from django.db.models import Max
 
 from aap_eda.core import models
 
-DELETE_BATCH_SIZE = 1000
+PROCESS_PAGE_SIZE = 1000
+DEFAULT_LOG_DELETE_BATCH_SIZE = 10_000
+MAX_LOG_DELETE_BATCH_SIZE = 50_000
+POSTGRES_QUERY_PARAMETER_LIMIT = 65_535
 
 
 def _utc_text(value: datetime) -> str:
@@ -48,6 +51,7 @@ class _PurgeOptions:
     audit_trail: bool
     internal_job_uuid: str | None
     purge_all_logs: bool
+    log_delete_batch_size: int
 
 
 def resolve_activation_ids(
@@ -146,7 +150,17 @@ def _validate_purge_options(
     audit_trail: bool,
     internal_job_uuid: str | None,
     purge_all_logs: bool,
+    log_delete_batch_size: int,
 ) -> _PurgeOptions:
+    if (
+        not isinstance(log_delete_batch_size, int)
+        or isinstance(log_delete_batch_size, bool)
+        or not 1 <= log_delete_batch_size <= MAX_LOG_DELETE_BATCH_SIZE
+    ):
+        raise ValueError(
+            "log_delete_batch_size must be an integer between 1 and "
+            f"{MAX_LOG_DELETE_BATCH_SIZE}."
+        )
     if not isinstance(purge_all_logs, bool):
         raise ValueError("purge_all_logs must be a boolean.")
     if purge_all_logs:
@@ -167,6 +181,19 @@ def _validate_purge_options(
             raise ValueError("A cutoff is required unless purging all logs.")
         selected_ids = resolve_activation_ids(activation_ids, activation_names)
         cutoff_timestamp = cutoff.timestamp()
+        if selected_ids is not None:
+            # Scoped queries also bind each activation ID. Reserve four
+            # parameters for the process, cutoff, and keyset bounds.
+            available_log_parameters = (
+                POSTGRES_QUERY_PARAMETER_LIMIT - len(selected_ids) - 4
+            )
+            if available_log_parameters < 1:
+                raise ValueError(
+                    "Too many selected activations for a log purge query."
+                )
+            log_delete_batch_size = min(
+                log_delete_batch_size, available_log_parameters
+            )
     return _PurgeOptions(
         cutoff,
         cutoff_timestamp,
@@ -174,6 +201,7 @@ def _validate_purge_options(
         audit_trail,
         internal_job_uuid,
         purge_all_logs,
+        log_delete_batch_size,
     )
 
 
@@ -239,7 +267,7 @@ def _purge_process_logs(process: tuple, options: _PurgeOptions):
         batch_ids = list(
             qualifying.filter(id__gt=last_log_id, id__lte=highest_log_id)
             .order_by("id")
-            .values_list("id", flat=True)[:DELETE_BATCH_SIZE]
+            .values_list("id", flat=True)[: options.log_delete_batch_size]
         )
         if not batch_ids:
             break
@@ -277,6 +305,7 @@ def delete_logs_older_than(
     audit_trail: bool = True,
     internal_job_uuid: str | None = None,
     purge_all_logs: bool = False,
+    log_delete_batch_size: int = DEFAULT_LOG_DELETE_BATCH_SIZE,
 ) -> int:
     """Purge logs per process in committed, bounded ID batches."""
     options = _validate_purge_options(
@@ -286,6 +315,7 @@ def delete_logs_older_than(
         audit_trail=audit_trail,
         internal_job_uuid=internal_job_uuid,
         purge_all_logs=purge_all_logs,
+        log_delete_batch_size=log_delete_batch_size,
     )
     processes = models.RulebookProcess.objects.all()
     if options.selected_ids is not None:
@@ -305,7 +335,7 @@ def delete_logs_older_than(
                 .order_by("id")
                 .values_list(
                     "id", "activation_id", "activation__log_tracking_id"
-                )[:DELETE_BATCH_SIZE]
+                )[:PROCESS_PAGE_SIZE]
             )
             if not process_batch:
                 break

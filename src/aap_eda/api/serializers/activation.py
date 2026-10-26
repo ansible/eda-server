@@ -55,7 +55,11 @@ from aap_eda.core.utils.credentials import (
     get_resolved_secrets,
     get_secret_fields,
 )
-from aap_eda.core.utils.delete_log_util import resolve_activation_ids
+from aap_eda.core.utils.delete_log_util import (
+    DEFAULT_LOG_DELETE_BATCH_SIZE,
+    MAX_LOG_DELETE_BATCH_SIZE,
+    resolve_activation_ids,
+)
 from aap_eda.core.utils.k8s_service_name import create_k8s_service_name
 from aap_eda.core.utils.log_retention import retention_cutoff
 from aap_eda.core.utils.rulebook import (
@@ -107,6 +111,16 @@ class LogPurgeRequestSerializer(serializers.Serializer):
         required=False,
         default=True,
         help_text="Write one audit marker per process that loses logs.",
+    )
+    log_delete_batch_size = serializers.IntegerField(
+        required=False,
+        min_value=1,
+        max_value=MAX_LOG_DELETE_BATCH_SIZE,
+        help_text=(
+            "Maximum log rows deleted per transaction "
+            f"(1-{MAX_LOG_DELETE_BATCH_SIZE:,}; "
+            f"default: {DEFAULT_LOG_DELETE_BATCH_SIZE:,})."
+        ),
     )
     activation_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
