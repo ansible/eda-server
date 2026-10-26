@@ -23,18 +23,6 @@ from aap_eda.core import models
 
 DELETE_BATCH_SIZE = 1000
 
-# This reserved value identifies new markers without a schema change.
-PURGE_MARKER_CREATED_AT = datetime(9999, 12, 31, tzinfo=timezone.utc)
-
-# Older versions wrote this fixed message with NULL log_created_at. Text
-# matching cannot distinguish an ordinary log with identical content.
-LEGACY_MARKER_PATTERN = (
-    r"^All log records older than [0-9]{4}-[0-9]{2}-[0-9]{2} "
-    r"[0-9]{2}:[0-9]{2}:[0-9]{2} UTC were purged at "
-    r"[0-9]{4}-[0-9]{2}-[0-9]{2} "
-    r"[0-9]{2}:[0-9]{2}:[0-9]{2} UTC\.$"
-)
-
 
 def _utc_text(value: datetime) -> str:
     value = value.astimezone(timezone.utc)
@@ -122,10 +110,7 @@ def _logs_to_purge(
     logs = logs.filter(log_timestamp__lt=cutoff_timestamp)
     if selected_ids is not None:
         logs = logs.filter(activation_instance__activation_id__in=selected_ids)
-    return logs.exclude(log_created_at=PURGE_MARKER_CREATED_AT).exclude(
-        log_created_at__isnull=True,
-        log__regex=LEGACY_MARKER_PATTERN,
-    )
+    return logs
 
 
 def _marker_text(
@@ -136,24 +121,21 @@ def _marker_text(
     orphaned: bool,
     internal_job_uuid: str | None,
 ) -> str:
-    purge_text = _utc_text(purge_time)
+    details = [f"Recorded at: {_utc_text(purge_time)}"]
+    noun = "record" if count == 1 else "records"
     if cutoff is None:
-        text = (
-            f"Global log purge ran at {purge_text}. "
-            f"Deleted {count} log rows."
-        )
+        text = f"Purged {count} log {noun} globally."
     else:
-        text = (
-            f"All log records older than {_utc_text(cutoff)} were purged at "
-            f"{purge_text}. Deleted {count} log rows."
-        )
+        text = f"Purged {count} log {noun} older than {_utc_text(cutoff)}."
     if internal_job_uuid is not None:
-        text += f" Job ID: {internal_job_uuid}."
+        details.append(f"Purge Job ID: {internal_job_uuid}")
     if tracking_id and tracking_id.strip():
-        text += f" Log Tracking id {tracking_id.strip()}."
+        details.append(f"Activation Lifecycle ID: {tracking_id.strip()}")
     elif orphaned:
-        text += " Log Tracking id unavailable (orphaned process)."
-    return text
+        details.append(
+            "Activation Lifecycle ID: unavailable (orphaned process)"
+        )
+    return f"{text} [{' | '.join(details)}]"
 
 
 def _validate_purge_options(
@@ -223,12 +205,13 @@ def _write_audit_marker(
             activation_instance_id=process_id,
             log=marker_text,
             log_timestamp=marker_timestamp,
-            log_created_at=PURGE_MARKER_CREATED_AT,
+            log_created_at=purge_time,
         )
         return marker.id
     updated = models.RulebookProcessLog.objects.filter(pk=marker_id).update(
         log=marker_text,
         log_timestamp=marker_timestamp,
+        log_created_at=purge_time,
     )
     if updated != 1:
         raise RuntimeError("The current purge marker disappeared.")

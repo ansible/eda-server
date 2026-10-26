@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 import pytest
@@ -19,6 +20,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
+from aap_eda.core.utils.delete_log_util import delete_logs_older_than
 from aap_eda.utils.log_sanitizer import REDACTED_STRING
 from tests.integration.constants import api_url_v1
 
@@ -115,6 +117,44 @@ def test_list_logs_from_activation_instance(
         "log_created_at",
         "activation_instance",
     ]
+
+
+@pytest.mark.django_db
+def test_list_logs_returns_actual_purge_marker_time(
+    default_activation_instances: List[models.RulebookProcess],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    models.RulebookProcessLog.objects.create(
+        activation_instance=instance,
+        log="old log",
+        log_timestamp=1,
+    )
+    before_purge = datetime.now(timezone.utc)
+    assert (
+        delete_logs_older_than(
+            datetime(2024, 1, 1, tzinfo=timezone.utc),
+            activation_ids=[instance.activation_id],
+        )
+        == 1
+    )
+    after_purge = datetime.now(timezone.utc)
+    marker = models.RulebookProcessLog.objects.get(
+        activation_instance=instance, log__startswith="Purged "
+    )
+
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}/logs/"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    marker_data = next(
+        entry for entry in response.data["results"] if entry["id"] == marker.id
+    )
+    assert before_purge <= marker.log_created_at <= after_purge
+    assert marker_data[
+        "log_created_at"
+    ] == marker.log_created_at.isoformat().replace("+00:00", "Z")
 
 
 @pytest.mark.django_db
