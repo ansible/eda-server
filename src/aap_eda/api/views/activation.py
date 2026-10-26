@@ -888,7 +888,9 @@ class LogPurgeViewSet(viewsets.GenericViewSet):
             "combined with a cutoff, activation selectors, or disabled "
             "audit. Without activation selectors, all processes, including "
             "orphaned ones, are included. Activation IDs and names limit "
-            "cutoff deletion to their union. The returned job ID "
+            "cutoff deletion to their union. The optional "
+            "log_delete_batch_size sets the maximum log rows deleted per "
+            "transaction (1-50,000; default 10,000). The returned job ID "
             "acknowledges scheduling only."
         ),
         request=serializers.LogPurgeRequestSerializer,

@@ -39,6 +39,7 @@ def submit_log_purge(
     activation_ids: list[int] | None = None,
     activation_names: list[str] | None = None,
     purge_all_logs: bool = False,
+    log_delete_batch_size: int | None = None,
 ) -> str:
     """Submit a fixed-purpose log purge task."""
     command_options = {"audit_trail": audit_trail}
@@ -52,6 +53,8 @@ def submit_log_purge(
         command_options["activation-names"] = activation_names
     if purge_all_logs:
         command_options["purge-all-logs"] = True
+    if log_delete_batch_size is not None:
+        command_options["log_delete_batch_size"] = log_delete_batch_size
 
     return aap_eda_manage_commands(
         "purge_log_records",
