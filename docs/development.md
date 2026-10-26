@@ -546,7 +546,7 @@ Content-Type: application/json
   returns this recorded time.
 - Cutoff purges treat earlier markers like other log rows: they are deleted and
   counted once their `log_timestamp` falls before the cutoff. Recent markers
-  can therefore remain across scheduled purges until they reach the cutoff.
+  can therefore remain until a later cutoff purge reaches them.
 
 **Check the outcome**
 

@@ -22,7 +22,6 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import connection, transaction
 from django.db.models.query import QuerySet
-from django.test import override_settings
 from django.utils import timezone
 
 from aap_eda.core import enums, models
@@ -169,10 +168,9 @@ def prepare_log_records(
 
 
 @pytest.mark.django_db
-def test_purge_log_records_requires_explicit_cutoff_even_with_setting():
-    with override_settings(ACTIVATION_DB_LOG_RETENTION_DAYS=0):
-        with pytest.raises(CommandError, match="Exactly one"):
-            call_command("purge_log_records")
+def test_purge_log_records_requires_explicit_cutoff():
+    with pytest.raises(CommandError, match="Exactly one"):
+        call_command("purge_log_records")
 
 
 @pytest.mark.django_db
@@ -434,15 +432,6 @@ def test_purge_without_audit_trail_does_not_create_audit_logs(
     assert models.RulebookProcessLog.objects.count() == 4
     assert not _audit_markers().exists()
     assert "Purged 4 log records" in capsys.readouterr().out
-
-
-@pytest.mark.django_db
-def test_purge_retention_setting_does_not_supply_cutoff(prepare_log_records):
-    with override_settings(ACTIVATION_DB_LOG_RETENTION_DAYS=15):
-        with pytest.raises(CommandError, match="Exactly one"):
-            call_command("purge_log_records")
-
-    assert models.RulebookProcessLog.objects.count() == 8
 
 
 @pytest.mark.django_db
