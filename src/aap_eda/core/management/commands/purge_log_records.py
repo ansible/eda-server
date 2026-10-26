@@ -28,6 +28,7 @@ from aap_eda.core.utils.delete_log_util import (
     MAX_LOG_DELETE_BATCH_SIZE,
     LogPurgeError,
     delete_logs_older_than,
+    purge_unattached_logs,
 )
 from aap_eda.core.utils.log_retention import retention_cutoff
 
@@ -37,8 +38,8 @@ class Command(BaseCommand):
 
     help = (
         "Purge log records older than exactly one cutoff, or use "
-        "--purge-all-logs to replace every existing log with an audit "
-        "marker. Without activation "
+        "--purge-all-logs to delete every existing log and leave one audit "
+        "marker per affected process. Without activation "
         "selectors, include every process (including orphaned processes). "
         "Activation IDs and names limit deletion to their union. "
         "One audit marker per affected process is enabled by default."
@@ -88,8 +89,10 @@ class Command(BaseCommand):
             help=(
                 "Delete all existing process logs at every timestamp, "
                 "including earlier audit markers, and leave one new audit "
-                "marker per affected process. Cannot be combined with a "
-                "cutoff, activation selectors, or --audit-trail=false."
+                "marker per affected process. Also delete logs without a "
+                "process, which cannot receive a marker. Cannot be combined "
+                "with a cutoff, activation selectors, or "
+                "--audit-trail=false."
             ),
         )
         parser.add_argument(
@@ -193,6 +196,18 @@ class Command(BaseCommand):
             raise CommandError("--purge-all-logs requires audit trail.")
         return value
 
+    @staticmethod
+    def _delete_unattached_logs(deleted_count: int, batch_size: int) -> int:
+        try:
+            for batch_deleted in purge_unattached_logs(batch_size):
+                deleted_count += batch_deleted
+        except Exception as exc:
+            raise CommandError(
+                f"Log purge failed after {deleted_count} committed rows: "
+                f"{exc}"
+            ) from exc
+        return deleted_count
+
     def handle(self, *args, **options):
         ids = options.get("activation-ids")
         names = options.get("activation-names")
@@ -216,7 +231,7 @@ class Command(BaseCommand):
         )
 
         try:
-            deleted_count = delete_logs_older_than(
+            process_deleted_count = delete_logs_older_than(
                 cutoff,
                 activation_ids=ids,
                 activation_names=names,
@@ -229,9 +244,12 @@ class Command(BaseCommand):
             raise CommandError(str(exc)) from exc
 
         if purge_all_logs:
+            deleted_count = self._delete_unattached_logs(
+                process_deleted_count, options["log_delete_batch_size"]
+            )
             marker_result = (
                 "Created audit markers for affected processes."
-                if deleted_count
+                if process_deleted_count
                 else "No audit markers created."
             )
             return self.style.SUCCESS(
@@ -245,6 +263,6 @@ class Command(BaseCommand):
             else "for selected activations"
         )
         return self.style.SUCCESS(
-            f"Purged {deleted_count} log records older than "
+            f"Purged {process_deleted_count} log records older than "
             f"{cutoff.strftime('%Y-%m-%d %H:%M:%S UTC')} {scope}."
         )
