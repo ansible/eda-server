@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import re
 from argparse import ArgumentTypeError
 from datetime import datetime, time, timezone
 from uuid import UUID
@@ -101,7 +102,10 @@ class Command(BaseCommand):
             "--internal-job-uuid",
             dest="internal-job-uuid",
             default=None,
-            help="EDA purge task UUID to include in audit markers.",
+            help=(
+                "Purge job UUID or custom ID (1-128 letters, digits, periods, "
+                "underscores, or hyphens) to include in audit markers."
+            ),
         )
 
     @staticmethod
@@ -184,9 +188,15 @@ class Command(BaseCommand):
             try:
                 job_uuid = str(UUID(str(job_uuid)))
             except (TypeError, ValueError, AttributeError) as exc:
-                raise CommandError(
-                    "--internal-job-uuid must be a UUID."
-                ) from exc
+                if not isinstance(job_uuid, str) or not re.fullmatch(
+                    r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", job_uuid
+                ):
+                    raise CommandError(
+                        "--internal-job-uuid must be a UUID or a custom ID "
+                        "of 1-128 ASCII letters, digits, periods, "
+                        "underscores, or hyphens, starting with a letter "
+                        "or digit."
+                    ) from exc
         audit_trail = self._validated_audit_trail(
             options["audit_trail"], purge_all_logs
         )

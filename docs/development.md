@@ -469,14 +469,15 @@ Do **not** confuse the two — see the command docstring in
 - **Choose a cutoff:** For an age-based purge, supply exactly one of
   `before_date` (midnight UTC in `YYYY-MM-DD` format) or a positive ISO 8601
   `retention_duration`. Only rows with `log_timestamp` strictly before the
-  cutoff qualify. Future UTC cutoffs are rejected.
+  cutoff qualify, including earlier audit markers. Future UTC cutoffs are
+  rejected.
 - **Purge every existing log:** Instead, send `"purge-all-logs": true` without
   a cutoff or activation selectors. This deletes ordinary logs and earlier
   audit markers from every process, then leaves one new audit marker per
   process that lost rows. The deleted count includes earlier markers. If
   processes keep writing logs, new rows can appear during or after the purge.
   Without a cutoff or this flag, the API returns HTTP 400 before queueing.
-- **Choose the scope:** With no selectors, qualifying ordinary logs from every
+- **Choose the scope:** With no selectors, qualifying logs from every
   process are included, including processes without an activation.
   `activation_ids` and `activation_names` select the union of matching
   activations. Empty or unknown selectors are rejected before queueing.
@@ -517,16 +518,23 @@ Content-Type: application/json
   activation and processes without an activation.
 - Use `--audit-trail=true` or `--audit-trail=false`. A bare `--audit-trail` is
   invalid.
-- The optional `--internal-job-uuid` adds the EDA purge task UUID to markers.
-  The API supplies this UUID automatically.
+- The optional `--internal-job-uuid` accepts a UUID or a custom ID of 1-128
+  ASCII letters, digits, periods, underscores, or hyphens, starting with a
+  letter or digit. Valid UUIDs are normalized. The value appears in audit
+  markers under `Purge Job ID`. The API supplies its task UUID automatically.
 
 **Deletion and audit markers**
 
 - Deletion commits in batches. If a later batch fails, worker logs record the
   count already deleted, and the job reports failure. Audit markers record the
   partial count when audit is enabled.
-- When audit is enabled, each process that loses ordinary log rows gets one
-  marker with its count for this invocation.
+- When audit is enabled, each process that loses log rows gets one marker with
+  its count for this invocation. Markers use `Recorded at` for the time the
+  audit row was written and store that time in `log_created_at`. The API
+  returns this recorded time.
+- Cutoff purges treat earlier markers like other log rows: they are deleted and
+  counted once their `log_timestamp` falls before the cutoff. Recent markers
+  can therefore remain across scheduled purges until they reach the cutoff.
 
 **Check the outcome**
 

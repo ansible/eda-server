@@ -6,6 +6,7 @@
 #
 #      http://www.apache.org/licenses/LICENSE-2.0
 
+from datetime import datetime, timezone
 from unittest import mock
 
 import pytest
@@ -13,10 +14,7 @@ from dispatcherd.worker.exceptions import DispatcherCancel
 from django.core.management.base import CommandError
 
 from aap_eda.core import models
-from aap_eda.core.utils.delete_log_util import (
-    PURGE_MARKER_CREATED_AT,
-    LogPurgeError,
-)
+from aap_eda.core.utils.delete_log_util import LogPurgeError
 from aap_eda.tasks.management import (
     LOG_PURGE_TASK_TIMEOUT_SECONDS,
     _aap_eda_manage,
@@ -90,11 +88,15 @@ def test_submit_log_purge_forwards_scope_when_audit_is_disabled():
 def test_submitted_purge_all_logs_uses_same_command_and_job_id(
     default_activation_instance, new_activation_instance
 ):
+    prior_recorded_at = datetime(2024, 2, 1, tzinfo=timezone.utc)
     models.RulebookProcessLog.objects.create(
         activation_instance=default_activation_instance,
-        log="old marker",
-        log_timestamp=1,
-        log_created_at=PURGE_MARKER_CREATED_AT,
+        log=(
+            "Purged 1 log record older than 2024-01-01 00:00:00 UTC. "
+            "[Recorded at: 2024-02-01 00:00:00 UTC]"
+        ),
+        log_timestamp=int(prior_recorded_at.timestamp()),
+        log_created_at=prior_recorded_at,
     )
     models.RulebookProcessLog.objects.create(
         activation_instance=default_activation_instance,
@@ -127,10 +129,8 @@ def test_submitted_purge_all_logs_uses_same_command_and_job_id(
     assert result["deleted"] == 3
     markers = models.RulebookProcessLog.objects.all()
     assert markers.count() == 2
-    assert all(f"Job ID: {job_id}." in marker.log for marker in markers)
-    assert all(
-        marker.log_created_at == PURGE_MARKER_CREATED_AT for marker in markers
-    )
+    assert all(f"Purge Job ID: {job_id}" in marker.log for marker in markers)
+    assert all(marker.log_created_at is not None for marker in markers)
 
 
 @pytest.mark.django_db
@@ -176,14 +176,14 @@ def test_worker_invokes_purge_command_and_returns_deleted_count(
     ).exists()
     markers = models.RulebookProcessLog.objects.filter(
         activation_instance=default_activation_instance,
-        log__contains="were purged at",
+        log__startswith="Purged ",
     )
     assert markers.count() == 1
-    assert "Deleted 1 log rows." in markers.get().log
-    assert f"Job ID: {job_id}." in markers.get().log
+    assert "Purged 1 log record older than" in markers.get().log
+    assert f"Purge Job ID: {job_id}" in markers.get().log
     assert not models.RulebookProcessLog.objects.filter(
         activation_instance=new_activation_instance,
-        log__contains="were purged at",
+        log__startswith="Purged ",
     ).exists()
     assert any(
         call.args[0].startswith("Log purge finished")
