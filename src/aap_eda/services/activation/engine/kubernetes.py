@@ -102,6 +102,11 @@ def get_service_account_namespace() -> str:
             f"Cannot determine control-plane namespace: "
             f"{SA_NAMESPACE_FILE} does not exist."
         ) from e
+    except PermissionError as e:
+        raise ContainerEngineInitError(
+            f"Cannot determine control-plane namespace: "
+            f"{SA_NAMESPACE_FILE} is not readable."
+        ) from e
 
     if not namespace:
         raise ContainerEngineInitError(

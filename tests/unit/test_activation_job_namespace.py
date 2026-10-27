@@ -238,6 +238,12 @@ def test_get_service_account_namespace_empty_file_raises():
             get_service_account_namespace()
 
 
+def test_get_service_account_namespace_permission_error_is_diagnostic():
+    with mock.patch("builtins.open", side_effect=PermissionError):
+        with pytest.raises(ContainerEngineInitError, match="is not readable"):
+            get_service_account_namespace()
+
+
 # --- make_job_name tests ---
 
 

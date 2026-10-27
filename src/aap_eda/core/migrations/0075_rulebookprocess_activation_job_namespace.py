@@ -19,6 +19,11 @@ def legacy_activation_namespace() -> str:
             "Cannot backfill legacy activation Job namespaces because "
             f"{SA_NAMESPACE_FILE} does not exist."
         ) from exc
+    except PermissionError as exc:
+        raise RuntimeError(
+            "Cannot backfill legacy activation Job namespaces because "
+            f"{SA_NAMESPACE_FILE} is not readable."
+        ) from exc
 
     if not namespace:
         raise RuntimeError(

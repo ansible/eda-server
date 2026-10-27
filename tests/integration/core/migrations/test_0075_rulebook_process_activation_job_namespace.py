@@ -79,3 +79,14 @@ def test_migration_skips_namespace_lookup_without_legacy_processes(
         call_command("migrate", "core", "0075")
 
     legacy_activation_namespace.assert_not_called()
+
+
+def test_migration_namespace_permission_error_is_diagnostic():
+    migration_module = import_module(
+        "aap_eda.core.migrations."
+        "0075_rulebookprocess_activation_job_namespace"
+    )
+
+    with mock.patch("builtins.open", side_effect=PermissionError):
+        with pytest.raises(RuntimeError, match="is not readable"):
+            migration_module.legacy_activation_namespace()
