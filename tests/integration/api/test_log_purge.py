@@ -132,25 +132,41 @@ def test_superuser_queues_purge_all_logs_without_cutoff(superuser_client):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(
-    "payload, expected_size",
-    [
-        ({"before_date": "2020-01-01", "log_delete_batch_size": 1}, 1),
-        ({"purge-all-logs": True, "log_delete_batch_size": 50_000}, 50_000),
-    ],
-)
-def test_api_forwards_log_delete_batch_size(
-    superuser_client, payload, expected_size
+def test_superuser_queues_purge_all_logs_with_cutoff(superuser_client):
+    with mock.patch(
+        "aap_eda.tasks.management.submit_task",
+        return_value=({"uuid": str(JOB_ID)}, "default"),
+    ) as submit_task:
+        response = superuser_client.post(
+            PURGE_URL,
+            {"purge-all-logs": True, "before_date": "2020-01-01"},
+            format="json",
+        )
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    command_options = submit_task.call_args.kwargs["args"][2]
+    assert command_options["purge-all-logs"] is True
+    assert command_options["date"] == "2020-01-01"
+
+
+@pytest.mark.django_db
+def test_superuser_queues_purge_all_logs_with_retention_duration(
+    superuser_client,
 ):
     with mock.patch(
         "aap_eda.tasks.management.submit_task",
         return_value=({"uuid": str(JOB_ID)}, "default"),
     ) as submit_task:
-        response = superuser_client.post(PURGE_URL, payload, format="json")
+        response = superuser_client.post(
+            PURGE_URL,
+            {"purge-all-logs": True, "retention_duration": "P30D"},
+            format="json",
+        )
 
     assert response.status_code == status.HTTP_202_ACCEPTED
     command_options = submit_task.call_args.kwargs["args"][2]
-    assert command_options["log_delete_batch_size"] == expected_size
+    assert command_options["purge-all-logs"] is True
+    assert command_options["retention_duration"] == "P30D"
 
 
 @pytest.mark.django_db
@@ -207,8 +223,13 @@ def test_anonymous_purge_uses_api_permission_denial(base_client):
         {"retention_duration": "-P1D"},
         {"purge-all-logs": False},
         {"purge_all_logs": True},
-        {"purge-all-logs": True, "before_date": "2020-01-01"},
-        {"purge-all-logs": True, "retention_duration": "P30D"},
+        {
+            "purge-all-logs": True,
+            "before_date": "2020-01-01",
+            "retention_duration": "P30D",
+        },
+        {"purge-all-logs": True, "before_date": "2999-01-01"},
+        {"purge-all-logs": True, "retention_duration": "P0D"},
         {"purge-all-logs": True, "audit_trail": False},
         {"purge-all-logs": True, "activation_ids": [1]},
         {"purge-all-logs": True, "activation_names": ["example"]},
@@ -221,13 +242,6 @@ def test_anonymous_purge_uses_api_permission_denial(base_client):
         {"before_date": "2020-01-01", "activation_id": "invalid"},
         {"before_date": "2020-01-01", "activation_id": None},
         {"before_date": "2020-01-01", "activation_namess": ["demo"]},
-        {"before_date": "2020-01-01", "log_delete_batch_size": 0},
-        {"before_date": "2020-01-01", "log_delete_batch_size": -1},
-        {"before_date": "2020-01-01", "log_delete_batch_size": 50_001},
-        {"before_date": "2020-01-01", "log_delete_batch_size": True},
-        {"before_date": "2020-01-01", "log_delete_batch_size": 1.5},
-        {"before_date": "2020-01-01", "log_delete_batch_size": "abc"},
-        {"purge-all-logs": True, "log_delete_batch_size": 50_001},
         {
             "before_date": "2020-01-01",
             "activation_names": ["missing-activation"],

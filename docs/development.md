@@ -471,10 +471,11 @@ Do **not** confuse the two — see the command docstring in
   `retention_duration`. Only rows with `log_timestamp` strictly before the
   cutoff qualify, including earlier audit markers. Future UTC cutoffs are
   rejected.
-- **Purge every existing log:** Instead, send `"purge-all-logs": true` without
-  a cutoff or activation selectors. This deletes ordinary logs and earlier
-  audit markers from every process, then leaves one new audit marker per
-  process that lost rows. The deleted count includes earlier markers. If
+- **Purge logs globally:** Send `"purge-all-logs": true` without activation
+  selectors. Alone, it deletes logs at every timestamp. Combine it with
+  `before_date` or `retention_duration` to delete only older logs, including
+  unattached logs. Each affected process receives a new audit marker; unattached
+  logs cannot receive one. The deleted count includes earlier markers. If
   processes keep writing logs, new rows can appear during or after the purge.
   Without a cutoff or this flag, the API returns HTTP 400 before queueing.
 - **Choose the scope:** With no selectors, qualifying logs from every
@@ -483,12 +484,6 @@ Do **not** confuse the two — see the command docstring in
   activations. Empty or unknown selectors are rejected before queueing.
 - **Choose audit behavior:** Audit markers are enabled by default. Set API
   `audit_trail` to `false` to disable them.
-- **Choose a log-delete batch size:** Optionally send
-  `"log_delete_batch_size": 5000` to delete at most 5,000 log rows per
-  transaction. The default is 10,000 and accepted values are 1–50,000.
-  A very large activation scope can lower the effective batch size to stay
-  within PostgreSQL's query-parameter limit. This setting does not change the
-  1,000-process fetch size.
 
 For example, this request queues a purge for the named activation:
 
@@ -509,14 +504,23 @@ Content-Type: application/json
 {"purge-all-logs": true}
 ```
 
+To purge logs globally before a cutoff:
+
+```http
+POST /api/eda/v1/logs/purge/
+Content-Type: application/json
+
+{"purge-all-logs": true, "before_date": "2024-01-01"}
+```
+
 **CLI options**
 
 - Use either `--date YYYY-MM-DD` or `--retention-duration P30D`. Calendar
   months and years in a duration are subtracted in UTC. If the target month
   lacks the original day, the cutoff uses that month's final day.
-- Use `--purge-all-logs` instead of a cutoff to delete every existing log and
-  replace prior audit markers with a new marker for each affected process.
-  This flag cannot be combined with a cutoff, activation selectors, or
+- Use `--purge-all-logs` alone to delete every existing log, or combine it
+  with `--date` or `--retention-duration` to delete only older logs globally.
+  This flag cannot be combined with activation selectors or
   `--audit-trail=false`. Omitting both a cutoff and this flag raises a command
   error before deletion.
 - Use `--activation-ids 123 456`, `--activation-names name1 name2`, or both to
@@ -524,10 +528,6 @@ Content-Type: application/json
   activation and processes without an activation.
 - Use `--audit-trail=true` or `--audit-trail=false`. A bare `--audit-trail` is
   invalid.
-- Use `--log-delete-batch-size N` to set the maximum number of log rows
-  deleted per transaction. The default is 10,000 and the accepted range is
-  1–50,000. This works for cutoff and full purges; process fetching stays at
-  1,000 processes per page.
 - The optional `--internal-job-uuid` accepts a UUID or a custom ID of 1-128
   ASCII letters, digits, periods, underscores, or hyphens, starting with a
   letter or digit. Valid UUIDs are normalized. The value appears in audit
@@ -535,11 +535,9 @@ Content-Type: application/json
 
 **Deletion and audit markers**
 
-- Deletion commits in batches. If a later batch fails, worker logs record the
-  count already deleted, and the job reports failure. Audit markers record the
-  partial count when audit is enabled.
-- A larger log-delete batch size can reduce database round trips, while each
-  transaction holds more rows and a failed batch can roll back more work.
+- Deletion runs once per process. If a later process fails, worker logs record
+  the count already deleted, and the job reports failure. Audit markers record
+  the count for each affected process when audit is enabled.
 - When audit is enabled, each process that loses log rows gets one marker with
   its count for this invocation. Markers use `Recorded at` for the time the
   audit row was written and store that time in `log_created_at`. The API

@@ -55,11 +55,7 @@ from aap_eda.core.utils.credentials import (
     get_resolved_secrets,
     get_secret_fields,
 )
-from aap_eda.core.utils.delete_log_util import (
-    DEFAULT_LOG_DELETE_BATCH_SIZE,
-    MAX_LOG_DELETE_BATCH_SIZE,
-    resolve_activation_ids,
-)
+from aap_eda.core.utils.delete_log_util import resolve_activation_ids
 from aap_eda.core.utils.k8s_service_name import create_k8s_service_name
 from aap_eda.core.utils.log_retention import retention_cutoff
 from aap_eda.core.utils.rulebook import (
@@ -112,16 +108,6 @@ class LogPurgeRequestSerializer(serializers.Serializer):
         default=True,
         help_text="Write one audit marker per process that loses logs.",
     )
-    log_delete_batch_size = serializers.IntegerField(
-        required=False,
-        min_value=1,
-        max_value=MAX_LOG_DELETE_BATCH_SIZE,
-        help_text=(
-            "Maximum log rows deleted per transaction "
-            f"(1-{MAX_LOG_DELETE_BATCH_SIZE:,}; "
-            f"default: {DEFAULT_LOG_DELETE_BATCH_SIZE:,})."
-        ),
-    )
     activation_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
         required=False,
@@ -142,21 +128,16 @@ class LogPurgeRequestSerializer(serializers.Serializer):
             required=False,
             default=False,
             help_text=(
-                "Delete all existing process logs and replace them with "
-                "audit markers. Cannot be combined with a cutoff or scope."
+                "Delete all existing process logs globally. Can be combined "
+                "with before_date or retention_duration to limit deletion "
+                "to older logs. Cannot be combined with activation selectors "
+                "or disabled audit."
             ),
         )
         return fields
 
     @staticmethod
     def _validate_full_purge(attrs):
-        if (
-            attrs.get("before_date") is not None
-            or attrs.get("retention_duration") is not None
-        ):
-            raise serializers.ValidationError(
-                "purge-all-logs cannot be combined with a cutoff."
-            )
         if "activation_ids" in attrs or "activation_names" in attrs:
             raise serializers.ValidationError(
                 "purge-all-logs cannot be combined with activation selectors."
@@ -173,14 +154,19 @@ class LogPurgeRequestSerializer(serializers.Serializer):
                 dict.fromkeys(sorted(unknown_fields), "Unknown field.")
             )
 
-        if attrs["purge_all_logs"]:
+        purge_all_logs = attrs["purge_all_logs"]
+        if purge_all_logs:
             self._validate_full_purge(attrs)
-            return attrs
         before_date = attrs.get("before_date")
         duration = attrs.get("retention_duration")
-        if (before_date is None) == (duration is None):
+        both_cutoffs = before_date is not None and duration is not None
+        no_cutoff = (
+            not purge_all_logs and before_date is None and duration is None
+        )
+        if both_cutoffs or no_cutoff:
             raise serializers.ValidationError(
-                "Exactly one of before_date or retention_duration is required."
+                "Exactly one of before_date or retention_duration "
+                "is required."
             )
         if before_date is not None:
             cutoff = datetime.combine(
@@ -191,13 +177,15 @@ class LogPurgeRequestSerializer(serializers.Serializer):
                     {"before_date": "The UTC cutoff must not be future."}
                 )
             attrs["before_date"] = before_date.isoformat()
-        else:
+        elif duration is not None:
             try:
                 retention_cutoff(duration)
             except ValueError as exc:
                 raise serializers.ValidationError(
                     {"retention_duration": str(exc)}
                 ) from exc
+        if purge_all_logs:
+            return attrs
         if "activation_ids" in attrs or "activation_names" in attrs:
             try:
                 attrs["activation_ids"] = sorted(
