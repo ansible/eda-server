@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 MANAGEMENT_TASKS_QUEUE = "default"
 LOG_PURGE_TASK_TIMEOUT_SECONDS = 3600
-_DELETED_COUNT = re.compile(r"^Purged (\d+) log records")
+_DELETED_COUNT = re.compile(r"^Purged (\d+) log records?")
 
 
 def submit_log_purge(
@@ -37,7 +37,6 @@ def submit_log_purge(
     retention_duration: str | None = None,
     audit_trail: bool = True,
     activation_ids: list[int] | None = None,
-    activation_names: list[str] | None = None,
     purge_all_logs: bool = False,
 ) -> str:
     """Submit a fixed-purpose log purge task."""
@@ -48,8 +47,6 @@ def submit_log_purge(
         command_options["retention_duration"] = retention_duration
     if activation_ids is not None:
         command_options["activation-ids"] = activation_ids
-    if activation_names is not None:
-        command_options["activation-names"] = activation_names
     if purge_all_logs:
         command_options["purge-all-logs"] = True
 

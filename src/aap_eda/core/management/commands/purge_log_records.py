@@ -113,6 +113,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def _audit_trail_value(value: str) -> bool:
+        """Parse audit-trail CLI flag to boolean."""
         if value == "true":
             return True
         if value == "false":
@@ -121,6 +122,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def _cutoff(options: dict) -> datetime:
+        """Parse and validate cutoff date from CLI options."""
         cutoff_date = options.get("date")
         retention_duration = options.get("retention_duration")
         if cutoff_date is not None and retention_duration is not None:
@@ -150,6 +152,7 @@ class Command(BaseCommand):
         )
 
     def _purge_mode(self, options: dict) -> tuple[bool, datetime | None]:
+        """Resolve and validate the purge scope and cutoff from CLI options."""
         ids = options.get("activation-ids")
         names = options.get("activation-names")
         purge_all_logs = options.get("purge-all-logs", False)
@@ -178,6 +181,7 @@ class Command(BaseCommand):
         return purge_all_logs, cutoff
 
     def _validated_audit_trail(self, value, purge_all_logs: bool) -> bool:
+        """Coerce and validate the audit-trail flag."""
         if isinstance(value, str):
             try:
                 value = self._audit_trail_value(value)
@@ -193,17 +197,20 @@ class Command(BaseCommand):
     def _delete_unattached_logs(
         deleted_count: int, cutoff_timestamp: float | None
     ) -> int:
+        """Delete logs not linked to any activation instance."""
         try:
             deleted_count += purge_unattached_logs(cutoff_timestamp)
         except Exception as exc:
-            raise CommandError(
+            raise LogPurgeError(
                 f"Log purge failed after {deleted_count} committed rows: "
-                f"{exc}"
+                f"{exc}",
+                deleted_count=deleted_count,
             ) from exc
         return deleted_count
 
     @staticmethod
     def _validated_job_uuid(job_uuid):
+        """Normalise a UUID or validate a custom job ID string."""
         if job_uuid is None:
             return None
         try:
@@ -238,36 +245,39 @@ class Command(BaseCommand):
                 internal_job_uuid=job_uuid,
                 purge_all_logs=purge_all_logs,
             )
+            if purge_all_logs:
+                deleted_count = self._delete_unattached_logs(
+                    process_deleted_count,
+                    cutoff.timestamp() if cutoff is not None else None,
+                )
         except (LogPurgeError, ValueError) as exc:
             raise CommandError(str(exc)) from exc
 
         if purge_all_logs:
-            deleted_count = self._delete_unattached_logs(
-                process_deleted_count,
-                cutoff.timestamp() if cutoff is not None else None,
-            )
             marker_result = (
                 "Created audit markers for affected processes."
                 if process_deleted_count
                 else "No audit markers created."
             )
+            noun = "record" if deleted_count == 1 else "records"
             if cutoff is not None:
                 cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S UTC")
                 return self.style.SUCCESS(
-                    f"Purged {deleted_count} log records globally older "
+                    f"Purged {deleted_count} log {noun} globally older "
                     f"than {cutoff_str}. {marker_result}"
                 )
             return self.style.SUCCESS(
-                f"Purged {deleted_count} log records globally at all "
+                f"Purged {deleted_count} log {noun} globally at all "
                 f"timestamps. {marker_result}"
             )
 
+        noun = "record" if process_deleted_count == 1 else "records"
         scope = (
             "globally"
             if ids is None and names is None
             else "for selected activations"
         )
         return self.style.SUCCESS(
-            f"Purged {process_deleted_count} log records older than "
+            f"Purged {process_deleted_count} log {noun} older than "
             f"{cutoff.strftime('%Y-%m-%d %H:%M:%S UTC')} {scope}."
         )

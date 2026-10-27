@@ -785,7 +785,7 @@ def test_retention_duration_cli_uses_execution_time_cutoff(
             "purge_log_records", "--retention-duration", "P1D"
         )
 
-    assert output.startswith("Purged 1 log records")
+    assert output.startswith("Purged 1 log record")
     assert not models.RulebookProcessLog.objects.filter(pk=logs[0].pk).exists()
     assert (
         models.RulebookProcessLog.objects.filter(
@@ -927,7 +927,7 @@ def test_cli_valid_internal_uuid_is_in_default_audit_marker(
         str(job_id).upper(),
     )
 
-    assert output.startswith("Purged 1 log records")
+    assert output.startswith("Purged 1 log record")
     marker = _audit_markers().get()
     assert f"Purge Job ID: {job_id}" in marker.log
     assert "Purged 1 log record older than" in marker.log
@@ -952,7 +952,7 @@ def test_cli_custom_internal_job_id_is_in_audit_marker(
         "Freds-Troubleshootin-Logs",
     )
 
-    assert output.startswith("Purged 1 log records")
+    assert output.startswith("Purged 1 log record")
     marker = _audit_markers().get()
     assert "Purge Job ID: Freds-Troubleshootin-Logs" in marker.log
 
@@ -1292,7 +1292,7 @@ def test_purge_all_logs_with_cutoff_filters_unattached_logs():
         "purge_log_records", "--purge-all-logs", "--date", "2024-01-01"
     )
 
-    assert output.startswith("Purged 1 log records globally older than")
+    assert output.startswith("Purged 1 log record globally older than")
     assert not models.RulebookProcessLog.objects.filter(pk=old_id).exists()
     assert models.RulebookProcessLog.objects.filter(pk=recent_id).exists()
     assert not _audit_markers().exists()
@@ -1334,3 +1334,26 @@ def test_purge_all_logs_failure_keeps_committed_marker_count(
     )
     marker = _audit_markers().get()
     assert "Purged 1 log record globally." in marker.log
+
+
+@pytest.mark.django_db(transaction=True)
+def test_purge_all_unattached_failure_raises_command_error_with_count(
+    default_activation_instance, monkeypatch
+):
+    """LogPurgeError from purge_unattached_logs propagates deleted_count."""
+    models.RulebookProcessLog.objects.create(
+        activation_instance=default_activation_instance,
+        log="old-log",
+        log_timestamp=1,
+    )
+
+    from aap_eda.core.management.commands import purge_log_records as cmd_mod
+
+    monkeypatch.setattr(
+        cmd_mod,
+        "purge_unattached_logs",
+        mock.Mock(side_effect=RuntimeError("disk full")),
+    )
+
+    with pytest.raises(CommandError, match="failed after 1 committed rows"):
+        call_command("purge_log_records", "--purge-all-logs")
