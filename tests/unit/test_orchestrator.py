@@ -976,6 +976,29 @@ def test_handle_unhealthy_queue_non_restart_running():
 
 
 @pytest.mark.django_db
+def test_handle_unhealthy_queue_preserves_terminal_cleanup():
+    """Do not overwrite a terminal result while cleanup is pending."""
+    process_parent = mock.Mock()
+    process_parent.status = ActivationStatus.RUNNING
+    process_parent.latest_instance.status = ActivationStatus.COMPLETED
+    process_parent.latest_instance.activation_pod_id = "activation-job"
+    status_manager = mock.Mock()
+
+    result = _handle_unhealthy_queue(
+        "activation",
+        ProcessParentType.ACTIVATION,
+        1,
+        "Monitor",
+        process_parent,
+        status_manager,
+    )
+
+    assert result is None
+    status_manager.set_status.assert_not_called()
+    status_manager.set_latest_instance_status.assert_not_called()
+
+
+@pytest.mark.django_db
 def test_handle_unhealthy_queue_restart_fallback():
     """Restart request falls back to least busy queue."""
     process_parent = mock.Mock()

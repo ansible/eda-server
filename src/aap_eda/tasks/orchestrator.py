@@ -22,7 +22,7 @@ from ansible_base.lib.utils.db import advisory_lock
 from dispatcherd.factories import get_control_from_settings
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
+from django.db.models import F, Q
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda import utils
@@ -61,6 +61,20 @@ class HealthyQueueNotFoundError(Exception):
 def _manage_process_job_id(process_parent_type: str, id: int) -> str:
     """Return the unique job id for the activation manager task."""
     return f"{process_parent_type}-{id}"
+
+
+def _has_terminal_cleanup_pending(process_parent: Activation) -> bool:
+    """Return whether a terminal Kubernetes Job still needs cleanup."""
+    latest_instance = process_parent.latest_instance
+    return bool(
+        latest_instance
+        and latest_instance.activation_pod_id
+        and latest_instance.status
+        in [
+            ActivationStatus.COMPLETED,
+            ActivationStatus.FAILED,
+        ]
+    )
 
 
 def get_process_parent(
@@ -424,6 +438,16 @@ def _handle_unhealthy_queue(
     # nothing we can do except update its status to
     # WORKERS_OFFLINE.
     if request_type != ActivationRequest.RESTART:
+        if _has_terminal_cleanup_pending(process_parent):
+            LOGGER.warning(
+                "Preserving terminal status for %s %s while Kubernetes "
+                "cleanup is pending on unhealthy queue %s",
+                process_parent_type,
+                process_parent_id,
+                queue_name,
+            )
+            return None
+
         # A process in PENDING status don't need to update its
         # status. A monitor can be scheduled for an activation
         # in PENDING status if its latest process is in
@@ -638,27 +662,38 @@ def monitor_rulebook_processes_no_lock() -> None:
             request.request_id,
         )
 
-    # Monitor active instances and terminal Jobs whose parent is still active
-    # because Kubernetes cleanup verification needs to be retried.
-    for process in models.RulebookProcess.objects.filter(
+    active_processes = Q(
+        status__in=[
+            ActivationStatus.STARTING,
+            ActivationStatus.RUNNING,
+            ActivationStatus.WORKERS_OFFLINE,
+        ]
+    )
+    terminal_processes = Q(
+        pk=F("activation__latest_instance_id"),
+        status__in=[
+            ActivationStatus.COMPLETED,
+            ActivationStatus.FAILED,
+        ],
+    ) & (
         Q(
-            status__in=[
-                ActivationStatus.STARTING,
-                ActivationStatus.RUNNING,
-                ActivationStatus.WORKERS_OFFLINE,
-            ]
-        )
-        | Q(
-            status__in=[
-                ActivationStatus.COMPLETED,
-                ActivationStatus.FAILED,
-            ],
             activation__status__in=[
                 ActivationStatus.STARTING,
                 ActivationStatus.RUNNING,
                 ActivationStatus.WORKERS_OFFLINE,
             ],
         )
+        | Q(
+            activation__status=ActivationStatus.STOPPING,
+            activation__is_enabled=False,
+        )
+    )
+
+    # Monitor active instances and the latest terminal Job while cleanup is
+    # pending. Historical terminal instances have already had their policy
+    # applied and must not produce duplicate monitor work.
+    for process in models.RulebookProcess.objects.filter(
+        active_processes | terminal_processes
     ):
         process_parent_type = str(process.parent_type)
         process_parent_id = process.activation_id

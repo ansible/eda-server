@@ -282,6 +282,63 @@ def test_monitor_rulebook_processes_retries_terminal_cleanup(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.queue_dispatch")
+def test_monitor_rulebook_processes_retries_terminal_cleanup_when_disabled(
+    queue_dispatch_mock, activation
+):
+    """Schedule cleanup for a disabled activation left in STOPPING."""
+    activation.is_enabled = False
+    activation.status = ActivationStatus.STOPPING
+    activation.save(update_fields=["is_enabled", "status"])
+    models.RulebookProcess.objects.create(
+        name="completed",
+        activation=activation,
+        status=ActivationStatus.COMPLETED,
+        organization=activation.organization,
+    )
+
+    orchestrator.monitor_rulebook_processes_no_lock()
+
+    queue_dispatch_mock.assert_called_once_with(
+        ProcessParentType.ACTIVATION,
+        activation.id,
+        None,
+        mock.ANY,
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.queue_dispatch")
+def test_monitor_rulebook_processes_skips_historical_terminal_instances(
+    queue_dispatch_mock, activation
+):
+    """Only the latest terminal instance is eligible for cleanup retry."""
+    activation.status = ActivationStatus.RUNNING
+    activation.save(update_fields=["status"])
+    models.RulebookProcess.objects.create(
+        name="historical",
+        activation=activation,
+        status=ActivationStatus.FAILED,
+        organization=activation.organization,
+    )
+    models.RulebookProcess.objects.create(
+        name="latest",
+        activation=activation,
+        status=ActivationStatus.COMPLETED,
+        organization=activation.organization,
+    )
+
+    orchestrator.monitor_rulebook_processes_no_lock()
+
+    queue_dispatch_mock.assert_called_once_with(
+        ProcessParentType.ACTIVATION,
+        activation.id,
+        None,
+        mock.ANY,
+    )
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "command, queued_request",
     [

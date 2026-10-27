@@ -525,10 +525,9 @@ def test_monitor_retries_terminal_cleanup_before_applying_policy(
     running_activation.save(update_fields=["restart_policy"])
     engine = MagicMock(spec=KubernetesEngine)
     engine.namespace = "new-ns"
-    engine.get_status.side_effect = [
-        MagicMock(status=container_status, message="container exited"),
-        engine_exceptions.ContainerNotFoundError("Job removed"),
-    ]
+    engine.get_status.return_value = MagicMock(
+        status=container_status, message="container exited"
+    )
     engine.cleanup.side_effect = [
         engine_exceptions.ContainerCleanupError("verification unavailable"),
         None,
@@ -555,10 +554,63 @@ def test_monitor_retries_terminal_cleanup_before_applying_policy(
     assert running_activation.status == container_status
     assert process.status == container_status
     assert engine.cleanup.call_count == 2
+    assert engine.get_status.call_count == 1
     if should_restart:
         restart_mock.assert_called_once()
     else:
         restart_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "container_status",
+    [
+        enums.ActivationStatus.COMPLETED,
+        enums.ActivationStatus.FAILED,
+    ],
+)
+@pytest.mark.django_db
+def test_monitor_preserves_terminal_status_while_cleanup_retries(
+    running_activation: models.Activation,
+    container_status: enums.ActivationStatus,
+):
+    """Do not replace a terminal result during a cleanup retry outage."""
+    running_activation.restart_policy = enums.RestartPolicy.NEVER
+    running_activation.save(update_fields=["restart_policy"])
+    engine = MagicMock(spec=KubernetesEngine)
+    engine.namespace = "new-ns"
+    engine.get_status.return_value = MagicMock(
+        status=container_status, message="container exited"
+    )
+    engine.cleanup.side_effect = [
+        engine_exceptions.ContainerCleanupError("verification unavailable"),
+        engine_exceptions.ContainerCleanupError("API unavailable"),
+        None,
+    ]
+    process = running_activation.latest_instance
+    process.activation_job_namespace = "old-ns"
+    process.save(update_fields=["activation_job_namespace"])
+    manager = ActivationManager(running_activation, container_engine=engine)
+
+    with pytest.raises(exceptions.ActivationMonitorError):
+        manager.monitor()
+
+    with pytest.raises(exceptions.ActivationMonitorError):
+        manager.monitor()
+
+    running_activation.refresh_from_db()
+    process.refresh_from_db()
+    assert running_activation.status == enums.ActivationStatus.RUNNING
+    assert process.status == container_status
+    assert process.activation_pod_id == "test-pod-id"
+    assert engine.get_status.call_count == 1
+
+    manager.monitor()
+
+    running_activation.refresh_from_db()
+    process.refresh_from_db()
+    assert running_activation.status == container_status
+    assert process.status == container_status
+    assert engine.cleanup.call_count == 3
 
 
 @pytest.mark.parametrize(

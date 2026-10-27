@@ -581,6 +581,19 @@ class ActivationManager(StatusManager):
 
         self._apply_terminal_policy(status, container_msg)
 
+    def _has_terminal_cleanup_pending(self) -> bool:
+        """Return whether a Kubernetes terminal result still needs cleanup."""
+        return bool(
+            isinstance(self.container_engine, KubernetesEngine)
+            and self.latest_instance
+            and self.latest_instance.activation_pod_id
+            and self.latest_instance.status
+            in [
+                ActivationStatus.COMPLETED,
+                ActivationStatus.FAILED,
+            ]
+        )
+
     def _completed_policy(self, container_msg: str):
         """Apply the completed restart policy.
 
@@ -1025,6 +1038,10 @@ class ActivationManager(StatusManager):
                 raise exceptions.ActivationMonitorError(str(exc)) from exc
             return
 
+        if self._has_terminal_cleanup_pending():
+            self._retry_terminal_cleanup()
+            return
+
         if self.db_instance.status not in [
             ActivationStatus.STARTING,
             ActivationStatus.RUNNING,
@@ -1168,6 +1185,14 @@ class ActivationManager(StatusManager):
         except engine_exceptions.ContainerNotFoundError:
             return None, False
         except engine_exceptions.ContainerEngineError as exc:
+            if self._has_terminal_cleanup_pending():
+                LOGGER.warning(
+                    "Preserving terminal status for activation %s while "
+                    "Kubernetes cleanup is pending",
+                    self.db_instance.id,
+                )
+                return None, True
+
             msg = (
                 f"Monitor operation: activation id: "
                 f"{self.db_instance.id} "
