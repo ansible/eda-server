@@ -72,14 +72,12 @@ def test_submit_log_purge_forwards_scope_when_audit_is_disabled():
             before_date="2020-01-01",
             audit_trail=False,
             activation_ids=[9],
-            activation_names=["production"],
         )
 
     assert submit_task.call_args.kwargs["args"][2] == {
         "date": "2020-01-01",
         "audit_trail": False,
         "activation-ids": [9],
-        "activation-names": ["production"],
         "internal-job-uuid": job_id,
     }
 

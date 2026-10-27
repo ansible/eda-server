@@ -93,7 +93,7 @@ def _update_event_stream_source(validated_data: dict) -> str:
 
 
 class LogPurgeRequestSerializer(serializers.Serializer):
-    """Validate the cutoff or full purge before scheduling a job."""
+    """Serializer for the asynchronous log purge endpoint."""
 
     before_date = serializers.DateField(
         required=False,
@@ -138,6 +138,7 @@ class LogPurgeRequestSerializer(serializers.Serializer):
 
     @staticmethod
     def _validate_full_purge(attrs):
+        """Reject selector or audit-off combinations with purge-all-logs."""
         if "activation_ids" in attrs or "activation_names" in attrs:
             raise serializers.ValidationError(
                 "purge-all-logs cannot be combined with activation selectors."
@@ -147,6 +148,61 @@ class LogPurgeRequestSerializer(serializers.Serializer):
                 "purge-all-logs requires audit_trail=true."
             )
 
+    def _validate_cutoff(self, attrs):
+        """Ensure exactly one cutoff is supplied and normalize it."""
+        before_date = attrs.get("before_date")
+        duration = attrs.get("retention_duration")
+        has_date = before_date is not None
+        has_duration = duration is not None
+        err = "Exactly one of before_date or retention_duration is required."
+
+        if has_date and has_duration:
+            raise serializers.ValidationError(err)
+        if not has_date and not has_duration and not attrs["purge_all_logs"]:
+            raise serializers.ValidationError(err)
+        if has_date:
+            self._validate_before_date(attrs, before_date)
+        elif has_duration:
+            self._validate_duration(duration)
+
+    @staticmethod
+    def _validate_before_date(attrs, before_date):
+        """Reject future dates and normalise before_date to ISO string."""
+        cutoff = datetime.combine(
+            before_date, time.min, tzinfo=datetime_timezone.utc
+        )
+        if cutoff > datetime.now(datetime_timezone.utc):
+            raise serializers.ValidationError(
+                {"before_date": "The UTC cutoff must not be future."}
+            )
+        attrs["before_date"] = before_date.isoformat()
+
+    @staticmethod
+    def _validate_duration(duration):
+        """Validate retention_duration as a positive ISO 8601 duration."""
+        try:
+            retention_cutoff(duration)
+        except ValueError as exc:
+            raise serializers.ValidationError(
+                {"retention_duration": str(exc)}
+            ) from exc
+
+    @staticmethod
+    def _resolve_activations(attrs):
+        """Resolve activation names to IDs."""
+        if "activation_ids" not in attrs and "activation_names" not in attrs:
+            return
+        try:
+            attrs["activation_ids"] = sorted(
+                resolve_activation_ids(
+                    attrs.get("activation_ids"),
+                    attrs.get("activation_names"),
+                )
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        attrs.pop("activation_names", None)
+
     def validate(self, attrs):
         unknown_fields = set(self.initial_data) - set(self.fields)
         if unknown_fields:
@@ -154,49 +210,12 @@ class LogPurgeRequestSerializer(serializers.Serializer):
                 dict.fromkeys(sorted(unknown_fields), "Unknown field.")
             )
 
-        purge_all_logs = attrs["purge_all_logs"]
-        if purge_all_logs:
+        if attrs["purge_all_logs"]:
             self._validate_full_purge(attrs)
-        before_date = attrs.get("before_date")
-        duration = attrs.get("retention_duration")
-        both_cutoffs = before_date is not None and duration is not None
-        no_cutoff = (
-            not purge_all_logs and before_date is None and duration is None
-        )
-        if both_cutoffs or no_cutoff:
-            raise serializers.ValidationError(
-                "Exactly one of before_date or retention_duration "
-                "is required."
-            )
-        if before_date is not None:
-            cutoff = datetime.combine(
-                before_date, time.min, tzinfo=datetime_timezone.utc
-            )
-            if cutoff > datetime.now(datetime_timezone.utc):
-                raise serializers.ValidationError(
-                    {"before_date": "The UTC cutoff must not be future."}
-                )
-            attrs["before_date"] = before_date.isoformat()
-        elif duration is not None:
-            try:
-                retention_cutoff(duration)
-            except ValueError as exc:
-                raise serializers.ValidationError(
-                    {"retention_duration": str(exc)}
-                ) from exc
-        if purge_all_logs:
+        self._validate_cutoff(attrs)
+        if attrs["purge_all_logs"]:
             return attrs
-        if "activation_ids" in attrs or "activation_names" in attrs:
-            try:
-                attrs["activation_ids"] = sorted(
-                    resolve_activation_ids(
-                        attrs.get("activation_ids"),
-                        attrs.get("activation_names"),
-                    )
-                )
-            except ValueError as exc:
-                raise serializers.ValidationError(str(exc)) from exc
-            attrs.pop("activation_names", None)
+        self._resolve_activations(attrs)
         return attrs
 
 

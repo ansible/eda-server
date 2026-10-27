@@ -527,7 +527,7 @@ Content-Type: application/json
   limit deletion to the selected activations. Omit both to include every
   activation and processes without an activation.
 - Use `--audit-trail=true` or `--audit-trail=false`. A bare `--audit-trail` is
-  invalid.
+  invalid. Default is True.
 - The optional `--internal-job-uuid` accepts a UUID or a custom ID of 1-128
   ASCII letters, digits, periods, underscores, or hyphens, starting with a
   letter or digit. Valid UUIDs are normalized. The value appears in audit
@@ -557,9 +557,6 @@ kubectl logs -n "${NAMESPACE:-aap-eda}" \
   -l app=eda,comp=default-worker --all-containers=true --since=24h \
   | grep "job_id=${JOB_ID}"
 ```
-
-- The dispatcherd `running` view reports only in-flight work. Structured
-  worker log lines are the completion and deletion-count record.
 
 ### Running linters
 

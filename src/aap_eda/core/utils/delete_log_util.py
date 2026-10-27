@@ -24,6 +24,7 @@ PROCESS_PAGE_SIZE = 1000
 
 
 def _utc_text(value: datetime) -> str:
+    """Format datetime as UTC string with optional microseconds."""
     value = value.astimezone(timezone.utc)
     time_format = "%Y-%m-%d %H:%M:%S"
     if value.microsecond:
@@ -41,6 +42,8 @@ class LogPurgeError(Exception):
 
 @dataclass(frozen=True)
 class _PurgeOptions:
+    """Validated purge operation parameters."""
+
     cutoff: datetime | None
     cutoff_timestamp: float | None
     selected_ids: set[int] | None
@@ -103,6 +106,7 @@ def _marker_text(
     orphaned: bool,
     internal_job_uuid: str | None,
 ) -> str:
+    """Format audit marker text with purge metadata."""
     details = [f"Recorded at: {_utc_text(purge_time)}"]
     noun = "record" if count == 1 else "records"
     if cutoff is None:
@@ -129,6 +133,7 @@ def _validate_purge_options(
     internal_job_uuid: str | None,
     purge_all_logs: bool,
 ) -> _PurgeOptions:
+    """Validate purge parameters and return configuration object."""
     if not isinstance(purge_all_logs, bool):
         raise ValueError("purge_all_logs must be a boolean.")
     if purge_all_logs:
@@ -166,6 +171,7 @@ def _write_audit_marker(
     deleted_count: int,
     options: _PurgeOptions,
 ) -> int:
+    """Create audit marker log record for a purge operation."""
     purge_time = datetime.now(timezone.utc)
     marker_timestamp = max(
         ceil(purge_time.timestamp()),
@@ -191,6 +197,7 @@ def _write_audit_marker(
 
 
 def _purge_process_logs(process: tuple, options: _PurgeOptions) -> int:
+    """Delete logs for one process matching purge criteria."""
     process_id, activation_id, tracking_id = process
     logs = models.RulebookProcessLog.objects.filter(
         activation_instance_id=process_id
@@ -214,6 +221,7 @@ def _purge_process_logs(process: tuple, options: _PurgeOptions) -> int:
 
 
 def purge_unattached_logs(cutoff_timestamp: float | None = None) -> int:
+    """Delete logs not linked to any activation instance."""
     logs = models.RulebookProcessLog.objects.filter(
         activation_instance_id__isnull=True
     )
