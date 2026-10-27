@@ -24,8 +24,6 @@ from django.core.management.base import (
 )
 
 from aap_eda.core.utils.delete_log_util import (
-    DEFAULT_LOG_DELETE_BATCH_SIZE,
-    MAX_LOG_DELETE_BATCH_SIZE,
     LogPurgeError,
     delete_logs_older_than,
     purge_unattached_logs,
@@ -38,8 +36,8 @@ class Command(BaseCommand):
 
     help = (
         "Purge log records older than exactly one cutoff, or use "
-        "--purge-all-logs to delete every existing log and leave one audit "
-        "marker per affected process. Without activation "
+        "--purge-all-logs with an optional cutoff to delete logs globally "
+        "and leave one audit marker per affected process. Without activation "
         "selectors, include every process (including orphaned processes). "
         "Activation IDs and names limit deletion to their union. "
         "One audit marker per affected process is enabled by default."
@@ -87,12 +85,12 @@ class Command(BaseCommand):
             dest="purge-all-logs",
             action="store_true",
             help=(
-                "Delete all existing process logs at every timestamp, "
-                "including earlier audit markers, and leave one new audit "
-                "marker per affected process. Also delete logs without a "
-                "process, which cannot receive a marker. Cannot be combined "
-                "with a cutoff, activation selectors, or "
-                "--audit-trail=false."
+                "Delete all existing process logs. When used alone, deletes "
+                "every log at every timestamp. When combined with --date or "
+                "--retention-duration, deletes logs older than the cutoff "
+                "across all activations. Also deletes unattached logs "
+                "(filtered by cutoff when provided). Cannot be combined "
+                "with activation selectors or --audit-trail=false."
             ),
         )
         parser.add_argument(
@@ -102,18 +100,6 @@ class Command(BaseCommand):
             default=True,
             metavar="true|false",
             help="Create a marker for each affected process (default: true).",
-        )
-        parser.add_argument(
-            "--log-delete-batch-size",
-            dest="log_delete_batch_size",
-            type=int,
-            default=DEFAULT_LOG_DELETE_BATCH_SIZE,
-            metavar="N",
-            help=(
-                "Delete at most N log rows per transaction "
-                f"(default: {DEFAULT_LOG_DELETE_BATCH_SIZE}; "
-                f"range: 1-{MAX_LOG_DELETE_BATCH_SIZE})."
-            ),
         )
         parser.add_argument(
             "--internal-job-uuid",
@@ -169,17 +155,24 @@ class Command(BaseCommand):
         purge_all_logs = options.get("purge-all-logs", False)
         if not isinstance(purge_all_logs, bool):
             raise CommandError("--purge-all-logs must be a boolean flag.")
-        if purge_all_logs and (
-            options.get("date") is not None
-            or options.get("retention_duration") is not None
-            or ids is not None
-            or names is not None
-        ):
+        if purge_all_logs and (ids is not None or names is not None):
             raise CommandError(
-                "--purge-all-logs cannot be combined with a cutoff or "
+                "--purge-all-logs cannot be combined with "
                 "activation selectors."
             )
-        cutoff = None if purge_all_logs else self._cutoff(options)
+        has_cutoff = (
+            options.get("date") is not None
+            or options.get("retention_duration") is not None
+        )
+        if purge_all_logs and not has_cutoff:
+            cutoff = None
+        elif has_cutoff:
+            cutoff = self._cutoff(options)
+        else:
+            raise CommandError(
+                "Exactly one of --date, --retention-duration, or "
+                "--purge-all-logs is required."
+            )
         if cutoff is not None and cutoff > datetime.now(timezone.utc):
             raise CommandError("--date must not be in the future.")
         return purge_all_logs, cutoff
@@ -197,10 +190,11 @@ class Command(BaseCommand):
         return value
 
     @staticmethod
-    def _delete_unattached_logs(deleted_count: int, batch_size: int) -> int:
+    def _delete_unattached_logs(
+        deleted_count: int, cutoff_timestamp: float | None
+    ) -> int:
         try:
-            for batch_deleted in purge_unattached_logs(batch_size):
-                deleted_count += batch_deleted
+            deleted_count += purge_unattached_logs(cutoff_timestamp)
         except Exception as exc:
             raise CommandError(
                 f"Log purge failed after {deleted_count} committed rows: "
@@ -208,24 +202,29 @@ class Command(BaseCommand):
             ) from exc
         return deleted_count
 
+    @staticmethod
+    def _validated_job_uuid(job_uuid):
+        if job_uuid is None:
+            return None
+        try:
+            return str(UUID(str(job_uuid)))
+        except (TypeError, ValueError, AttributeError) as exc:
+            if not isinstance(job_uuid, str) or not re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", job_uuid
+            ):
+                raise CommandError(
+                    "--internal-job-uuid must be a UUID or a custom ID "
+                    "of 1-128 ASCII letters, digits, periods, "
+                    "underscores, or hyphens, starting with a letter "
+                    "or digit."
+                ) from exc
+        return job_uuid
+
     def handle(self, *args, **options):
         ids = options.get("activation-ids")
         names = options.get("activation-names")
         purge_all_logs, cutoff = self._purge_mode(options)
-        job_uuid = options.get("internal-job-uuid")
-        if job_uuid is not None:
-            try:
-                job_uuid = str(UUID(str(job_uuid)))
-            except (TypeError, ValueError, AttributeError) as exc:
-                if not isinstance(job_uuid, str) or not re.fullmatch(
-                    r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", job_uuid
-                ):
-                    raise CommandError(
-                        "--internal-job-uuid must be a UUID or a custom ID "
-                        "of 1-128 ASCII letters, digits, periods, "
-                        "underscores, or hyphens, starting with a letter "
-                        "or digit."
-                    ) from exc
+        job_uuid = self._validated_job_uuid(options.get("internal-job-uuid"))
         audit_trail = self._validated_audit_trail(
             options["audit_trail"], purge_all_logs
         )
@@ -238,20 +237,26 @@ class Command(BaseCommand):
                 audit_trail=audit_trail,
                 internal_job_uuid=job_uuid,
                 purge_all_logs=purge_all_logs,
-                log_delete_batch_size=options["log_delete_batch_size"],
             )
         except (LogPurgeError, ValueError) as exc:
             raise CommandError(str(exc)) from exc
 
         if purge_all_logs:
             deleted_count = self._delete_unattached_logs(
-                process_deleted_count, options["log_delete_batch_size"]
+                process_deleted_count,
+                cutoff.timestamp() if cutoff is not None else None,
             )
             marker_result = (
                 "Created audit markers for affected processes."
                 if process_deleted_count
                 else "No audit markers created."
             )
+            if cutoff is not None:
+                cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S UTC")
+                return self.style.SUCCESS(
+                    f"Purged {deleted_count} log records globally older "
+                    f"than {cutoff_str}. {marker_result}"
+                )
             return self.style.SUCCESS(
                 f"Purged {deleted_count} log records globally at all "
                 f"timestamps. {marker_result}"

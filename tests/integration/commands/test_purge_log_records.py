@@ -435,110 +435,6 @@ def test_purge_without_audit_trail_does_not_create_audit_logs(
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("batch_size", [0, -1, 50_001, True, "2", 1.5, None])
-def test_programmatic_batch_size_rejected_before_deletion(
-    default_activation_instance, batch_size
-):
-    log = models.RulebookProcessLog.objects.create(
-        activation_instance=default_activation_instance,
-        log="must remain",
-        log_timestamp=1,
-    )
-
-    with pytest.raises(CommandError, match="log_delete_batch_size"):
-        call_command(
-            "purge_log_records",
-            date="2024-01-01",
-            log_delete_batch_size=batch_size,
-        )
-
-    assert models.RulebookProcessLog.objects.filter(pk=log.pk).exists()
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize("batch_size", [0, -1, 50_001, True, "2", 1.5, None])
-def test_utility_rejects_invalid_batch_size_before_deletion(
-    default_activation_instance, batch_size
-):
-    log = models.RulebookProcessLog.objects.create(
-        activation_instance=default_activation_instance,
-        log="must remain",
-        log_timestamp=1,
-    )
-
-    cutoff = datetime(2024, 1, 1, tzinfo=datetime_timezone.utc)
-    with pytest.raises(ValueError, match="log_delete_batch_size"):
-        delete_log_util.delete_logs_older_than(
-            cutoff,
-            log_delete_batch_size=batch_size,
-        )
-
-    assert models.RulebookProcessLog.objects.filter(pk=log.pk).exists()
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize("batch_size", ["0", "50001", "not-an-integer"])
-def test_cli_rejects_invalid_batch_size_before_deletion(
-    default_activation_instance, batch_size
-):
-    log = models.RulebookProcessLog.objects.create(
-        activation_instance=default_activation_instance,
-        log="must remain",
-        log_timestamp=1,
-    )
-
-    with pytest.raises(CommandError):
-        call_command(
-            "purge_log_records",
-            "--date",
-            "2024-01-01",
-            "--log-delete-batch-size",
-            batch_size,
-        )
-
-    assert models.RulebookProcessLog.objects.filter(pk=log.pk).exists()
-
-
-@pytest.mark.django_db
-def test_cli_batch_size_defaults_to_10000_and_accepts_50000():
-    with mock.patch(
-        "aap_eda.core.management.commands.purge_log_records."
-        "delete_logs_older_than",
-        return_value=0,
-    ) as delete_logs:
-        call_command("purge_log_records", "--date", "2024-01-01")
-        assert delete_logs.call_args.kwargs["log_delete_batch_size"] == 10_000
-
-        call_command(
-            "purge_log_records",
-            "--date",
-            "2024-01-01",
-            "--log-delete-batch-size",
-            "50000",
-        )
-        assert delete_logs.call_args.kwargs["log_delete_batch_size"] == 50_000
-
-
-def test_large_activation_scope_caps_effective_log_batch_size():
-    with mock.patch.object(
-        delete_log_util,
-        "resolve_activation_ids",
-        return_value=set(range(20_000)),
-    ):
-        options = delete_log_util._validate_purge_options(
-            datetime(2024, 1, 1, tzinfo=datetime_timezone.utc),
-            activation_ids=[1],
-            activation_names=None,
-            audit_trail=True,
-            internal_job_uuid=None,
-            purge_all_logs=False,
-            log_delete_batch_size=50_000,
-        )
-
-    assert options.log_delete_batch_size == 45_531
-
-
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     "args",
     [
@@ -692,13 +588,13 @@ def test_retention_duration_deletes_strictly_older_rows_across_activations(
 
 
 @pytest.mark.django_db
-def test_retention_batches_continue_after_more_than_one_batch(
+def test_retention_deletes_qualifying_rows_in_one_call_per_process(
     default_activation_instance, monkeypatch
 ):
     logs = models.RulebookProcessLog.objects.bulk_create(
         [
             models.RulebookProcessLog(
-                log=f"batch-{index}",
+                log=f"old-{index}",
                 activation_instance=default_activation_instance,
                 log_timestamp=1,
             )
@@ -706,25 +602,24 @@ def test_retention_batches_continue_after_more_than_one_batch(
         ]
     )
     original_delete = QuerySet.delete
-    deleted_batch_sizes = []
+    deleted_query_sizes = []
 
-    def record_batch_size(queryset):
-        deleted_batch_sizes.append(queryset.count())
+    def record_delete(queryset):
+        deleted_query_sizes.append(queryset.count())
         return original_delete(queryset)
 
-    monkeypatch.setattr(QuerySet, "delete", record_batch_size)
+    monkeypatch.setattr(QuerySet, "delete", record_delete)
 
     assert (
         delete_log_util.delete_logs_older_than(
             datetime(1970, 1, 1, 0, 0, 2, tzinfo=datetime_timezone.utc),
-            log_delete_batch_size=2,
         )
         == 5
     )
     assert not models.RulebookProcessLog.objects.filter(
         pk__in=[log.pk for log in logs]
     ).exists()
-    assert deleted_batch_sizes == [2, 2, 1]
+    assert deleted_query_sizes == [5]
     marker = _audit_markers().get()
     assert "Purged 5 log records older than" in marker.log
     assert marker.log_created_at is not None
@@ -735,7 +630,7 @@ def test_retention_batches_continue_after_more_than_one_batch(
 
 
 @pytest.mark.django_db
-def test_retention_stops_at_initial_highest_qualifying_id(
+def test_retention_does_not_revisit_process_after_deletion(
     default_activation_instance, monkeypatch
 ):
     models.RulebookProcessLog.objects.bulk_create(
@@ -752,7 +647,7 @@ def test_retention_stops_at_initial_highest_qualifying_id(
     new_log = []
     calls = 0
 
-    def insert_after_first_batch(queryset):
+    def insert_after_delete(queryset):
         nonlocal calls
         result = original_delete(queryset)
         calls += 1
@@ -766,10 +661,9 @@ def test_retention_stops_at_initial_highest_qualifying_id(
             )
         return result
 
-    monkeypatch.setattr(QuerySet, "delete", insert_after_first_batch)
+    monkeypatch.setattr(QuerySet, "delete", insert_after_delete)
     deleted = delete_log_util.delete_logs_older_than(
         datetime(1970, 1, 1, 0, 0, 2, tzinfo=datetime_timezone.utc),
-        log_delete_batch_size=1,
     )
 
     assert deleted == 2
@@ -777,7 +671,7 @@ def test_retention_stops_at_initial_highest_qualifying_id(
 
 
 @pytest.mark.django_db
-def test_batch_delete_rechecks_cutoff_after_candidate_selection(
+def test_delete_rechecks_cutoff_when_executed(
     default_activation_instance, monkeypatch
 ):
     log = models.RulebookProcessLog.objects.create(
@@ -820,17 +714,17 @@ def test_retention_with_no_matching_rows_returns_zero(
 
 
 @pytest.mark.django_db(transaction=True)
-def test_retention_failure_reports_committed_batch_count(
-    default_activation_instance, monkeypatch
+def test_retention_failure_reports_committed_process_count(
+    default_activation_instances, monkeypatch
 ):
     models.RulebookProcessLog.objects.bulk_create(
         [
             models.RulebookProcessLog(
                 log=f"partial-{index}",
-                activation_instance=default_activation_instance,
+                activation_instance=process,
                 log_timestamp=1,
             )
-            for index in range(3)
+            for index, process in enumerate(default_activation_instances)
         ]
     )
     original_delete = QuerySet.delete
@@ -840,23 +734,23 @@ def test_retention_failure_reports_committed_batch_count(
         nonlocal calls
         calls += 1
         if calls == 2:
-            raise RuntimeError("injected batch failure")
+            raise RuntimeError("injected process failure")
         return original_delete(queryset)
 
     monkeypatch.setattr(QuerySet, "delete", fail_second_delete)
     cutoff = datetime(1970, 1, 1, 0, 0, 2, tzinfo=datetime_timezone.utc)
     with pytest.raises(delete_log_util.LogPurgeError) as error:
-        delete_log_util.delete_logs_older_than(cutoff, log_delete_batch_size=1)
+        delete_log_util.delete_logs_older_than(cutoff)
 
     assert error.value.deleted_count == 1
-    assert models.RulebookProcessLog.objects.count() == 3
+    assert models.RulebookProcessLog.objects.count() == 2
     marker = _audit_markers().get()
     assert "Purged 1 log record older than" in marker.log
     assert (
         models.RulebookProcessLog.objects.filter(
             log__startswith="partial-"
         ).count()
-        == 2
+        == 1
     )
 
 
@@ -1198,8 +1092,6 @@ def test_purge_all_logs_replaces_old_rows_and_markers_per_process(
         "--purge-all-logs",
         "--internal-job-uuid",
         str(job_id),
-        "--log-delete-batch-size",
-        "2",
     )
 
     assert output.startswith("Purged 7 log records globally")
@@ -1225,11 +1117,85 @@ def test_purge_all_logs_replaces_old_rows_and_markers_per_process(
 
 
 @pytest.mark.django_db
+def test_purge_all_logs_with_date_deletes_old_logs_globally(
+    default_activation_instances,
+):
+    old_timestamp = datetime(
+        2023, 1, 1, tzinfo=datetime_timezone.utc
+    ).timestamp()
+    recent_timestamp = datetime(
+        2025, 1, 1, tzinfo=datetime_timezone.utc
+    ).timestamp()
+    old_logs = []
+    recent_logs = []
+    for process in default_activation_instances:
+        old_logs.append(
+            models.RulebookProcessLog.objects.create(
+                activation_instance=process,
+                log="old",
+                log_timestamp=old_timestamp,
+            )
+        )
+        recent_logs.append(
+            models.RulebookProcessLog.objects.create(
+                activation_instance=process,
+                log="recent",
+                log_timestamp=recent_timestamp,
+            )
+        )
+
+    output = call_command(
+        "purge_log_records", "--purge-all-logs", "--date", "2024-01-01"
+    )
+
+    assert output.startswith(
+        "Purged 2 log records globally older than 2024-01-01"
+    )
+    assert not models.RulebookProcessLog.objects.filter(
+        pk__in=[log.pk for log in old_logs]
+    ).exists()
+    assert (
+        models.RulebookProcessLog.objects.filter(
+            pk__in=[log.pk for log in recent_logs]
+        ).count()
+        == 2
+    )
+    assert _audit_markers().count() == 2
+    assert all(
+        "Purged 1 log record older than" in marker.log
+        for marker in _audit_markers()
+    )
+
+
+@pytest.mark.django_db
+def test_purge_all_logs_with_retention_duration(default_activation_instances):
+    now = int(timezone.now().timestamp())
+    for process in default_activation_instances:
+        models.RulebookProcessLog.objects.create(
+            activation_instance=process,
+            log="old",
+            log_timestamp=now - 7200,
+        )
+        models.RulebookProcessLog.objects.create(
+            activation_instance=process,
+            log="recent",
+            log_timestamp=now,
+        )
+
+    output = call_command(
+        "purge_log_records", "--purge-all-logs", "--retention-duration", "PT1H"
+    )
+
+    assert output.startswith("Purged 2 log records globally older than")
+    assert not models.RulebookProcessLog.objects.filter(log="old").exists()
+    assert models.RulebookProcessLog.objects.filter(log="recent").count() == 2
+    assert _audit_markers().count() == 2
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "conflicting_options",
     [
-        ("--date", "2024-01-01"),
-        ("--retention-duration", "P1D"),
         ("--activation-ids", "1"),
         ("--activation-names", "example"),
         ("--audit-trail=false",),
@@ -1296,9 +1262,7 @@ def test_purge_all_logs_deletes_logs_without_process():
         inserted_ids = [row[0] for row in cursor.fetchall()]
     assert len(inserted_ids) == 5
 
-    output = call_command(
-        "purge_log_records", "--purge-all-logs", "--log-delete-batch-size", "2"
-    )
+    output = call_command("purge_log_records", "--purge-all-logs")
 
     assert output.startswith("Purged 5 log records globally")
     assert "No audit markers created." in output
@@ -1307,18 +1271,45 @@ def test_purge_all_logs_deletes_logs_without_process():
     ).exists()
 
 
+@pytest.mark.django_db
+def test_purge_all_logs_with_cutoff_filters_unattached_logs():
+    cutoff = datetime(2024, 1, 1, tzinfo=datetime_timezone.utc).timestamp()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "ALTER TABLE core_rulebook_process_log "
+            "ALTER COLUMN activation_instance_id DROP NOT NULL"
+        )
+        cursor.execute(
+            "INSERT INTO core_rulebook_process_log "
+            "(activation_instance_id, log, log_timestamp) "
+            "VALUES (NULL, 'old unattached', %s), "
+            "(NULL, 'recent unattached', %s) RETURNING id",
+            [cutoff - 1, cutoff + 1],
+        )
+        old_id, recent_id = [row[0] for row in cursor.fetchall()]
+
+    output = call_command(
+        "purge_log_records", "--purge-all-logs", "--date", "2024-01-01"
+    )
+
+    assert output.startswith("Purged 1 log records globally older than")
+    assert not models.RulebookProcessLog.objects.filter(pk=old_id).exists()
+    assert models.RulebookProcessLog.objects.filter(pk=recent_id).exists()
+    assert not _audit_markers().exists()
+
+
 @pytest.mark.django_db(transaction=True)
 def test_purge_all_logs_failure_keeps_committed_marker_count(
-    default_activation_instance, monkeypatch
+    default_activation_instances, monkeypatch
 ):
     models.RulebookProcessLog.objects.bulk_create(
         [
             models.RulebookProcessLog(
-                activation_instance=default_activation_instance,
+                activation_instance=process,
                 log=f"old-{index}",
                 log_timestamp=1,
             )
-            for index in range(2)
+            for index, process in enumerate(default_activation_instances)
         ]
     )
     original_delete = QuerySet.delete
@@ -1328,17 +1319,12 @@ def test_purge_all_logs_failure_keeps_committed_marker_count(
         nonlocal calls
         calls += 1
         if calls == 2:
-            raise RuntimeError("injected batch failure")
+            raise RuntimeError("injected process failure")
         return original_delete(queryset)
 
     monkeypatch.setattr(QuerySet, "delete", fail_second_delete)
     with pytest.raises(CommandError, match="failed after 1 committed rows"):
-        call_command(
-            "purge_log_records",
-            "--purge-all-logs",
-            "--log-delete-batch-size",
-            "1",
-        )
+        call_command("purge_log_records", "--purge-all-logs")
 
     assert (
         models.RulebookProcessLog.objects.filter(
