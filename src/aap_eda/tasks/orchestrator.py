@@ -22,6 +22,7 @@ from ansible_base.lib.utils.db import advisory_lock
 from dispatcherd.factories import get_control_from_settings
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda import utils
@@ -36,10 +37,12 @@ from aap_eda.middleware.request_log_middleware import (
     assign_log_tracking_id,
     assign_request_id,
 )
+from aap_eda.services.activation import exceptions as activation_exceptions
 from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )
+from aap_eda.services.activation.engine import exceptions as engine_exceptions
 
 from .exceptions import UnknownProcessParentType
 
@@ -92,6 +95,35 @@ def _manage(process_parent_type: str, id: int, request_id: str = "") -> None:
         _manage_no_lock(process_parent_type, id, request_id)
 
 
+def _process_pending_requests(
+    process_parent: Activation,
+    process_parent_type: str,
+    parent_id: int,
+) -> tuple[bool, bool]:
+    """Run queued requests until one needs a later retry.
+
+    Return whether a request was processed and whether a request remains
+    pending because it could not complete.
+    """
+    has_request_processed = False
+    while pending_requests := requests_queue.peek_all(
+        process_parent_type,
+        parent_id,
+    ):
+        for request in pending_requests:
+            if not _run_request(process_parent, request):
+                return has_request_processed, True
+
+            requests_queue.pop_until(
+                process_parent_type,
+                parent_id,
+                request.id,
+            )
+            has_request_processed = True
+
+    return has_request_processed, False
+
+
 def _manage_no_lock(
     process_parent_type: str, id: int, request_id: str = ""
 ) -> None:
@@ -109,18 +141,11 @@ def _manage_no_lock(
         )
         return
 
-    has_request_processed = False
-    while_condition = True
-    while while_condition:
-        pending_requests = requests_queue.peek_all(process_parent_type, id)
-        while_condition = bool(pending_requests)
-        for request in pending_requests:
-            if _run_request(process_parent, request):
-                requests_queue.pop_until(process_parent_type, id, request.id)
-                has_request_processed = True
-            else:
-                while_condition = False
-                break
+    has_request_processed, request_pending_retry = _process_pending_requests(
+        process_parent,
+        process_parent_type,
+        id,
+    )
 
     should_monitor = process_parent.status in [
         ActivationStatus.STARTING,
@@ -130,7 +155,11 @@ def _manage_no_lock(
         not process_parent.is_enabled
         and process_parent.status == ActivationStatus.STOPPING
     )
-    if not has_request_processed and should_monitor:
+    if (
+        not has_request_processed
+        and not request_pending_retry
+        and should_monitor
+    ):
         try:
             queue_name = get_queue_name_by_parent_id(process_parent_type, id)
         except ValueError as exc:
@@ -189,6 +218,20 @@ def _run_request(
             f"{process_parent_type} {process_parent.id}. Reason {str(e)}",
             exc_info=settings.DEBUG,
         )
+        if (
+            request.request == ActivationRequest.RESTART
+            and isinstance(e, activation_exceptions.ActivationStopError)
+            and isinstance(
+                e.__cause__, engine_exceptions.ContainerCleanupError
+            )
+        ):
+            LOGGER.info(
+                "Retaining restart request for %s %s until Kubernetes "
+                "cleanup succeeds",
+                process_parent_type,
+                process_parent.id,
+            )
+            return False
     return True
 
 
@@ -595,13 +638,27 @@ def monitor_rulebook_processes_no_lock() -> None:
             request.request_id,
         )
 
-    # monitor running instances
+    # Monitor active instances and terminal Jobs whose parent is still active
+    # because Kubernetes cleanup verification needs to be retried.
     for process in models.RulebookProcess.objects.filter(
-        status__in=[
-            ActivationStatus.STARTING,
-            ActivationStatus.RUNNING,
-            ActivationStatus.WORKERS_OFFLINE,
-        ]
+        Q(
+            status__in=[
+                ActivationStatus.STARTING,
+                ActivationStatus.RUNNING,
+                ActivationStatus.WORKERS_OFFLINE,
+            ]
+        )
+        | Q(
+            status__in=[
+                ActivationStatus.COMPLETED,
+                ActivationStatus.FAILED,
+            ],
+            activation__status__in=[
+                ActivationStatus.STARTING,
+                ActivationStatus.RUNNING,
+                ActivationStatus.WORKERS_OFFLINE,
+            ],
+        )
     ):
         process_parent_type = str(process.parent_type)
         process_parent_id = process.activation_id

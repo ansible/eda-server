@@ -497,11 +497,68 @@ def test_monitor_cleanup_failure_preserves_job_for_retry(
     running_activation.refresh_from_db()
     process.refresh_from_db()
     assert running_activation.status == enums.ActivationStatus.RUNNING
-    assert process.status == enums.ActivationStatus.RUNNING
+    if container_status == enums.ActivationStatus.ERROR:
+        assert process.status == enums.ActivationStatus.RUNNING
+    else:
+        assert process.status == container_status
     assert process.activation_pod_id == "test-pod-id"
     assert engine.namespace == "new-ns"
     engine.cleanup.assert_called_once()
     restart_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("container_status", "should_restart"),
+    [
+        (enums.ActivationStatus.COMPLETED, False),
+        (enums.ActivationStatus.FAILED, True),
+    ],
+)
+@pytest.mark.django_db
+def test_monitor_retries_terminal_cleanup_before_applying_policy(
+    running_activation: models.Activation,
+    container_status: enums.ActivationStatus,
+    should_restart: bool,
+):
+    """Keep the observed terminal result while cleanup verification retries."""
+    running_activation.restart_policy = enums.RestartPolicy.ON_FAILURE
+    running_activation.save(update_fields=["restart_policy"])
+    engine = MagicMock(spec=KubernetesEngine)
+    engine.namespace = "new-ns"
+    engine.get_status.side_effect = [
+        MagicMock(status=container_status, message="container exited"),
+        engine_exceptions.ContainerNotFoundError("Job removed"),
+    ]
+    engine.cleanup.side_effect = [
+        engine_exceptions.ContainerCleanupError("verification unavailable"),
+        None,
+    ]
+    process = running_activation.latest_instance
+    process.activation_job_namespace = "old-ns"
+    process.save(update_fields=["activation_job_namespace"])
+    manager = ActivationManager(running_activation, container_engine=engine)
+
+    with patch(SYSTEM_RESTART_PATH) as restart_mock:
+        with pytest.raises(exceptions.ActivationMonitorError):
+            manager.monitor()
+
+        running_activation.refresh_from_db()
+        process.refresh_from_db()
+        assert running_activation.status == enums.ActivationStatus.RUNNING
+        assert process.status == container_status
+        assert process.activation_pod_id == "test-pod-id"
+
+        manager.monitor()
+
+    running_activation.refresh_from_db()
+    process.refresh_from_db()
+    assert running_activation.status == container_status
+    assert process.status == container_status
+    assert engine.cleanup.call_count == 2
+    if should_restart:
+        restart_mock.assert_called_once()
+    else:
+        restart_mock.assert_not_called()
 
 
 @pytest.mark.parametrize(

@@ -506,6 +506,14 @@ class ActivationManager(StatusManager):
             "Missing container policy called for "
             f"activation id: {self.db_instance.id}",
         )
+
+        if self.latest_instance.status in [
+            ActivationStatus.COMPLETED,
+            ActivationStatus.FAILED,
+        ]:
+            self._retry_terminal_cleanup()
+            return
+
         container_logger = self.container_logger_class(self.latest_instance.id)
         msg = (
             "Missing container for running activation."
@@ -537,6 +545,41 @@ class ActivationManager(StatusManager):
             msg,
         )
         container_logger.write(msg, flush=True)
+
+    def _apply_terminal_policy(
+        self, status: ActivationStatus, container_msg: str
+    ):
+        """Apply a terminal policy after Kubernetes cleanup is confirmed."""
+        if status == ActivationStatus.COMPLETED:
+            self._completed_policy(container_msg)
+        elif status == ActivationStatus.FAILED:
+            self._failed_policy(
+                container_msg,
+                cleanup_already_done=True,
+            )
+
+    def _retry_terminal_cleanup(self):
+        """Retry cleanup before applying a previously observed terminal policy.
+
+        A Kubernetes delete request can succeed while the follow-up
+        verification fails. Keep the observed terminal result on the process
+        so a later monitor does not treat the already-deleted Job as an
+        unexpected missing container.
+        """
+        status = self.latest_instance.status
+        container_msg = self.latest_instance.status_message or ""
+
+        try:
+            self._cleanup()
+        except engine_exceptions.ContainerCleanupError as exc:
+            msg = (
+                f"Monitor operation: activation {self.db_instance.id} "
+                f"failed to cleanup its Job. Reason: {exc}"
+            )
+            LOGGER.error(msg)
+            raise exceptions.ActivationMonitorError(msg) from exc
+
+        self._apply_terminal_policy(status, container_msg)
 
     def _completed_policy(self, container_msg: str):
         """Apply the completed restart policy.
@@ -1018,8 +1061,11 @@ class ActivationManager(StatusManager):
         if container_status.status in (
             ActivationStatus.COMPLETED,
             ActivationStatus.FAILED,
-            ActivationStatus.ERROR,
         ):
+            self.set_latest_instance_status(
+                container_status.status,
+                container_status.message,
+            )
             try:
                 self._cleanup()
             except engine_exceptions.ContainerCleanupError as exc:
@@ -1030,12 +1076,9 @@ class ActivationManager(StatusManager):
                 LOGGER.error(msg)
                 raise exceptions.ActivationMonitorError(msg) from exc
 
-        if container_status.status == ActivationStatus.COMPLETED:  # RC == 0
-            self._completed_policy(container_status.message)
-            return
-        if container_status.status == ActivationStatus.FAILED:  # RC != 0
-            self._failed_policy(
-                container_status.message, cleanup_already_done=True
+            self._apply_terminal_policy(
+                container_status.status,
+                container_status.message,
             )
             return
 
@@ -1080,6 +1123,15 @@ class ActivationManager(StatusManager):
         # we don't expect an error status for the container
         # in these cases we run the cleanup and set the activation to error
         if container_status.status == ActivationStatus.ERROR:
+            try:
+                self._cleanup()
+            except engine_exceptions.ContainerCleanupError as exc:
+                msg = (
+                    f"Monitor operation: activation {self.db_instance.id} "
+                    f"failed to cleanup its Job. Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                raise exceptions.ActivationMonitorError(msg) from exc
             msg = (
                 f"Monitor operation: activation id: {self.db_instance.id} "
                 f"Container is in an error state. {container_status.message}"
