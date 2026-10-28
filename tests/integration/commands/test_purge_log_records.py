@@ -1337,6 +1337,53 @@ def test_purge_all_logs_failure_keeps_committed_marker_count(
 
 
 @pytest.mark.django_db(transaction=True)
+def test_marker_failure_rolls_back_process_deletion(
+    default_activation_instances, monkeypatch
+):
+    """If audit marker creation fails, that process's log deletion
+    rolls back and the error reports only prior committed rows."""
+    models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                activation_instance=process,
+                log=f"old-{index}",
+                log_timestamp=1,
+            )
+            for index, process in enumerate(default_activation_instances)
+        ]
+    )
+    original_create = models.RulebookProcessLog.objects.create
+    calls = {"marker": 0}
+
+    def fail_second_marker(**kwargs):
+        if kwargs.get("log", "").startswith("Purged "):
+            calls["marker"] += 1
+            if calls["marker"] == 2:
+                raise RuntimeError("injected marker failure")
+        return original_create(**kwargs)
+
+    monkeypatch.setattr(
+        models.RulebookProcessLog.objects,
+        "create",
+        fail_second_marker,
+    )
+    with pytest.raises(CommandError, match="failed after 1 committed rows"):
+        call_command("purge_log_records", "--purge-all-logs")
+
+    assert (
+        models.RulebookProcessLog.objects.filter(
+            log__startswith="old-"
+        ).count()
+        == 1
+    )
+    markers = models.RulebookProcessLog.objects.filter(
+        log__startswith="Purged "
+    )
+    assert markers.count() == 1
+    assert "Purged 1 log record globally." in markers.get().log
+
+
+@pytest.mark.django_db(transaction=True)
 def test_purge_all_unattached_failure_raises_command_error_with_count(
     default_activation_instance, monkeypatch
 ):
