@@ -1032,18 +1032,18 @@ testing = ["coverage (>=3.7.0)", "django-debug-toolbar (>=3.2,<4)", "jinja2"]
 
 [[package]]
 name = "djangorestframework"
-version = "3.15.1"
+version = "3.18.3"
 description = "Web APIs for Django, made easy."
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "djangorestframework-3.15.1-py3-none-any.whl", hash = "sha256:3ccc0475bce968608cf30d07fb17d8e52d1d7fc8bfe779c905463200750cbca6"},
-    {file = "djangorestframework-3.15.1.tar.gz", hash = "sha256:f88fad74183dfc7144b2756d0d2ac716ea5b4c7c9840995ac3bfd8ec034333c1"},
+    {file = "djangorestframework-3.18.3-py3-none-any.whl", hash = "sha256:8544bb674846731b1e3c9b309236ee1dc412905a0aa725be2ec193ca950a7d12"},
+    {file = "djangorestframework-3.18.3.tar.gz", hash = "sha256:446a9b352e7eff630421ab3f2328bd2401b109a9470afa4a31189994911ed030"},
 ]
 
 [package.dependencies]
-django = ">=3.0"
+django = ">=5.2"
 
 [[package]]
 name = "drf-spectacular"
@@ -3648,4 +3648,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.13"
-content-hash = "80ab4c807d31c98fa1f3d84e1d62043a529e38381efeb915e94f0e962f2cc1ef"
+content-hash = "9681770ca45339d4af6cdc82588f70fec852a8b305c0d034056d8a767bc12560"
