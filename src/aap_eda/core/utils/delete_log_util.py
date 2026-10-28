@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from math import ceil
 
+from django.db import transaction
 from django.db.models import Max
 
 from aap_eda.core import models
@@ -208,15 +209,16 @@ def _purge_process_logs(process: tuple, options: _PurgeOptions) -> int:
         logs = logs.filter(
             activation_instance__activation_id__in=options.selected_ids
         )
-    deleted_count, _ = logs.delete()
-    if options.audit_trail and deleted_count:
-        _write_audit_marker(
-            process_id,
-            activation_id,
-            tracking_id,
-            deleted_count,
-            options,
-        )
+    with transaction.atomic():
+        deleted_count, _ = logs.delete()
+        if options.audit_trail and deleted_count:
+            _write_audit_marker(
+                process_id,
+                activation_id,
+                tracking_id,
+                deleted_count,
+                options,
+            )
     return deleted_count
 
 
