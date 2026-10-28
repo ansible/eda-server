@@ -68,6 +68,7 @@ class RulebookProcess(BaseOrgModel):
     ended_at = models.DateTimeField(null=True)
     # TODO: rename field to pod_id
     activation_pod_id = models.TextField(null=True)
+    activation_job_namespace = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
     log_read_at = models.DateTimeField(null=True)
 

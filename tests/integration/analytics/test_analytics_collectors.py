@@ -864,6 +864,7 @@ def test_rulebook_processes_table_collector(
                 "updated_at",
                 "ended_at",
                 "activation_pod_id",
+                "activation_job_namespace",
                 "status_message",
                 "log_read_at",
             ]

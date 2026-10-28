@@ -64,6 +64,7 @@ POD_FAILED_REASONS = [
     IMAGE_PULL_ERROR,
 ]
 POD_DELETE_TIMEOUT = 60
+JOB_DELETE_VERIFY_TIMEOUT = 15
 
 
 @dataclass
@@ -88,6 +89,90 @@ def get_k8s_client() -> Client:
         raise ContainerEngineInitError(str(e)) from e
 
 
+SA_NAMESPACE_FILE = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+
+
+def get_service_account_namespace() -> str:
+    """Return the namespace of the EDA control-plane ServiceAccount."""
+    try:
+        with open(SA_NAMESPACE_FILE, encoding="utf-8") as f:
+            namespace = f.read().strip()
+    except FileNotFoundError as e:
+        raise ContainerEngineInitError(
+            f"Cannot determine control-plane namespace: "
+            f"{SA_NAMESPACE_FILE} does not exist."
+        ) from e
+    except PermissionError as e:
+        raise ContainerEngineInitError(
+            f"Cannot determine control-plane namespace: "
+            f"{SA_NAMESPACE_FILE} is not readable."
+        ) from e
+
+    if not namespace:
+        raise ContainerEngineInitError(
+            "Cannot determine control-plane namespace: "
+            f"{SA_NAMESPACE_FILE} is empty."
+        )
+
+    return namespace
+
+
+def verify_namespace_accessible(batch_api, namespace: str) -> None:
+    """Probe a namespace, retrying transient errors but failing on 4xx."""
+    for attempt in range(1, K8S_API_RETRIES + 1):
+        try:
+            batch_api.list_namespaced_job(namespace=namespace, limit=1)
+            return
+        except ApiException as exc:
+            if isinstance(exc.status, int) and 400 <= exc.status < 500:
+                raise ContainerEngineInitError(
+                    f"Namespace {namespace!r} is not accessible "
+                    f"(HTTP {exc.status}). Fix the namespace configuration "
+                    f"or RBAC before proceeding."
+                ) from exc
+            if exc.status not in K8S_API_TRANSIENT_STATUS_CODES:
+                raise ContainerEngineInitError(
+                    f"Cannot verify namespace {namespace!r}: {exc}"
+                ) from exc
+            LOGGER.warning(
+                "Transient K8s API error (HTTP %s) on attempt %d/%d "
+                "for namespace %s: %s",
+                exc.status,
+                attempt,
+                K8S_API_RETRIES,
+                namespace,
+                exc.reason,
+            )
+            if attempt == K8S_API_RETRIES:
+                raise ContainerEngineInitError(
+                    f"Cannot verify namespace {namespace!r} after "
+                    f"{K8S_API_RETRIES} retries: {exc}"
+                ) from exc
+            time.sleep(K8S_API_RETRY_BACKOFF * attempt)
+
+
+def resolve_activation_namespace() -> tuple[str, bool]:
+    """Resolve the activation Job namespace from env var or SA file.
+
+    Returns (namespace, is_override) where is_override is True when
+    the namespace came from an env-var override.
+    """
+    ns_override = os.environ.get(
+        "EDA_CONTAINER_GROUP_DEFAULT_NAMESPACE", ""
+    ).strip()
+    if ns_override:
+        return ns_override, True
+
+    return get_service_account_namespace(), False
+
+
+def make_job_name(
+    resource_prefix: str, parent_id: int, process_id: int
+) -> str:
+    """Build the deterministic Job name for an activation process."""
+    return f"{resource_prefix}-job-{parent_id}-{process_id}"
+
+
 class Engine(ContainerEngine):
     def __init__(
         self,
@@ -109,14 +194,18 @@ class Engine(ContainerEngine):
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         # TODO : Should this be compatible with the previous version
         # Previous Version
-        self.job_name = (
-            f"{self.resource_prefix}-job-{request.process_parent_id}"
-            f"-{request.rulebook_process_id}"
+        self.job_name = make_job_name(
+            self.resource_prefix,
+            request.process_parent_id,
+            request.rulebook_process_id,
         )
         self.pod_name = (
             f"{self.resource_prefix}-pod-{request.process_parent_id}"
             f"-{request.rulebook_process_id}"
         )
+
+        if self._namespace_is_override:
+            verify_namespace_accessible(self.client.batch_api, self.namespace)
 
         try:
             log_handler.write("Creating Job")
@@ -570,14 +659,43 @@ class Engine(ContainerEngine):
         )
 
         if not (activation_job.items and activation_job.items[0].metadata):
+            self._verify_job_deleted()
             LOGGER.info(f"Job for {self.job_name} has been removed")
             return
 
         activation_job_name = activation_job.items[0].metadata.name
         self._delete_job_resource(activation_job_name, log_handler)
+        self._verify_job_deleted()
 
-    def _get_resource_version(self) -> str:
-        """Return the current resourceVersion for this job's pods."""
+    def _verify_job_deleted(self) -> None:
+        selector = f"job-name={self.job_name}"
+        deadline = time.monotonic() + JOB_DELETE_VERIFY_TIMEOUT
+        while True:
+            jobs = self._call_k8s_api(
+                self.client.batch_api.list_namespaced_job,
+                namespace=self.namespace,
+                label_selector=selector,
+                error_cls=ContainerCleanupError,
+                description=f"verify job deletion {self.job_name}",
+            )
+            pods = self._call_k8s_api(
+                self.client.core_api.list_namespaced_pod,
+                namespace=self.namespace,
+                label_selector=selector,
+                error_cls=ContainerCleanupError,
+                description=f"verify pod deletion {self.job_name}",
+            )
+            if not jobs.items and not pods.items:
+                return
+            if time.monotonic() >= deadline:
+                raise ContainerCleanupError(
+                    f"Job or Pod {self.job_name} still exists in "
+                    f"{self.namespace}"
+                )
+            time.sleep(1)
+
+    def _get_resource_version(self) -> str | None:
+        """Return a watch position only when this Job still has Pods."""
         pod_list = self._call_k8s_api(
             self.client.core_api.list_namespaced_pod,
             namespace=self.namespace,
@@ -585,7 +703,9 @@ class Engine(ContainerEngine):
             error_cls=ContainerCleanupError,
             description=f"List pods for {self.job_name}",
         )
-        return pod_list.metadata.resource_version
+        if pod_list.items:
+            return pod_list.metadata.resource_version
+        return None
 
     def _delete_job_resource(
         self, job_name: str, log_handler: LogHandler
@@ -604,9 +724,10 @@ class Engine(ContainerEngine):
         if result.status == "Failure":
             raise ContainerCleanupError(f"{result}")
 
-        self._watch_pod_deletion(
-            log_handler, resource_version=resource_version
-        )
+        if resource_version is not None:
+            self._watch_pod_deletion(
+                log_handler, resource_version=resource_version
+            )
 
     def _watch_for_deleted_event(
         self,
@@ -675,9 +796,11 @@ class Engine(ContainerEngine):
         last_exc = None
         for attempt in range(1, K8S_API_RETRIES + 1):
             watcher = watch.Watch()
-            if attempt > 1:
-                resource_version = self._get_resource_version()
             try:
+                if attempt > 1:
+                    resource_version = self._get_resource_version()
+                    if resource_version is None:
+                        return
                 if self._watch_for_deleted_event(
                     watcher, resource_version, log_handler
                 ):
@@ -757,29 +880,14 @@ class Engine(ContainerEngine):
         ) from last_exc
 
     def _set_namespace(self) -> None:
-        ns_override = os.environ.get("EDA_ACTIVATION_JOB_NAMESPACE", "")
-        if ns_override.strip():
-            self.namespace = ns_override.strip()
-            LOGGER.info(
-                "Using activation job namespace override: %s",
-                self.namespace,
+        namespace, is_override = resolve_activation_namespace()
+        if is_override:
+            LOGGER.debug(
+                "Activation Job namespace override from environment: %s",
+                namespace,
             )
-            return
-
-        namespace_file = (
-            "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
-        )
-        try:
-            with open(
-                namespace_file, mode="r", encoding="utf-8"
-            ) as namespace_ref:
-                self.namespace = namespace_ref.read()
-
-            LOGGER.info(f"Namespace is {self.namespace}")
-        except FileNotFoundError as e:
-            message = f"Namespace file {namespace_file} does not exist."
-            LOGGER.error(message)
-            raise ContainerEngineInitError(message) from e
+        self.namespace = namespace
+        self._namespace_is_override = is_override
 
     def _create_secret(
         self,

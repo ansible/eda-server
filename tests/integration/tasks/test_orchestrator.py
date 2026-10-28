@@ -26,6 +26,8 @@ from aap_eda.core.enums import (
     ActivationStatus,
     ProcessParentType,
 )
+from aap_eda.services.activation import exceptions as activation_exceptions
+from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.tasks import orchestrator
 
 
@@ -162,6 +164,177 @@ def test_manage_request(manager_mock, activation, verb):
         manager_instance_mock.start.assert_called_once_with(is_restart=True)
     assert (
         len(queue.peek_all(ProcessParentType.ACTIVATION, activation.id)) == 0
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
+def test_manage_retries_failed_stop_for_disabled_stopping_activation(
+    manager_mock, activation
+):
+    """Monitor retries cleanup after a failed stop request is consumed."""
+    activation.is_enabled = False
+    activation.status = ActivationStatus.STOPPING
+    activation.save(update_fields=["is_enabled", "status"])
+    process = models.RulebookProcess.objects.create(
+        name="running",
+        activation=activation,
+        status=ActivationStatus.RUNNING,
+        organization=activation.organization,
+    )
+    models.RulebookProcessQueue.objects.create(
+        process=process,
+        queue_name="activation",
+    )
+    queue.push(
+        ProcessParentType.ACTIVATION, activation.id, ActivationRequest.STOP
+    )
+
+    manager_instance_mock = mock.Mock()
+    manager_instance_mock.stop.side_effect = RuntimeError("cleanup failed")
+    manager_mock.return_value = manager_instance_mock
+
+    with mock.patch.object(settings, "RULEBOOK_QUEUE_NAME", "activation"):
+        orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+
+        assert not queue.peek_all(ProcessParentType.ACTIVATION, activation.id)
+        activation.refresh_from_db()
+        assert activation.is_enabled is False
+        assert activation.status == ActivationStatus.STOPPING
+
+        orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+
+    manager_instance_mock.stop.assert_called_once()
+    manager_instance_mock.monitor.assert_called_once()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
+def test_manage_retries_restart_after_kubernetes_cleanup_failure(
+    manager_mock, activation
+):
+    """Keep a restart request until Kubernetes cleanup permits replacement."""
+    activation.status = ActivationStatus.RUNNING
+    activation.save(update_fields=["status"])
+    process = models.RulebookProcess.objects.create(
+        name="running",
+        activation=activation,
+        status=ActivationStatus.RUNNING,
+        organization=activation.organization,
+    )
+    models.RulebookProcessQueue.objects.create(
+        process=process,
+        queue_name="activation",
+    )
+    queue.push(
+        ProcessParentType.ACTIVATION,
+        activation.id,
+        ActivationRequest.RESTART,
+    )
+
+    cleanup_error = engine_exceptions.ContainerCleanupError("cleanup failed")
+    restart_error = activation_exceptions.ActivationStopError("stop failed")
+    restart_error.__cause__ = cleanup_error
+    manager_instance_mock = mock.Mock()
+    manager_instance_mock.restart.side_effect = restart_error
+    manager_mock.return_value = manager_instance_mock
+
+    with mock.patch.object(settings, "RULEBOOK_QUEUE_NAME", "activation"):
+        orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+
+        assert (
+            len(queue.peek_all(ProcessParentType.ACTIVATION, activation.id))
+            == 1
+        )
+        manager_instance_mock.monitor.assert_not_called()
+
+        manager_instance_mock.restart.side_effect = None
+        orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+
+    assert not queue.peek_all(ProcessParentType.ACTIVATION, activation.id)
+    assert manager_instance_mock.restart.call_count == 2
+    manager_instance_mock.monitor.assert_not_called()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.queue_dispatch")
+def test_monitor_rulebook_processes_retries_terminal_cleanup(
+    queue_dispatch_mock, activation
+):
+    """Schedule a terminal process while its parent still needs cleanup."""
+    activation.status = ActivationStatus.RUNNING
+    activation.save(update_fields=["status"])
+    models.RulebookProcess.objects.create(
+        name="completed",
+        activation=activation,
+        status=ActivationStatus.COMPLETED,
+        organization=activation.organization,
+    )
+
+    orchestrator.monitor_rulebook_processes_no_lock()
+
+    queue_dispatch_mock.assert_called_once_with(
+        ProcessParentType.ACTIVATION,
+        activation.id,
+        None,
+        mock.ANY,
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.queue_dispatch")
+def test_monitor_rulebook_processes_retries_terminal_cleanup_when_disabled(
+    queue_dispatch_mock, activation
+):
+    """Schedule cleanup for a disabled activation left in STOPPING."""
+    activation.is_enabled = False
+    activation.status = ActivationStatus.STOPPING
+    activation.save(update_fields=["is_enabled", "status"])
+    models.RulebookProcess.objects.create(
+        name="completed",
+        activation=activation,
+        status=ActivationStatus.COMPLETED,
+        organization=activation.organization,
+    )
+
+    orchestrator.monitor_rulebook_processes_no_lock()
+
+    queue_dispatch_mock.assert_called_once_with(
+        ProcessParentType.ACTIVATION,
+        activation.id,
+        None,
+        mock.ANY,
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.queue_dispatch")
+def test_monitor_rulebook_processes_skips_historical_terminal_instances(
+    queue_dispatch_mock, activation
+):
+    """Only the latest terminal instance is eligible for cleanup retry."""
+    activation.status = ActivationStatus.RUNNING
+    activation.save(update_fields=["status"])
+    models.RulebookProcess.objects.create(
+        name="historical",
+        activation=activation,
+        status=ActivationStatus.FAILED,
+        organization=activation.organization,
+    )
+    models.RulebookProcess.objects.create(
+        name="latest",
+        activation=activation,
+        status=ActivationStatus.COMPLETED,
+        organization=activation.organization,
+    )
+
+    orchestrator.monitor_rulebook_processes_no_lock()
+
+    queue_dispatch_mock.assert_called_once_with(
+        ProcessParentType.ACTIVATION,
+        activation.id,
+        None,
+        mock.ANY,
     )
 
 
