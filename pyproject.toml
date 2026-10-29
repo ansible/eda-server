@@ -128,7 +128,7 @@ ipython = "*"
 
 [tool.black]
 line-length = 79
-target-version = ["py39", "py310"]
+target-version = ["py311"]
 
 [tool.isort]
 profile = "black"
