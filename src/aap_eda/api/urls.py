@@ -37,6 +37,7 @@ router = routers.SimpleRouter()
 router.register("projects", views.ProjectViewSet)
 router.register("rulebooks", views.RulebookViewSet)
 router.register("activations", views.ActivationViewSet)
+router.register("logs", views.LogPurgeViewSet, basename="logs")
 router.register(
     "activation-instances",
     views.ActivationInstanceViewSet,
