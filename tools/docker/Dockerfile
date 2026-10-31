@@ -28,6 +28,7 @@ RUN DNF=dnf \
     gcc \
     gettext \
     git-core \
+    tzdata \
     java-17-openjdk-headless" \
     && $DNF -y install dnf-plugins-core \
     && $DNF -y config-manager --set-enabled crb \
@@ -94,4 +95,23 @@ RUN for dir in \
 
 USER "$USER_ID"
 
+# Red Hat patches downstream RPM packages (python3-certifi,
+# python3-requests, and the system Python binary) to automatically
+# redirect certificate lookups to the OS trust store at
+# /etc/pki/tls/certs/ca-bundle.crt. However, when applications run
+# inside a virtual environment (/app/venv), pip installs vanilla,
+# upstream wheels directly from PyPI. These unpatched PyPI packages
+# bypass the OS entirely, relying instead on an isolated, embedded
+# Mozilla certificate bundle that has no awareness of Red Hat
+# system paths or your mounted enterprise CAs.
+
+# Setting REQUESTS_CA_BUNDLE and SSL_CERT_FILE to
+# /etc/pki/tls/certs/ca-bundle.crt bridges this disconnect on RHEL/CentOS.
+# It forces both higher-level HTTP libraries (requests, urllib3)
+# and low-level Python/OpenSSL standard library calls inside your
+# virtualenv to ignore their isolated bundles and route trust
+# verification back through the unified Linux host certificate store.
+
+ENV REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt \
+    SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
 CMD ["aap-eda-manage", "runserver", "0.0.0.0:8000"]
