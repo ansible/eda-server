@@ -12,12 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
+import re
 import types
 import uuid
+from decimal import Decimal, DecimalException
 from typing import Optional, Union, get_args, get_origin, get_type_hints
 
 from django.core.exceptions import ImproperlyConfigured
 from dynaconf import Dynaconf
+from kubernetes.utils.quantity import parse_quantity
 
 from aap_eda import utils
 from aap_eda.core.enums import RulebookProcessLogLevel
@@ -28,6 +31,10 @@ logger = logging.getLogger(__name__)
 
 MAX_PG_IDENTIFIER_LENGTH = 63
 DEFAULT_RULEBOOK_QUEUE_NAME = "activation"
+K8S_QUANTITY_RE = re.compile(
+    r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)"
+    r"(?:Ki|Mi|Gi|Ti|Pi|Ei|n|u|m|k|M|G|T|P|E|[eE][+-]?[0-9]+)?"
+)
 
 
 def _normalize_queue_name(name: str) -> str:
@@ -429,6 +436,48 @@ def _enforce_types(settings: Dynaconf) -> None:
             _validate_type(key, settings[key], key_type)
 
 
+def _parse_k8s_resource_quantity(
+    name: str, value: Optional[str]
+) -> Optional[Decimal]:
+    if value is None:
+        return None
+    if K8S_QUANTITY_RE.fullmatch(value) is None:
+        raise ImproperlyConfigured(
+            f"{name} setting must be a valid Kubernetes quantity."
+        )
+    try:
+        quantity = parse_quantity(value)
+    except (DecimalException, TypeError, ValueError) as exc:
+        raise ImproperlyConfigured(
+            f"{name} setting must be a valid Kubernetes quantity."
+        ) from exc
+    if not quantity.is_finite() or quantity < 0:
+        raise ImproperlyConfigured(
+            f"{name} setting must be a finite, non-negative "
+            "Kubernetes quantity."
+        )
+    return quantity
+
+
+def _validate_k8s_resource_requirements(settings: Dynaconf) -> None:
+    """Validate Kubernetes CPU and memory requests and limits."""
+    request_limit_pairs = (
+        ("K8S_CPU_REQUEST", "K8S_CPU_LIMIT"),
+        ("K8S_MEM_REQUEST", "K8S_MEM_LIMIT"),
+    )
+    for request_name, limit_name in request_limit_pairs:
+        request = _parse_k8s_resource_quantity(
+            request_name, settings.get(request_name)
+        )
+        limit = _parse_k8s_resource_quantity(
+            limit_name, settings.get(limit_name)
+        )
+        if request is not None and limit is not None and request > limit:
+            raise ImproperlyConfigured(
+                f"{request_name} setting must not exceed {limit_name}."
+            )
+
+
 def _validate_type(key: str, value, key_type) -> None:
     """Validate that a value matches the expected type.
 
@@ -484,6 +533,7 @@ def post_loading(loaded_settings: Dynaconf):
     settings.update(loaded_settings.to_dict())
 
     _enforce_types(settings)
+    _validate_k8s_resource_requirements(settings)
 
     _warn_tls_verification_disabled(settings)
 

@@ -183,6 +183,79 @@ def test_types(mock_settings, name, value, expected):
         assert mock_settings[name] == expected
 
 
+@pytest.mark.parametrize(
+    "resource_values",
+    [
+        {},
+        {"K8S_CPU_REQUEST": "250m"},
+        {"K8S_MEM_LIMIT": "200Mi"},
+        {
+            "K8S_CPU_REQUEST": "250m",
+            "K8S_CPU_LIMIT": "500m",
+            "K8S_MEM_REQUEST": "100Mi",
+            "K8S_MEM_LIMIT": "200Mi",
+        },
+        {"K8S_CPU_REQUEST": "1", "K8S_CPU_LIMIT": "1000m"},
+        {"K8S_MEM_REQUEST": "1Gi", "K8S_MEM_LIMIT": "1024Mi"},
+        {"K8S_CPU_REQUEST": ".5", "K8S_CPU_LIMIT": "1."},
+        {"K8S_MEM_REQUEST": "1e3", "K8S_MEM_LIMIT": "1E+3"},
+    ],
+)
+def test_valid_k8s_resource_quantities(mock_settings, resource_values):
+    """Unset and correctly ordered quantities pass settings validation."""
+    for name, value in resource_values.items():
+        mock_settings[name] = value
+
+    post_loading(mock_settings)
+
+    for name in (
+        "K8S_CPU_REQUEST",
+        "K8S_MEM_REQUEST",
+        "K8S_CPU_LIMIT",
+        "K8S_MEM_LIMIT",
+    ):
+        assert mock_settings[name] == resource_values.get(name)
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("K8S_CPU_REQUEST", "not-a-quantity"),
+        ("K8S_CPU_REQUEST", "1_000"),
+        ("K8S_MEM_REQUEST", "١"),
+        ("K8S_MEM_LIMIT", "1e3Mi"),
+        ("K8S_MEM_REQUEST", "NaN"),
+        ("K8S_CPU_LIMIT", "Infinity"),
+        ("K8S_MEM_LIMIT", "-1Gi"),
+    ],
+)
+def test_invalid_k8s_resource_quantities(mock_settings, name, value):
+    mock_settings[name] = value
+
+    with pytest.raises(ImproperlyConfigured, match=name):
+        post_loading(mock_settings)
+
+
+@pytest.mark.parametrize(
+    ("request_name", "request_value", "limit_name", "limit_value"),
+    [
+        ("K8S_CPU_REQUEST", "600m", "K8S_CPU_LIMIT", "500m"),
+        ("K8S_MEM_REQUEST", "2Gi", "K8S_MEM_LIMIT", "1Gi"),
+    ],
+)
+def test_k8s_resource_request_must_not_exceed_limit(
+    mock_settings, request_name, request_value, limit_name, limit_value
+):
+    mock_settings[request_name] = request_value
+    mock_settings[limit_name] = limit_value
+
+    with pytest.raises(
+        ImproperlyConfigured,
+        match=f"{request_name} setting must not exceed {limit_name}",
+    ):
+        post_loading(mock_settings)
+
+
 def test_optional_type_exception_msg(mock_settings):
     """Test exception message when an optional type error occurs."""
     mock_settings[
