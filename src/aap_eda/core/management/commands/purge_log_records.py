@@ -34,6 +34,8 @@ from aap_eda.core.utils.log_retention import retention_cutoff
 class Command(BaseCommand):
     """Purge old logs globally or for selected activations."""
 
+    VERSION = "1.1.1"
+
     help = (
         "Purge log records older than exactly one cutoff, or use "
         "--purge-all-logs with an optional cutoff to delete logs globally "
@@ -42,6 +44,9 @@ class Command(BaseCommand):
         "Activation IDs and names limit deletion to their union. "
         "One audit marker per affected process is enabled by default."
     )
+
+    def get_version(self):
+        return self.VERSION
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
@@ -260,17 +265,19 @@ class Command(BaseCommand):
                 else "No audit markers created."
             )
             noun = "record" if deleted_count == 1 else "records"
+            tag = f"[purge_log_records v{self.VERSION}]"
             if cutoff is not None:
                 cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S UTC")
                 return self.style.SUCCESS(
                     f"Purged {deleted_count} log {noun} globally older "
-                    f"than {cutoff_str}. {marker_result}"
+                    f"than {cutoff_str}. {marker_result} {tag}"
                 )
             return self.style.SUCCESS(
                 f"Purged {deleted_count} log {noun} globally at all "
-                f"timestamps. {marker_result}"
+                f"timestamps. {marker_result} {tag}"
             )
 
+        tag = f"[purge_log_records v{self.VERSION}]"
         noun = "record" if process_deleted_count == 1 else "records"
         scope = (
             "globally"
@@ -279,5 +286,5 @@ class Command(BaseCommand):
         )
         return self.style.SUCCESS(
             f"Purged {process_deleted_count} log {noun} older than "
-            f"{cutoff.strftime('%Y-%m-%d %H:%M:%S UTC')} {scope}."
+            f"{cutoff.strftime('%Y-%m-%d %H:%M:%S UTC')} {scope}. {tag}"
         )
