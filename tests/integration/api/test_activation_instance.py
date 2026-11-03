@@ -158,6 +158,44 @@ def test_list_logs_returns_actual_purge_marker_time(
 
 
 @pytest.mark.django_db
+def test_purge_audit_marker_sorts_before_surviving_logs(
+    default_activation_instances: List[models.RulebookProcess],
+    admin_client: APIClient,
+):
+    instance = default_activation_instances[0]
+    cutoff = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    cutoff_ts = int(cutoff.timestamp())
+    models.RulebookProcessLog.objects.filter(
+        activation_instance=instance
+    ).delete()
+    old_log = models.RulebookProcessLog.objects.create(
+        activation_instance=instance,
+        log="old log to purge",
+        log_timestamp=cutoff_ts - 100,
+    )
+    surviving = models.RulebookProcessLog.objects.create(
+        activation_instance=instance,
+        log="surviving log",
+        log_timestamp=cutoff_ts + 100,
+    )
+
+    delete_logs_older_than(
+        cutoff,
+        activation_ids=[instance.activation_id],
+    )
+    assert not models.RulebookProcessLog.objects.filter(pk=old_log.pk).exists()
+
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}/logs/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    results = response.data["results"]
+    assert len(results) == 2
+    assert results[0]["log"].startswith("Purged ")
+    assert results[1]["id"] == surviving.id
+
+
+@pytest.mark.django_db
 def test_list_activation_instance_logs_filter(
     default_activation_instances: List[models.RulebookProcess],
     default_activation_instance_logs: List[models.RulebookProcessLog],

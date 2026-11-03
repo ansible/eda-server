@@ -174,12 +174,10 @@ def _write_audit_marker(
 ) -> int:
     """Create audit marker log record for a purge operation."""
     purge_time = datetime.now(timezone.utc)
-    marker_timestamp = max(
-        ceil(purge_time.timestamp()),
-        ceil(options.cutoff_timestamp)
-        if options.cutoff_timestamp is not None
-        else 0,
-    )
+    if options.cutoff_timestamp is not None:
+        marker_timestamp = ceil(options.cutoff_timestamp) - 1
+    else:
+        marker_timestamp = ceil(purge_time.timestamp())
     marker_text = _marker_text(
         options.cutoff,
         purge_time,

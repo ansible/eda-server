@@ -542,8 +542,9 @@ def test_activation_filter_limits_deletion_and_markers(
         .replace(tzinfo=datetime_timezone.utc)
         .timestamp()
     )
+    expected_ts = ceil(cutoff_timestamp) - 1
     assert all(
-        log_timestamp >= cutoff_timestamp
+        log_timestamp == expected_ts
         for log_timestamp in audit_logs.values_list("log_timestamp", flat=True)
     )
     assert (
@@ -1024,11 +1025,7 @@ def test_marker_uses_invocation_count_job_uuid_tracking_and_ceiled_timestamp(
     )
     after_purge = timezone.now()
     marker = _audit_markers().get()
-    assert (
-        max(ceil(before_purge.timestamp()), ceil(cutoff.timestamp()))
-        <= marker.log_timestamp
-        <= max(ceil(after_purge.timestamp()), ceil(cutoff.timestamp()))
-    )
+    assert marker.log_timestamp == ceil(cutoff.timestamp()) - 1
     assert before_purge <= marker.log_created_at <= after_purge
     assert marker.log.startswith(
         "Purged 1 log record older than "
@@ -1042,14 +1039,13 @@ def test_marker_uses_invocation_count_job_uuid_tracking_and_ceiled_timestamp(
     models.RulebookProcessLog.objects.create(
         activation_instance=process, log="another old row", log_timestamp=1
     )
-    assert delete_log_util.delete_logs_older_than(cutoff) == 1
+    assert delete_log_util.delete_logs_older_than(cutoff) == 2
     markers = list(_audit_markers())
-    assert len(markers) == 2
-    assert all("Purged 1 log record older than" in row.log for row in markers)
-    assert (
-        "Purge Job ID:"
-        not in next(row for row in markers if row.pk != marker.pk).log
-    )
+    assert len(markers) == 1
+    new_marker = markers[0]
+    assert new_marker.pk != marker.pk
+    assert "Purged 2 log records older than" in new_marker.log
+    assert "Purge Job ID:" not in new_marker.log
 
 
 @pytest.mark.django_db
