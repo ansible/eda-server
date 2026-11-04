@@ -934,7 +934,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2026.10.30.0.dev10+g05f6a267a"
+version = "2026.11.3.0.dev14+gbf4d98d3d"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.12"
@@ -960,13 +960,13 @@ sqlparse = ">=0.5.2"
 urllib3 = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 
 [package.extras]
-all = ["asgiref", "channels", "cryptography", "cryptography (<47)", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular (<1.0)", "jwcrypto (>=1.5.7)", "ldap-filter", "lxml (==5.3.0)", "opentelemetry-api", "opentelemetry-exporter-otlp-proto-grpc", "opentelemetry-instrumentation-django", "opentelemetry-instrumentation-grpc", "opentelemetry-instrumentation-logging", "opentelemetry-instrumentation-psycopg", "opentelemetry-instrumentation-psycopg2", "opentelemetry-instrumentation-requests", "opentelemetry-sdk", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis (>=7.4.0)", "referencing (<0.37.0)", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (>=5.1.1,<6)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
+all = ["asgiref", "channels", "cryptography", "cryptography (<47)", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular (<1.0)", "jwcrypto (>=1.5.7)", "ldap-filter", "lxml (==5.3.0)", "oauthlib (>=4.0.0)", "opentelemetry-api", "opentelemetry-exporter-otlp-proto-grpc", "opentelemetry-instrumentation-django", "opentelemetry-instrumentation-grpc", "opentelemetry-instrumentation-logging", "opentelemetry-instrumentation-psycopg", "opentelemetry-instrumentation-psycopg2", "opentelemetry-instrumentation-requests", "opentelemetry-sdk", "pyasn1 (>=0.6.5)", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis (>=7.4.0)", "referencing (<0.37.0)", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (>=5.1.1,<6)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
 api-documentation = ["drf-spectacular (<1.0)", "referencing (<0.37.0)"]
-authentication = ["cryptography (<47)", "django-auth-ldap", "ldap-filter", "lxml (==5.3.0)", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "social-auth-core (>=5.1.1,<6)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
+authentication = ["cryptography (<47)", "django-auth-ldap", "ldap-filter", "lxml (==5.3.0)", "pyasn1 (>=0.6.5)", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "social-auth-core (>=5.1.1,<6)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
 feature-flags = ["django-flags"]
 jwt-consumer = ["pyjwt", "requests"]
-oauth2-provider = ["django-oauth-toolkit (<2.4.0)", "jwcrypto (>=1.5.7)"]
+oauth2-provider = ["django-oauth-toolkit (<2.4.0)", "jwcrypto (>=1.5.7)", "oauthlib (>=4.0.0)"]
 observability = ["opentelemetry-api", "opentelemetry-exporter-otlp-proto-grpc", "opentelemetry-instrumentation-django", "opentelemetry-instrumentation-grpc", "opentelemetry-instrumentation-logging", "opentelemetry-instrumentation-psycopg", "opentelemetry-instrumentation-psycopg2", "opentelemetry-instrumentation-requests", "opentelemetry-sdk"]
 redis-client = ["django-redis", "redis (>=7.4.0)"]
 resource-registry = ["asgiref", "pyjwt", "requests", "urllib3"]
@@ -976,7 +976,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "05f6a267a9bedd60451f530a493ab1f13e975b40"
+resolved_reference = "bf4d98d3d15fbdbf265c182f26fcc7c00028fa15"
 
 [[package]]
 name = "django-crum"
@@ -3301,14 +3301,14 @@ files = [
 
 [[package]]
 name = "tzdata"
-version = "2023.3"
+version = "2026.6"
 description = "Provider of IANA time zone data"
 optional = false
 python-versions = ">=2"
 groups = ["main"]
 files = [
-    {file = "tzdata-2023.3-py2.py3-none-any.whl", hash = "sha256:7e65763eef3120314099b6939b5546db7adce1e7d6f2e179e3df563c70511eda"},
-    {file = "tzdata-2023.3.tar.gz", hash = "sha256:11ef1e08e54acb0d4f95bdb1be05da659673de4acbd21bf9c69e94cc5e907a3a"},
+    {file = "tzdata-2026.6-py2.py3-none-any.whl", hash = "sha256:0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec"},
+    {file = "tzdata-2026.6.tar.gz", hash = "sha256:85d2cd9c09f81f0bb29db27759fc83af4f1e620efb814f8c5bf8b4cc4feece6d"},
 ]
 
 [[package]]
