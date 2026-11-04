@@ -16,6 +16,7 @@ import logging
 import secrets
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, time, timezone as datetime_timezone
 from typing import Optional
 
 import yaml
@@ -54,7 +55,9 @@ from aap_eda.core.utils.credentials import (
     get_resolved_secrets,
     get_secret_fields,
 )
+from aap_eda.core.utils.delete_log_util import resolve_activation_ids
 from aap_eda.core.utils.k8s_service_name import create_k8s_service_name
+from aap_eda.core.utils.log_retention import retention_cutoff
 from aap_eda.core.utils.rulebook import (
     build_rulebook_with_event_streams,
     build_source_list,
@@ -87,6 +90,139 @@ def _update_event_stream_source(validated_data: dict) -> str:
             "Failed to update event stream source in rulesets: %s", str(e)
         )
         raise InvalidEventStreamSource(e) from e
+
+
+class LogPurgeRequestSerializer(serializers.Serializer):
+    """Serializer for the asynchronous log purge endpoint."""
+
+    before_date = serializers.DateField(
+        required=False,
+        help_text="Exclusive UTC midnight cutoff (YYYY-MM-DD).",
+    )
+    retention_duration = serializers.CharField(
+        required=False,
+        help_text="Exclusive cutoff as a positive ISO 8601 duration.",
+    )
+    audit_trail = serializers.BooleanField(
+        required=False,
+        default=True,
+        help_text="Write one audit marker per process that loses logs.",
+    )
+    activation_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=False,
+        help_text="Limit deletion to these activation IDs.",
+    )
+    activation_names = serializers.ListField(
+        child=serializers.CharField(allow_blank=False, trim_whitespace=False),
+        required=False,
+        allow_empty=False,
+        help_text="Limit deletion to these activation names.",
+    )
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["purge-all-logs"] = serializers.BooleanField(
+            source="purge_all_logs",
+            required=False,
+            default=False,
+            help_text=(
+                "Delete all existing process logs globally. Can be combined "
+                "with before_date or retention_duration to limit deletion "
+                "to older logs. Cannot be combined with activation selectors "
+                "or disabled audit."
+            ),
+        )
+        return fields
+
+    @staticmethod
+    def _validate_full_purge(attrs):
+        """Reject selector or audit-off combinations with purge-all-logs."""
+        if "activation_ids" in attrs or "activation_names" in attrs:
+            raise serializers.ValidationError(
+                "purge-all-logs cannot be combined with activation selectors."
+            )
+        if not attrs["audit_trail"]:
+            raise serializers.ValidationError(
+                "purge-all-logs requires audit_trail=true."
+            )
+
+    def _validate_cutoff(self, attrs):
+        """Ensure exactly one cutoff is supplied and normalize it."""
+        before_date = attrs.get("before_date")
+        duration = attrs.get("retention_duration")
+        has_date = before_date is not None
+        has_duration = duration is not None
+        err = "Exactly one of before_date or retention_duration is required."
+
+        if has_date and has_duration:
+            raise serializers.ValidationError(err)
+        if not has_date and not has_duration and not attrs["purge_all_logs"]:
+            raise serializers.ValidationError(err)
+        if has_date:
+            self._validate_before_date(attrs, before_date)
+        elif has_duration:
+            self._validate_duration(duration)
+
+    @staticmethod
+    def _validate_before_date(attrs, before_date):
+        """Reject future dates and normalise before_date to ISO string."""
+        cutoff = datetime.combine(
+            before_date, time.min, tzinfo=datetime_timezone.utc
+        )
+        if cutoff > datetime.now(datetime_timezone.utc):
+            raise serializers.ValidationError(
+                {"before_date": "The UTC cutoff must not be future."}
+            )
+        attrs["before_date"] = before_date.isoformat()
+
+    @staticmethod
+    def _validate_duration(duration):
+        """Validate retention_duration as a positive ISO 8601 duration."""
+        try:
+            retention_cutoff(duration)
+        except ValueError as exc:
+            raise serializers.ValidationError(
+                {"retention_duration": str(exc)}
+            ) from exc
+
+    @staticmethod
+    def _resolve_activations(attrs):
+        """Resolve activation names to IDs."""
+        if "activation_ids" not in attrs and "activation_names" not in attrs:
+            return
+        try:
+            attrs["activation_ids"] = sorted(
+                resolve_activation_ids(
+                    attrs.get("activation_ids"),
+                    attrs.get("activation_names"),
+                )
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        attrs.pop("activation_names", None)
+
+    def validate(self, attrs):
+        unknown_fields = set(self.initial_data) - set(self.fields)
+        if unknown_fields:
+            raise serializers.ValidationError(
+                dict.fromkeys(sorted(unknown_fields), "Unknown field.")
+            )
+
+        if attrs["purge_all_logs"]:
+            self._validate_full_purge(attrs)
+        self._validate_cutoff(attrs)
+        if attrs["purge_all_logs"]:
+            return attrs
+        self._resolve_activations(attrs)
+        return attrs
+
+
+class LogPurgeResponseSerializer(serializers.Serializer):
+    """Acknowledgement returned after a purge task is queued."""
+
+    job_id = serializers.UUIDField()
 
 
 def _update_k8s_service_name(validated_data: dict) -> str:
