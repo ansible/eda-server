@@ -50,13 +50,62 @@ def backfill_rulebook_process_activation_job_namespace(apps, schema_editor):
     processes.update(activation_job_namespace=legacy_activation_namespace())
 
 
+class AddFieldIfAbsent(migrations.AddField):
+    """Add/validate the column forward and retain it on database rollback."""
+
+    def database_forwards(
+        self, app_label, schema_editor, from_state, to_state
+    ):
+        connection = schema_editor.connection
+        model = to_state.apps.get_model(app_label, self.model_name)
+        if not self.allow_migrate_model(connection.alias, model):
+            return
+
+        field = model._meta.get_field(self.name)
+        with connection.cursor() as cursor:
+            columns = connection.introspection.get_table_description(
+                cursor, model._meta.db_table
+            )
+
+        existing_column = next(
+            (column for column in columns if column.name == field.column), None
+        )
+        if existing_column is None:
+            return super().database_forwards(
+                app_label, schema_editor, from_state, to_state
+            )
+
+        existing_type = connection.introspection.get_field_type(
+            existing_column.type_code, existing_column
+        )
+        expected_type = field.get_internal_type()
+        if (
+            existing_type != expected_type
+            or existing_column.null_ok != field.null
+        ):
+            raise RuntimeError(
+                f"Existing column {model._meta.db_table}.{field.column} is "
+                f"incompatible: expected {expected_type} "
+                f"(nullable={field.null}), found {existing_type} "
+                f"(nullable={existing_column.null_ok})."
+            )
+
+    def database_backwards(
+        self, app_label, schema_editor, from_state, to_state
+    ):
+        # The column may have existed before this migration on a supported
+        # release database. Its ownership isn't persisted, so dropping it here
+        # could break a downgrade. A leftover nullable column is harmless.
+        return
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("core", "0074_awxtoken_ck_awx_token_name_not_empty_and_more"),
     ]
 
     operations = [
-        migrations.AddField(
+        AddFieldIfAbsent(
             model_name="rulebookprocess",
             name="activation_job_namespace",
             field=models.TextField(null=True),
