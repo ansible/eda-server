@@ -14,7 +14,7 @@
 
 
 import pytest
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf as lazy_fixture
 
 from aap_eda.core import enums, models
 from aap_eda.core.exceptions import (
