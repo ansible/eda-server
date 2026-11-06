@@ -1,4 +1,5 @@
 """Delete rows from drools tables based on ha_uuid."""
+
 import logging
 import os
 import tempfile

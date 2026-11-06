@@ -1,4 +1,5 @@
 """Unit tests for certificate validation functionality."""
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
