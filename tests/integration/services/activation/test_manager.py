@@ -22,7 +22,7 @@ from _pytest.logging import LogCaptureFixture
 from django.conf import settings as django_settings
 from django.utils import timezone
 from pytest_django.fixtures import SettingsWrapper
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf as lazy_fixture
 
 from aap_eda.core import enums, models
 from aap_eda.services.activation.activation_manager import (

@@ -2661,19 +2661,19 @@ pytest = ">=7.3.1"
 test = ["coverage (>=7.2.7)", "pytest-mock (>=3.10)"]
 
 [[package]]
-name = "pytest-lazy-fixture"
-version = "0.6.3"
-description = "It helps to use fixtures in pytest.mark.parametrize"
+name = "pytest-lazy-fixtures"
+version = "1.4.1"
+description = "Allows you to use fixtures in @pytest.mark.parametrize."
 optional = false
-python-versions = "*"
+python-versions = ">=3.8"
 groups = ["test"]
 files = [
-    {file = "pytest-lazy-fixture-0.6.3.tar.gz", hash = "sha256:0e7d0c7f74ba33e6e80905e9bfd81f9d15ef9a790de97993e34213deb5ad10ac"},
-    {file = "pytest_lazy_fixture-0.6.3-py3-none-any.whl", hash = "sha256:e0b379f38299ff27a653f03eaa69b08a6fd4484e46fd1c9907d984b9f9daeda6"},
+    {file = "pytest_lazy_fixtures-1.4.1-py3-none-any.whl", hash = "sha256:42213af5859ea4a3c7ec86a7f9dbb43efa9b02547460bddad041e846cdcf921d"},
+    {file = "pytest_lazy_fixtures-1.4.1.tar.gz", hash = "sha256:8684abfd4914ea01f1e2f7b24524739344421d8f3f12286fb3100fb5681e1181"},
 ]
 
 [package.dependencies]
-pytest = ">=3.2.5"
+pytest = ">=7"
 
 [[package]]
 name = "python-daemon"
@@ -3723,4 +3723,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.13"
-content-hash = "e5d23d7a09ac17c3833add46fb5383e8a57d553e9997a471a7348443b5336d04"
+content-hash = "ba36fc92848702646c522453b6c97b7ac347577ecd6a5075bbafca524d43d6ad"
