@@ -734,9 +734,10 @@ def test_delete_job(mock_watch, init_kubernetes_data, kubernetes_engine):
     job_mock = mock.Mock()
     job_mock.metadata.name = job_name
 
-    with mock.patch.object(
-        engine.client, "batch_api"
-    ) as batch_api_mock, mock.patch.object(engine, "_verify_job_deleted"):
+    with (
+        mock.patch.object(engine.client, "batch_api") as batch_api_mock,
+        mock.patch.object(engine, "_verify_job_deleted"),
+    ):
         batch_api_mock.list_namespaced_job.return_value.items = [job_mock]
         mock_watch.return_value.stream.return_value = [{"type": "DELETED"}]
         with mock.patch.object(
@@ -746,9 +747,10 @@ def test_delete_job(mock_watch, init_kubernetes_data, kubernetes_engine):
 
         batch_api_mock.delete_namespaced_job.assert_called_once()
 
-    with mock.patch.object(
-        engine.client, "batch_api"
-    ) as batch_api_mock, mock.patch.object(engine, "_verify_job_deleted"):
+    with (
+        mock.patch.object(engine.client, "batch_api") as batch_api_mock,
+        mock.patch.object(engine, "_verify_job_deleted"),
+    ):
         batch_api_mock.list_namespaced_job.return_value.items = None
         engine._delete_job(log_handler)
 
@@ -757,9 +759,10 @@ def test_delete_job(mock_watch, init_kubernetes_data, kubernetes_engine):
         )
 
     event = {"type": "DELETED"}
-    with mock.patch.object(
-        engine.client, "batch_api"
-    ) as batch_api_mock, mock.patch.object(engine, "_verify_job_deleted"):
+    with (
+        mock.patch.object(engine.client, "batch_api") as batch_api_mock,
+        mock.patch.object(engine, "_verify_job_deleted"),
+    ):
         batch_api_mock.list_namespaced_job.return_value.items = [job_mock]
         mock_watch.return_value.stream.return_value = [event]
         with mock.patch.object(
@@ -842,12 +845,15 @@ def test_verify_job_deleted_times_out_on_remaining_resource(
         [mock.Mock()] if remaining_resource == "pod" else []
     )
 
-    with mock.patch(
-        "aap_eda.services.activation.engine.kubernetes.time.monotonic",
-        side_effect=[0, JOB_DELETE_VERIFY_TIMEOUT],
-    ), mock.patch(
-        "aap_eda.services.activation.engine.kubernetes.time.sleep"
-    ) as sleep:
+    with (
+        mock.patch(
+            "aap_eda.services.activation.engine.kubernetes.time.monotonic",
+            side_effect=[0, JOB_DELETE_VERIFY_TIMEOUT],
+        ),
+        mock.patch(
+            "aap_eda.services.activation.engine.kubernetes.time.sleep"
+        ) as sleep,
+    ):
         with pytest.raises(ContainerCleanupError, match="still exists"):
             engine._verify_job_deleted()
 
@@ -882,9 +888,10 @@ def test_pod_cleanup_exception_handling(
     job_mock = mock.Mock()
     job_mock.metadata.name = job_name
 
-    with mock.patch.object(
-        engine.client, "batch_api"
-    ) as batch_api_mock, mock.patch.object(engine, "_verify_job_deleted"):
+    with (
+        mock.patch.object(engine.client, "batch_api") as batch_api_mock,
+        mock.patch.object(engine, "_verify_job_deleted"),
+    ):
         batch_api_mock.list_namespaced_job.return_value.items = [job_mock]
 
         # Test 404 handling
@@ -1544,9 +1551,11 @@ def test_start_with_env_override_verifies_access(
             client=mock_client,
         )
 
-    with mock.patch.object(engine, "_create_job"), mock.patch.object(
-        engine, "_wait_for_pod_to_start"
-    ), mock.patch.object(engine, "_create_service"):
+    with (
+        mock.patch.object(engine, "_create_job"),
+        mock.patch.object(engine, "_wait_for_pod_to_start"),
+        mock.patch.object(engine, "_create_service"),
+    ):
         engine.start(request, mock_log_handler)
 
     mock_client.batch_api.list_namespaced_job.assert_called_once_with(
@@ -1612,9 +1621,11 @@ def test_start_uses_make_job_name(
         default_organization,
     )
 
-    with mock.patch.object(engine, "_create_job"), mock.patch.object(
-        engine, "_wait_for_pod_to_start"
-    ), mock.patch.object(engine, "_create_service"):
+    with (
+        mock.patch.object(engine, "_create_job"),
+        mock.patch.object(engine, "_wait_for_pod_to_start"),
+        mock.patch.object(engine, "_create_service"),
+    ):
         engine.start(request, mock_log_handler)
 
     act_id = init_kubernetes_data.activation.id

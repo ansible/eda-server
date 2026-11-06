@@ -787,12 +787,15 @@ def test_manage_monitor_runs_when_queue_returns_none(
 def test_resolve_existing_queue_no_queue_assigned():
     """When no queue is assigned, fall back to least busy."""
     status_manager = mock.Mock()
-    with mock.patch(
-        "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
-        return_value=None,
-    ), mock.patch(
-        "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
-        return_value="healthy-queue",
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+            return_value=None,
+        ),
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
+            return_value="healthy-queue",
+        ),
     ):
         result = _resolve_existing_queue(
             ProcessParentType.ACTIVATION,
@@ -809,14 +812,16 @@ def test_resolve_existing_queue_no_queue_assigned():
 def test_resolve_existing_queue_stale_queue():
     """When queue is not in configured queues, fall back to least busy."""
     status_manager = mock.Mock()
-    with mock.patch(
-        "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
-        return_value="old-queue",
-    ), mock.patch(
-        "aap_eda.tasks.orchestrator.settings"
-    ) as mock_settings, mock.patch(
-        "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
-        return_value="healthy-queue",
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+            return_value="old-queue",
+        ),
+        mock.patch("aap_eda.tasks.orchestrator.settings") as mock_settings,
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
+            return_value="healthy-queue",
+        ),
     ):
         mock_settings.RULEBOOK_WORKER_QUEUES = ["activation"]
         result = _resolve_existing_queue(
@@ -834,12 +839,15 @@ def test_resolve_existing_queue_stale_queue():
 def test_resolve_existing_queue_no_healthy_queues():
     """When no healthy queues exist, set PENDING and return None."""
     status_manager = mock.Mock()
-    with mock.patch(
-        "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
-        return_value=None,
-    ), mock.patch(
-        "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
-        side_effect=HealthyQueueNotFoundError,
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+            return_value=None,
+        ),
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_least_busy_queue_name",
+            side_effect=HealthyQueueNotFoundError,
+        ),
     ):
         result = _resolve_existing_queue(
             ProcessParentType.ACTIVATION,
@@ -859,14 +867,16 @@ def test_resolve_existing_queue_no_healthy_queues():
 def test_resolve_existing_queue_healthy():
     """When assigned queue is healthy, return it."""
     status_manager = mock.Mock()
-    with mock.patch(
-        "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
-        return_value="activation",
-    ), mock.patch(
-        "aap_eda.tasks.orchestrator.settings"
-    ) as mock_settings, mock.patch(
-        "aap_eda.tasks.orchestrator.check_rulebook_queue_health",
-        return_value=True,
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+            return_value="activation",
+        ),
+        mock.patch("aap_eda.tasks.orchestrator.settings") as mock_settings,
+        mock.patch(
+            "aap_eda.tasks.orchestrator.check_rulebook_queue_health",
+            return_value=True,
+        ),
     ):
         mock_settings.RULEBOOK_WORKER_QUEUES = ["activation"]
         result = _resolve_existing_queue(
@@ -885,18 +895,21 @@ def test_resolve_existing_queue_unhealthy_delegates():
     """When queue is unhealthy, delegate to _handle_unhealthy_queue."""
     status_manager = mock.Mock()
     process_parent = mock.Mock()
-    with mock.patch(
-        "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
-        return_value="activation",
-    ), mock.patch(
-        "aap_eda.tasks.orchestrator.settings"
-    ) as mock_settings, mock.patch(
-        "aap_eda.tasks.orchestrator.check_rulebook_queue_health",
-        return_value=False,
-    ), mock.patch(
-        "aap_eda.tasks.orchestrator._handle_unhealthy_queue",
-        return_value="fallback-queue",
-    ) as mock_handle:
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+            return_value="activation",
+        ),
+        mock.patch("aap_eda.tasks.orchestrator.settings") as mock_settings,
+        mock.patch(
+            "aap_eda.tasks.orchestrator.check_rulebook_queue_health",
+            return_value=False,
+        ),
+        mock.patch(
+            "aap_eda.tasks.orchestrator._handle_unhealthy_queue",
+            return_value="fallback-queue",
+        ) as mock_handle,
+    ):
         mock_settings.RULEBOOK_WORKER_QUEUES = ["activation"]
         result = _resolve_existing_queue(
             ProcessParentType.ACTIVATION,

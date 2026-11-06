@@ -2517,9 +2517,9 @@ class Command(BaseCommand):
             "EVENT_PERSISTENCE_DB_USER": settings.EVENT_PERSISTENCE_DB_USER,
         }
         if not use_cert_auth:
-            required[
-                "EVENT_PERSISTENCE_DB_PASSWORD"
-            ] = settings.EVENT_PERSISTENCE_DB_PASSWORD
+            required["EVENT_PERSISTENCE_DB_PASSWORD"] = (
+                settings.EVENT_PERSISTENCE_DB_PASSWORD
+            )
 
         missing = [k for k, v in required.items() if not v]
         if missing:
