@@ -1371,11 +1371,12 @@ def test_singleton_credential_validation():
     mock_cred_type = MagicMock()
     mock_cred_type.name = enums.SINGLETON_CREDENTIAL_TYPES[0]
 
-    with patch.object(
-        models.CredentialType, "objects"
-    ) as mock_cred_type_manager, patch.object(
-        models.EdaCredential.objects, "filter"
-    ) as mock_filter:
+    with (
+        patch.object(
+            models.CredentialType, "objects"
+        ) as mock_cred_type_manager,
+        patch.object(models.EdaCredential.objects, "filter") as mock_filter,
+    ):
         mock_cred_type_manager.get.return_value = mock_cred_type
         mock_filter.return_value.exists.return_value = True
 
@@ -1399,11 +1400,12 @@ def test_non_singleton_credential_allows_multiple():
     mock_cred_type = MagicMock()
     mock_cred_type.name = "git_repo"
 
-    with patch.object(
-        models.CredentialType, "objects"
-    ) as mock_cred_type_manager, patch.object(
-        models.EdaCredential.objects, "filter"
-    ) as mock_filter:
+    with (
+        patch.object(
+            models.CredentialType, "objects"
+        ) as mock_cred_type_manager,
+        patch.object(models.EdaCredential.objects, "filter") as mock_filter,
+    ):
         mock_cred_type_manager.get.return_value = mock_cred_type
         mock_filter.return_value.exists.return_value = True
 
@@ -1828,12 +1830,15 @@ def test_create_mtls_eda_credential(
     }
 
     # Mock certificate validation to avoid complex certificate parsing
-    with patch(
-        "aap_eda.core.utils.credentials._validate_pem_certificate",
-        return_value=[],
-    ), patch(
-        "aap_eda.core.utils.credentials._validate_certificate_subject_format",
-        return_value=[],
+    with (
+        patch(
+            "aap_eda.core.utils.credentials._validate_pem_certificate",
+            return_value=[],
+        ),
+        patch(
+            "aap_eda.core.utils.credentials._validate_certificate_subject_format",  # noqa: E501
+            return_value=[],
+        ),
     ):
         response = admin_client.post(
             f"{api_url_v1}/eda-credentials/", data=data_in

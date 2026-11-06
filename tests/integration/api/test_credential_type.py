@@ -20,7 +20,7 @@ from ansible_base.lib.metadata import (
     build_tier2_frontend_pattern as _build_tier2,
 )
 from django.test import override_settings
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf as lazy_fixture
 from rest_framework import status
 from rest_framework.test import APIClient
 

@@ -25,12 +25,13 @@ from aap_eda.tasks.management import (
 @pytest.mark.django_db
 def test_submit_log_purge_uses_default_queue_uuid_and_purge_timeout():
     job_id = "712beb16-b7dd-40c9-aa29-a7f734376c7a"
-    with mock.patch(
-        "aap_eda.tasks.management.uuid4", return_value=job_id
-    ), mock.patch(
-        "aap_eda.tasks.management.submit_task",
-        return_value=({"uuid": job_id}, "default"),
-    ) as submit_task:
+    with (
+        mock.patch("aap_eda.tasks.management.uuid4", return_value=job_id),
+        mock.patch(
+            "aap_eda.tasks.management.submit_task",
+            return_value=({"uuid": job_id}, "default"),
+        ) as submit_task,
+    ):
         assert (
             submit_log_purge(
                 retention_duration="P1M",
@@ -62,12 +63,13 @@ def test_submit_log_purge_uses_default_queue_uuid_and_purge_timeout():
 @pytest.mark.django_db
 def test_submit_log_purge_forwards_scope_when_audit_is_disabled():
     job_id = "712beb16-b7dd-40c9-aa29-a7f734376c7a"
-    with mock.patch(
-        "aap_eda.tasks.management.uuid4", return_value=job_id
-    ), mock.patch(
-        "aap_eda.tasks.management.submit_task",
-        return_value=({"uuid": job_id}, "default"),
-    ) as submit_task:
+    with (
+        mock.patch("aap_eda.tasks.management.uuid4", return_value=job_id),
+        mock.patch(
+            "aap_eda.tasks.management.submit_task",
+            return_value=({"uuid": job_id}, "default"),
+        ) as submit_task,
+    ):
         submit_log_purge(
             before_date="2020-01-01",
             audit_trail=False,
@@ -107,12 +109,13 @@ def test_submitted_purge_all_logs_uses_same_command_and_job_id(
         log_timestamp=1,
     )
     job_id = "712beb16-b7dd-40c9-aa29-a7f734376c7a"
-    with mock.patch(
-        "aap_eda.tasks.management.uuid4", return_value=job_id
-    ), mock.patch(
-        "aap_eda.tasks.management.submit_task",
-        return_value=({"uuid": job_id}, "default"),
-    ) as submit_task:
+    with (
+        mock.patch("aap_eda.tasks.management.uuid4", return_value=job_id),
+        mock.patch(
+            "aap_eda.tasks.management.submit_task",
+            return_value=({"uuid": job_id}, "default"),
+        ) as submit_task,
+    ):
         assert submit_log_purge(purge_all_logs=True) == job_id
 
     worker_args = submit_task.call_args.kwargs["args"]
@@ -243,13 +246,14 @@ def test_worker_lock_contention_is_an_observable_skip():
         def __exit__(self, exc_type, exc, traceback):
             return False
 
-    with mock.patch(
-        "aap_eda.tasks.management.advisory_lock", return_value=NotAcquired()
-    ), mock.patch(
-        "aap_eda.tasks.management.call_command"
-    ) as call_command, mock.patch(
-        "aap_eda.tasks.management.logger.warning"
-    ) as log_warning:
+    with (
+        mock.patch(
+            "aap_eda.tasks.management.advisory_lock",
+            return_value=NotAcquired(),
+        ),
+        mock.patch("aap_eda.tasks.management.call_command") as call_command,
+        mock.patch("aap_eda.tasks.management.logger.warning") as log_warning,
+    ):
         result = _aap_eda_manage("locked-job", "purge_log_records", {})
 
     assert result["status"] == "skipped"
@@ -268,12 +272,14 @@ def test_worker_lock_contention_is_an_observable_skip():
     "failure", [CommandError("partial failure"), DispatcherCancel()]
 )
 def test_worker_propagates_command_and_timeout_failures(failure):
-    with mock.patch(
-        "aap_eda.tasks.management.call_command", side_effect=failure
-    ), mock.patch(
-        "aap_eda.tasks.management.logger.exception"
-    ) as log_exception, pytest.raises(
-        type(failure)
+    with (
+        mock.patch(
+            "aap_eda.tasks.management.call_command", side_effect=failure
+        ),
+        mock.patch(
+            "aap_eda.tasks.management.logger.exception"
+        ) as log_exception,
+        pytest.raises(type(failure)),
     ):
         _aap_eda_manage("failed-job", "purge_log_records", {})
 
@@ -288,12 +294,14 @@ def test_worker_propagates_command_and_timeout_failures(failure):
 def test_worker_logs_committed_partial_count_on_purge_failure():
     failure = CommandError("later batch failed")
     failure.__cause__ = LogPurgeError("later batch failed", 1000)
-    with mock.patch(
-        "aap_eda.tasks.management.call_command", side_effect=failure
-    ), mock.patch(
-        "aap_eda.tasks.management.logger.exception"
-    ) as log_exception, pytest.raises(
-        CommandError
+    with (
+        mock.patch(
+            "aap_eda.tasks.management.call_command", side_effect=failure
+        ),
+        mock.patch(
+            "aap_eda.tasks.management.logger.exception"
+        ) as log_exception,
+        pytest.raises(CommandError),
     ):
         _aap_eda_manage(
             "partial-job", "purge_log_records", {"date": "2020-01-01"}

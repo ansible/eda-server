@@ -24,12 +24,19 @@ from aap_eda.core.health import check_dispatcherd_workers_health
 def test_check_dispatcherd_workers_health_all_healthy():
     """Test check_dispatcherd_workers_health when both project and rulebook
     workers are healthy."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.check_rulebook_queue_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES", ["activation"]
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.check_rulebook_queue_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
+            ["activation"],
+        ),
     ):
         assert check_dispatcherd_workers_health() is True
 
@@ -48,12 +55,19 @@ def test_check_dispatcherd_workers_health_project_workers_unhealthy():
 def test_check_dispatcherd_workers_health_rulebook_workers_unhealthy():
     """Test check_dispatcherd_workers_health when rulebook workers are
     unhealthy."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.check_rulebook_queue_health", return_value=False
-    ), patch(
-        "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES", ["activation"]
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.check_rulebook_queue_health",
+            return_value=False,
+        ),
+        patch(
+            "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
+            ["activation"],
+        ),
     ):
         assert check_dispatcherd_workers_health() is False
 
@@ -62,9 +76,13 @@ def test_check_dispatcherd_workers_health_rulebook_workers_unhealthy():
 def test_check_dispatcherd_workers_health_no_rulebook_queues():
     """Test check_dispatcherd_workers_health when no rulebook queues are
     configured."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch("aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES", []):
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch("aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES", []),
+    ):
         assert check_dispatcherd_workers_health() is True
 
 
@@ -72,13 +90,19 @@ def test_check_dispatcherd_workers_health_no_rulebook_queues():
 def test_check_dispatcherd_workers_health_multiple_queues():
     """Test check_dispatcherd_workers_health with multiple rulebook queues
     checks all queues when no queue_name is specified."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.check_rulebook_queue_health", return_value=True
-    ) as mock_check_queue, patch(
-        "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
-        ["primary", "secondary", "tertiary"],
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.check_rulebook_queue_health",
+            return_value=True,
+        ) as mock_check_queue,
+        patch(
+            "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
+            ["primary", "secondary", "tertiary"],
+        ),
     ):
         result = check_dispatcherd_workers_health()
         assert result is True
@@ -111,13 +135,19 @@ def test_check_dispatcherd_workers_health_project_exception():
 def test_check_dispatcherd_workers_health_rulebook_exception():
     """Test check_dispatcherd_workers_health when rulebook queue check raises
     exception."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.check_rulebook_queue_health",
-        side_effect=RuntimeError("Queue inspection failed"),
-    ), patch(
-        "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES", ["activation"]
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.check_rulebook_queue_health",
+            side_effect=RuntimeError("Queue inspection failed"),
+        ),
+        patch(
+            "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
+            ["activation"],
+        ),
     ):
         assert check_dispatcherd_workers_health() is False
 
@@ -126,11 +156,15 @@ def test_check_dispatcherd_workers_health_rulebook_exception():
 def test_check_dispatcherd_workers_health_settings_exception():
     """Test check_dispatcherd_workers_health when accessing settings raises
     exception."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.getattr",
-        side_effect=AttributeError("Settings not available"),
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.getattr",
+            side_effect=AttributeError("Settings not available"),
+        ),
     ):
         assert check_dispatcherd_workers_health() is False
 
@@ -139,11 +173,16 @@ def test_check_dispatcherd_workers_health_settings_exception():
 def test_check_dispatcherd_workers_health_specific_queue():
     """Test check_dispatcherd_workers_health checks only the specified queue
     when queue_name is provided."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.check_rulebook_queue_health", return_value=True
-    ) as mock_check_queue:
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.check_rulebook_queue_health",
+            return_value=True,
+        ) as mock_check_queue,
+    ):
         result = check_dispatcherd_workers_health(queue_name="secondary")
         assert result is True
         mock_check_queue.assert_called_once_with("secondary")
@@ -157,14 +196,19 @@ def test_check_dispatcherd_workers_health_any_queue_healthy():
     def only_tertiary_healthy(queue):
         return queue == "tertiary"
 
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.check_rulebook_queue_health",
-        side_effect=only_tertiary_healthy,
-    ), patch(
-        "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
-        ["primary", "secondary", "tertiary"],
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.check_rulebook_queue_health",
+            side_effect=only_tertiary_healthy,
+        ),
+        patch(
+            "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
+            ["primary", "secondary", "tertiary"],
+        ),
     ):
         result = check_dispatcherd_workers_health()
         assert result is True
@@ -174,10 +218,15 @@ def test_check_dispatcherd_workers_health_any_queue_healthy():
 def test_check_dispatcherd_workers_health_specific_queue_raises():
     """Test that when raise_exceptions=True and the specified queue is
     unhealthy, WorkerUnavailable is raised with worker_type='activation'."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.check_rulebook_queue_health", return_value=False
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.check_rulebook_queue_health",
+            return_value=False,
+        ),
     ):
         with pytest.raises(api_exc.WorkerUnavailable) as exc_info:
             check_dispatcherd_workers_health(

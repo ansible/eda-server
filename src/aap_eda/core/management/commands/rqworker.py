@@ -27,6 +27,7 @@ Worker class mapping:
     * Default queue -> DefaultWorker
     * Activation queue -> ActivationWorker
 """
+
 import logging
 
 from django.core.management.base import BaseCommand

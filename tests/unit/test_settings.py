@@ -258,9 +258,9 @@ def test_k8s_resource_request_must_not_exceed_limit(
 
 def test_optional_type_exception_msg(mock_settings):
     """Test exception message when an optional type error occurs."""
-    mock_settings[
-        "WEBSOCKET_SSL_VERIFY"
-    ] = 123  # Use invalid type instead of string
+    mock_settings["WEBSOCKET_SSL_VERIFY"] = (
+        123  # Use invalid type instead of string
+    )
     with pytest.raises(
         ImproperlyConfigured,
         match="WEBSOCKET_SSL_VERIFY setting must be a bool or str",
