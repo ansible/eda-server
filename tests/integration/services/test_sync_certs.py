@@ -1,4 +1,5 @@
 """Unit tests for certificate synchronization service."""
+
 import hashlib
 from unittest.mock import Mock, patch
 

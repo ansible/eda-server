@@ -23,12 +23,13 @@ JOB_ID = UUID("c3dd8dd8-b1d5-49e0-86e9-216cb2c942a8")
 def test_superuser_queues_scoped_purge_with_one_eda_job_id(
     superuser_client, default_activation, new_activation
 ):
-    with mock.patch(
-        "aap_eda.tasks.management.uuid4", return_value=JOB_ID
-    ), mock.patch(
-        "aap_eda.tasks.management.submit_task",
-        return_value=({"uuid": str(JOB_ID)}, "default"),
-    ) as submit_task:
+    with (
+        mock.patch("aap_eda.tasks.management.uuid4", return_value=JOB_ID),
+        mock.patch(
+            "aap_eda.tasks.management.submit_task",
+            return_value=({"uuid": str(JOB_ID)}, "default"),
+        ) as submit_task,
+    ):
         response = superuser_client.post(
             PURGE_URL,
             {
@@ -87,12 +88,13 @@ def test_name_only_scope_is_queued_as_activation_id(
 
 @pytest.mark.django_db
 def test_superuser_queues_global_purge_with_absolute_date(superuser_client):
-    with mock.patch(
-        "aap_eda.tasks.management.uuid4", return_value=JOB_ID
-    ), mock.patch(
-        "aap_eda.tasks.management.submit_task",
-        return_value=({"uuid": str(JOB_ID)}, "default"),
-    ) as submit_task:
+    with (
+        mock.patch("aap_eda.tasks.management.uuid4", return_value=JOB_ID),
+        mock.patch(
+            "aap_eda.tasks.management.submit_task",
+            return_value=({"uuid": str(JOB_ID)}, "default"),
+        ) as submit_task,
+    ):
         response = superuser_client.post(
             PURGE_URL, {"before_date": "2020-01-01"}, format="json"
         )
@@ -108,12 +110,13 @@ def test_superuser_queues_global_purge_with_absolute_date(superuser_client):
 
 @pytest.mark.django_db
 def test_superuser_queues_purge_all_logs_without_cutoff(superuser_client):
-    with mock.patch(
-        "aap_eda.tasks.management.uuid4", return_value=JOB_ID
-    ), mock.patch(
-        "aap_eda.tasks.management.submit_task",
-        return_value=({"uuid": str(JOB_ID)}, "default"),
-    ) as submit_task:
+    with (
+        mock.patch("aap_eda.tasks.management.uuid4", return_value=JOB_ID),
+        mock.patch(
+            "aap_eda.tasks.management.submit_task",
+            return_value=({"uuid": str(JOB_ID)}, "default"),
+        ) as submit_task,
+    ):
         response = superuser_client.post(
             PURGE_URL, {"purge-all-logs": True}, format="json"
         )
@@ -173,12 +176,13 @@ def test_superuser_queues_purge_all_logs_with_retention_duration(
 def test_api_keeps_activation_scope_when_audit_is_disabled(
     superuser_client, default_activation
 ):
-    with mock.patch(
-        "aap_eda.tasks.management.uuid4", return_value=JOB_ID
-    ), mock.patch(
-        "aap_eda.tasks.management.submit_task",
-        return_value=({"uuid": str(JOB_ID)}, "default"),
-    ) as submit_task:
+    with (
+        mock.patch("aap_eda.tasks.management.uuid4", return_value=JOB_ID),
+        mock.patch(
+            "aap_eda.tasks.management.submit_task",
+            return_value=({"uuid": str(JOB_ID)}, "default"),
+        ) as submit_task,
+    ):
         response = superuser_client.post(
             PURGE_URL,
             {

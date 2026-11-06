@@ -21,6 +21,7 @@ Task configuration has moved to:
     * DISPATCHERD_STARTUP_TASKS - one-time tasks executed at startup
     * DISPATCHERD_SCHEDULE_TASKS - recurring tasks with intervals
 """
+
 import logging
 import signal
 import time

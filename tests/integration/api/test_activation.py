@@ -2766,9 +2766,9 @@ def test_update_activation_change_rule_engine_credential(
     activation_payload["is_enabled"] = False  # Must be disabled to update
     activation_payload["eda_credentials"] = [aap_credential.id]
     activation_payload["enable_persistence"] = True
-    activation_payload[
-        "rule_engine_credential_id"
-    ] = rule_engine_credential_1.id
+    activation_payload["rule_engine_credential_id"] = (
+        rule_engine_credential_1.id
+    )
 
     response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload

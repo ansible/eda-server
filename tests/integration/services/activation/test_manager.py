@@ -21,8 +21,8 @@ import pytest
 from _pytest.logging import LogCaptureFixture
 from django.conf import settings as django_settings
 from django.utils import timezone
-from pytest_django.fixtures import SettingsWrapper
-from pytest_lazyfixture import lazy_fixture
+from pytest_django.fixtures import Settings
+from pytest_lazy_fixtures import lf as lazy_fixture
 
 from aap_eda.core import enums, models
 from aap_eda.services.activation.activation_manager import (
@@ -41,7 +41,7 @@ from aap_eda.services.activation.engine.kubernetes import (
 from aap_eda.services.activation.status_manager import StatusManager
 
 
-def apply_settings(settings: SettingsWrapper, **kwargs):
+def apply_settings(settings: Settings, **kwargs):
     """Apply settings."""
     for key, value in kwargs.items():
         setattr(settings, key, value)
@@ -203,7 +203,7 @@ def failing_cleanup(container_engine_mock):
 @pytest.mark.django_db
 def test_get_container_request(
     activation_with_instance: models.Activation,
-    settings: SettingsWrapper,
+    settings: Settings,
     container_engine_mock: MagicMock,
 ):
     """Test build_cmdline."""
@@ -1530,7 +1530,7 @@ def test_handle_unresponsive_activation_fails_instance_on_success(
 @pytest.mark.django_db
 def test_create_activation_instance_records_k8s_namespace(
     basic_activation: models.Activation,
-    settings: SettingsWrapper,
+    settings: Settings,
 ):
     """When engine is KubernetesEngine, namespace is recorded on process."""
     override_settings = {
@@ -1664,7 +1664,7 @@ def test_failed_k8s_start_does_not_log_job_started(
 def test_create_activation_instance_null_namespace_non_k8s(
     basic_activation: models.Activation,
     container_engine_mock: MagicMock,
-    settings: SettingsWrapper,
+    settings: Settings,
 ):
     """Non-K8s engine leaves activation_job_namespace as None."""
     override_settings = {
