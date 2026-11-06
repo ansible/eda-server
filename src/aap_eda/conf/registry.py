@@ -34,12 +34,10 @@ ANALYTICS_GATHER_INTERVAL = 4 * 3600  # 4 hours
 logger = logging.getLogger(__name__)
 
 
-class InvalidKeyError(Exception):
-    ...
+class InvalidKeyError(Exception): ...
 
 
-class InvalidValueError(Exception):
-    ...
+class InvalidValueError(Exception): ...
 
 
 @dataclass

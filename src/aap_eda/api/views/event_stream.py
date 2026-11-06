@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 """EventStream configuration API Set."""
+
 import logging
 
 from ansible_base.rbac.api.related import check_related_permissions
