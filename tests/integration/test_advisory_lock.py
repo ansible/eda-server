@@ -1,3 +1,4 @@
+import importlib
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 from contextlib import ExitStack
@@ -63,15 +64,11 @@ from tests.integration.utils import ThreadSafeList
 def test_job_uniqueness(module_data):
     call_log = []
     lock = Lock()
+    module = importlib.import_module(module_data["module_path"])
+    importlib.reload(module)
 
     def _wrapper_call(shared_list):
         """Patch fn mock in a thread-safe way inside each thread."""
-        import importlib
-
-        module = importlib.import_module(module_data["module_path"])
-
-        importlib.reload(module)
-
         patches = [
             mock.patch(
                 f"{module_data['module_path']}.{module_data['fn_mock']}",
