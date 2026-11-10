@@ -131,9 +131,12 @@ def test_podman_socket_url_as_root(settings):
 def test_podman_socket_url_non_root_with_xdg_runtime_dir(settings):
     """Test for a non-root user with XDG_RUNTIME_DIR set."""
     settings.PODMAN_SOCKET_URL = None
-    with mock.patch("os.getuid", return_value=1000), mock.patch(
-        "os.getenv",
-        return_value="/custom/runtime/dir",
+    with (
+        mock.patch("os.getuid", return_value=1000),
+        mock.patch(
+            "os.getenv",
+            return_value="/custom/runtime/dir",
+        ),
     ):
         result = _get_podman_socket_url()
         assert result == "unix:///custom/runtime/dir/podman/podman.sock"

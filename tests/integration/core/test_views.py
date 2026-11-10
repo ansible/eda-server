@@ -39,11 +39,14 @@ def test_status_view():
 def test_status_view_database_failure():
     client = APIClient()
     client.force_authenticate(user=None)
-    with patch(
-        "aap_eda.core.views.StatusView._check_database", return_value=False
-    ), patch(
-        "aap_eda.core.views.check_dispatcherd_workers_health",
-        return_value=True,
+    with (
+        patch(
+            "aap_eda.core.views.StatusView._check_database", return_value=False
+        ),
+        patch(
+            "aap_eda.core.views.check_dispatcherd_workers_health",
+            return_value=True,
+        ),
     ):
         response = client.get(f"{api_url_v1}/status/")
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -75,11 +78,14 @@ def test_status_view_multiple_failures():
     """Test status view when both database and dispatcherd fail."""
     client = APIClient()
     client.force_authenticate(user=None)
-    with patch(
-        "aap_eda.core.views.StatusView._check_database", return_value=False
-    ), patch(
-        "aap_eda.core.views.check_dispatcherd_workers_health",
-        return_value=False,
+    with (
+        patch(
+            "aap_eda.core.views.StatusView._check_database", return_value=False
+        ),
+        patch(
+            "aap_eda.core.views.check_dispatcherd_workers_health",
+            return_value=False,
+        ),
     ):
         response = client.get(f"{api_url_v1}/status/")
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -94,12 +100,19 @@ def test_status_view_multiple_failures():
 def test_check_dispatcherd_all_workers_healthy():
     """Test check_dispatcherd_workers_health when both default and activation
     workers are healthy."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.check_rulebook_queue_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES", ["activation"]
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.check_rulebook_queue_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
+            ["activation"],
+        ),
     ):
         assert check_dispatcherd_workers_health() is True
 
@@ -117,12 +130,19 @@ def test_check_dispatcherd_default_workers_unhealthy():
 @pytest.mark.django_db
 def test_check_dispatcherd_activation_workers_unhealthy():
     """Test _check_dispatcherd when activation workers are unhealthy."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.check_rulebook_queue_health", return_value=False
-    ), patch(
-        "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES", ["activation"]
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.check_rulebook_queue_health",
+            return_value=False,
+        ),
+        patch(
+            "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
+            ["activation"],
+        ),
     ):
         assert check_dispatcherd_workers_health() is False
 
@@ -130,9 +150,13 @@ def test_check_dispatcherd_activation_workers_unhealthy():
 @pytest.mark.django_db
 def test_check_dispatcherd_no_rulebook_queues():
     """Test _check_dispatcherd when no rulebook queues are configured."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch("aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES", []):
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch("aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES", []),
+    ):
         assert check_dispatcherd_workers_health() is True
 
 
@@ -149,13 +173,19 @@ def test_check_dispatcherd_exception_handling():
 @pytest.mark.django_db
 def test_check_dispatcherd_multiple_queues():
     """Test _check_dispatcherd with multiple rulebook queues (checks first)."""
-    with patch(
-        "aap_eda.core.health.check_default_worker_health", return_value=True
-    ), patch(
-        "aap_eda.core.health.check_rulebook_queue_health", return_value=True
-    ) as mock_check_queue, patch(
-        "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
-        ["activation", "secondary", "tertiary"],
+    with (
+        patch(
+            "aap_eda.core.health.check_default_worker_health",
+            return_value=True,
+        ),
+        patch(
+            "aap_eda.core.health.check_rulebook_queue_health",
+            return_value=True,
+        ) as mock_check_queue,
+        patch(
+            "aap_eda.core.health.settings.RULEBOOK_WORKER_QUEUES",
+            ["activation", "secondary", "tertiary"],
+        ),
     ):
         result = check_dispatcherd_workers_health()
         assert result is True
