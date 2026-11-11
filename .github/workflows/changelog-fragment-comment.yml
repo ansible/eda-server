@@ -1,0 +1,20 @@
+---
+# Companion workflow: posts changelog fragment results as PR comments.
+# Uses workflow_run trigger (fork-safe pattern).
+# Jira: AAP-86437
+name: "API: Changelog Fragment Comment"
+
+on:
+  workflow_run:
+    workflows: ["API: Changelog Fragment Enforcement"]
+    types:
+      - completed
+
+permissions:
+  pull-requests: write
+  actions: read
+
+jobs:
+  comment:
+    # djyasin/actions for test; production: ansible/actions@<tag>
+    uses: djyasin/actions/.github/workflows/openapi-post-changelog-comment.yml@feat/changelog-fragment-enforcement # PR #167
