@@ -7,8 +7,6 @@ from unittest import mock
 
 import pytest
 
-from tests.integration.utils import ThreadSafeList
-
 
 @pytest.mark.parametrize(
     "module_data",
@@ -67,49 +65,49 @@ def test_job_uniqueness(module_data):
     module = importlib.import_module(module_data["module_path"])
     importlib.reload(module)
 
-    def _wrapper_call(shared_list):
-        """Patch fn mock in a thread-safe way inside each thread."""
-        patches = [
+    patches = [
+        mock.patch(
+            f"{module_data['module_path']}.{module_data['fn_mock']}",
+        ),
+    ]
+
+    # Add mock for get_insights_tracking_state for analytics tests
+    if module_data["fn_call"] == "gather_analytics":
+        patches.append(
             mock.patch(
-                f"{module_data['module_path']}.{module_data['fn_mock']}",
-            ),
-        ]
-
-        # Add mock for get_insights_tracking_state for analytics tests
-        if module_data["fn_call"] == "gather_analytics":
-            patches.append(
-                mock.patch(
-                    "aap_eda.analytics.utils.get_insights_tracking_state",
-                    return_value=True,
-                )
+                "aap_eda.analytics.utils.get_insights_tracking_state",
+                return_value=True,
             )
-
-        with ExitStack() as stack:
-            mocks = [stack.enter_context(patch) for patch in patches]
-            fn_mock = mocks[0]
-
-            def record_call(void=None, **kwargs):
-                time.sleep(1)
-                shared_list.append("called")
-
-            fn_mock.side_effect = record_call
-            try:
-                getattr(module, module_data["fn_call"])(
-                    *module_data["fn_args"],
-                )
-            except Exception as e:
-                pytest.fail(
-                    f"Exception raised in {module_data['fn_call']}: {e}"
-                )
+        )
 
     def thread_safe_call():
-        _wrapper_call(ThreadSafeList(call_log, lock))
+        try:
+            getattr(module, module_data["fn_call"])(
+                *module_data["fn_args"],
+            )
+        except Exception as e:
+            pytest.fail(f"Exception raised in {module_data['fn_call']}: {e}")
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [
-            executor.submit(thread_safe_call),
-            executor.submit(thread_safe_call),
-        ]
-        wait(futures, timeout=3)
+    # Patch once, outside the worker threads. Patching inside each thread
+    # races: the first thread to leave its ExitStack restores the original
+    # attribute and clobbers the mock the other thread still relies on, so
+    # neither call reaches the side effect and the assertion below sees 0.
+    with ExitStack() as stack:
+        mocks = [stack.enter_context(patch) for patch in patches]
+        fn_mock = mocks[0]
+
+        def record_call(void=None, **kwargs):
+            time.sleep(1)
+            with lock:
+                call_log.append("called")
+
+        fn_mock.side_effect = record_call
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(thread_safe_call),
+                executor.submit(thread_safe_call),
+            ]
+            wait(futures, timeout=3)
 
     assert len(call_log) == 1
