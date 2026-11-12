@@ -108,6 +108,16 @@ def test_job_uniqueness(module_data):
                 executor.submit(thread_safe_call),
                 executor.submit(thread_safe_call),
             ]
-            wait(futures, timeout=3)
+            done, not_done = wait(futures, timeout=3)
+
+            # Surface worker exceptions (including pytest.fail) instead of
+            # letting the call_log assertion mask them.
+            for future in done:
+                future.result()
+
+            if not_done:
+                pytest.fail(
+                    f"{len(not_done)} worker(s) did not finish within 3s"
+                )
 
     assert len(call_log) == 1
