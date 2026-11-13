@@ -1,4 +1,5 @@
 """Serializer for CredentialInputSource."""
+
 #  Copyright 2025 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");

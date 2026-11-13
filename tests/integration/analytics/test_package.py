@@ -54,9 +54,12 @@ def test_get_ingress_url(package: Package, mock_settings) -> None:
     mock_credentials = MagicMock()
     mock_credentials.return_value.exists.return_value = False
 
-    with patch("aap_eda.analytics.utils.settings", new=mock_settings), patch(
-        "aap_eda.analytics.utils._get_analytics_credentials",
-        return_value=mock_credentials,
+    with (
+        patch("aap_eda.analytics.utils.settings", new=mock_settings),
+        patch(
+            "aap_eda.analytics.utils._get_analytics_credentials",
+            return_value=mock_credentials,
+        ),
     ):
         assert package.get_ingress_url() == "https://test.url"
 
@@ -99,11 +102,14 @@ def test_credential_priority(package, mock_settings):
     mock_credentials = MagicMock()
     mock_credentials.return_value.exists.return_value = False
 
-    with patch(
-        "aap_eda.analytics.utils.application_settings", new=mock_settings
-    ), patch(
-        "aap_eda.analytics.utils._get_analytics_credentials",
-        return_value=mock_credentials,
+    with (
+        patch(
+            "aap_eda.analytics.utils.application_settings", new=mock_settings
+        ),
+        patch(
+            "aap_eda.analytics.utils._get_analytics_credentials",
+            return_value=mock_credentials,
+        ),
     ):
         with override_settings(
             REDHAT_USERNAME=rh_user,
@@ -121,12 +127,11 @@ def test_credential_priority(package, mock_settings):
 
 
 def test_service_account_auth_with_valid_token(package, mock_session):
-    with patch.object(package, "shipping_auth_mode") as mock_auth_mode, patch(
-        "aap_eda.analytics.utils.get_proxy_url"
-    ) as mock_proxy, patch(
-        "aap_eda.analytics.utils.get_cert_path"
-    ) as mock_cert, patch(
-        "aap_eda.analytics.utils.generate_token"
+    with (
+        patch.object(package, "shipping_auth_mode") as mock_auth_mode,
+        patch("aap_eda.analytics.utils.get_proxy_url") as mock_proxy,
+        patch("aap_eda.analytics.utils.get_cert_path") as mock_cert,
+        patch("aap_eda.analytics.utils.generate_token"),
     ):
         mock_auth_mode.return_value = package.SHIPPING_AUTH_SERVICE_ACCOUNT
         package.token.is_expired = lambda: False
@@ -147,9 +152,10 @@ def test_service_account_auth_with_valid_token(package, mock_session):
 
 
 def test_service_account_auth_with_token_renewal(package, mock_session):
-    with patch.object(package, "shipping_auth_mode") as mock_auth_mode, patch(
-        "aap_eda.analytics.utils.generate_token"
-    ) as mock_gen_token:
+    with (
+        patch.object(package, "shipping_auth_mode") as mock_auth_mode,
+        patch("aap_eda.analytics.utils.generate_token") as mock_gen_token,
+    ):
         mock_auth_mode.return_value = package.SHIPPING_AUTH_SERVICE_ACCOUNT
         package.token.is_expired = lambda: True
         new_token = MagicMock(access_token="new_token_123")
@@ -163,15 +169,12 @@ def test_service_account_auth_with_token_renewal(package, mock_session):
 
 
 def test_userpass_auth(package, mock_session):
-    with patch.object(
-        package, "shipping_auth_mode"
-    ) as mock_auth_mode, patch.object(
-        package, "_get_rh_user"
-    ) as mock_user, patch.object(
-        package, "_get_rh_password"
-    ) as mock_pass, patch(
-        "aap_eda.analytics.utils.get_cert_path"
-    ) as mock_cert:
+    with (
+        patch.object(package, "shipping_auth_mode") as mock_auth_mode,
+        patch.object(package, "_get_rh_user") as mock_user,
+        patch.object(package, "_get_rh_password") as mock_pass,
+        patch("aap_eda.analytics.utils.get_cert_path") as mock_cert,
+    ):
         mock_auth_mode.return_value = package.SHIPPING_AUTH_USERPASS
         mock_user.return_value = "test_user"
         mock_pass.return_value = "test_pass"
