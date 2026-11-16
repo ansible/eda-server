@@ -6,10 +6,10 @@ name: "API: Breaking Change Detection"
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     branches:
       - main
       - stable-*
-      - AAP-86437-*
 
 permissions:
   contents: read
