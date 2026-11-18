@@ -17,6 +17,7 @@ from typing import Optional, Union
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from django.conf import settings
 from django.utils.encoding import force_bytes
@@ -61,3 +62,5 @@ class Fernet256(Fernet):
 
         self._signing_key = key[:32]
         self._encryption_key = key[32:]
+        # Required for compatibility with cryptography >= 50.0.0
+        self._aes = algorithms.AES(self._encryption_key)
