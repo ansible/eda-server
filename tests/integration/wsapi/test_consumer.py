@@ -63,19 +63,23 @@ def eda_caplog(caplog_factory):
     return caplog_factory(logger)
 
 
-@pytest.fixture
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_without_credentials(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
+    preseed_credential_types,
 ):
     rulebook_process_with_extra_var = await _prepare_db_data(
         default_organization
     )
     rulebook_process_without_extra_var = (
-        await _prepare_activation_instance_without_extra_var()
+        await _prepare_activation_instance_without_extra_var(
+            default_organization
+        )
     )
-    rulebook_process_no_token = await _prepare_activation_instance_no_token()
+    rulebook_process_no_token = await _prepare_activation_instance_no_token(
+        default_organization
+    )
 
     payload = {
         "type": "Worker",
