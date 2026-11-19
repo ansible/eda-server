@@ -18,13 +18,19 @@ from django.apps import apps
 
 from aap_eda.core import enums, models
 from aap_eda.core.management.commands.create_initial_data import (
+    CREDENTIAL_TYPES,
     EVENT_STREAM_OAUTH2_JWT_INPUTS,
-    OAUTH2_JWT_DESCRIPTION,
-    OAUTH2_JWT_REQUIRED_CLAIMS_FIELD,
 )
 
 migration = import_module(
     "aap_eda.core.migrations.0076_oauth2_jwt_required_claims"
+)
+
+
+OAUTH2_JWT_DESCRIPTION = next(
+    ctype["description"]
+    for ctype in CREDENTIAL_TYPES
+    if ctype["name"] == enums.EventStreamCredentialType.OAUTH2_JWT
 )
 
 
@@ -48,9 +54,12 @@ def pre_migration_jwt_type(preseed_credential_types):
     return ctype
 
 
-def test_migration_field_matches_create_initial_data():
-    """The inlined migration copy must stay in sync with seed data."""
-    assert migration.REQUIRED_CLAIMS_FIELD == OAUTH2_JWT_REQUIRED_CLAIMS_FIELD
+def test_migration_description_matches_create_initial_data():
+    """The inlined migration description must stay in sync with seed data.
+
+    The inlined field is covered by test_forward_adds_required_claims,
+    which compares the migrated inputs to the seed data inputs.
+    """
     assert migration.NEW_DESCRIPTION == OAUTH2_JWT_DESCRIPTION
 
 
