@@ -240,10 +240,8 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
             return {}
         try:
             claims = yaml.safe_load(value)
-        except yaml.YAMLError as err:
-            message = "Invalid required claims configuration"
-            logger.error(message)
-            raise AuthenticationFailed(message) from err
+        except yaml.YAMLError:
+            claims = None
         if not isinstance(claims, dict):
             message = "Invalid required claims configuration"
             logger.error(message)

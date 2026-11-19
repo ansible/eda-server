@@ -16,10 +16,13 @@ from unittest.mock import patch
 import jwt
 import pytest
 from rest_framework import status
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.renderers import JSONRenderer
 from rest_framework.test import APIClient
 
+from aap_eda.api.views.external_event_stream import ExternalEventStreamViewSet
 from aap_eda.core import enums, models
+from aap_eda.core.utils.credentials import inputs_to_store
 from tests.integration.api.test_event_stream import (
     create_event_stream,
     create_event_stream_credential,
@@ -183,3 +186,94 @@ def test_create_oauth2_jwt_credential_with_invalid_required_claims(
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json()["inputs.required_claims"] == [error]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, {}),
+        ("", {}),
+        (
+            '{"iss": "https://idp.example.com"}',
+            {"iss": "https://idp.example.com"},
+        ),
+        ("groups:\n  - eda-senders\n", {"groups": ["eda-senders"]}),
+    ],
+)
+def test_parse_required_claims(value, expected):
+    assert ExternalEventStreamViewSet._parse_required_claims(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "iss: [unclosed",  # not valid YAML
+        "- eda-senders",  # valid YAML but not a mapping
+        "just a string",
+    ],
+)
+def test_parse_required_claims_invalid_fails_closed(value):
+    with pytest.raises(
+        AuthenticationFailed, match="Invalid required claims configuration"
+    ):
+        ExternalEventStreamViewSet._parse_required_claims(value)
+
+
+@pytest.mark.django_db
+def test_post_event_stream_with_corrupt_stored_required_claims(
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """A stored value that bypassed save-time validation must reject."""
+    header_key = "Authorization"
+    inputs = {
+        "auth_type": "oauth2-jwt",
+        "jwks_url": "https://my_as_server/.well-known/jwks.json",
+        "audience": "",
+        "required_claims": '{"iss": "https://idp.example.com"}',
+        "http_header_key": header_key,
+    }
+    obj = create_event_stream_credential(
+        admin_client, enums.EventStreamCredentialType.OAUTH2_JWT.value, inputs
+    )
+    event_stream = create_event_stream(
+        admin_client,
+        {
+            "name": "test-es-corrupt-claims",
+            "eda_credential_id": obj["id"],
+            "event_stream_type": obj["credential_type"]["kind"],
+            "organization_id": get_default_test_org().id,
+            "test_mode": True,
+        },
+    )
+
+    # Bypass API validation to emulate a corrupt stored value
+    credential = models.EdaCredential.objects.get(pk=obj["id"])
+    credential.inputs = inputs_to_store(
+        {**inputs, "required_claims": "- not-a-mapping"}
+    )
+    credential.save(update_fields=["inputs"])
+
+    content_type = "application/json"
+    with patch("aap_eda.api.event_stream_authentication.PyJWKClient"):
+        with patch(
+            "aap_eda.api.event_stream_authentication.jwt_decode",
+            return_value={"iss": "https://idp.example.com"},
+        ) as mock_decode:
+            response = admin_client.post(
+                event_stream_post_url(event_stream.uuid),
+                headers={
+                    header_key: "Bearer dummy",
+                    "Content-Type": content_type,
+                },
+                data=JSONRenderer().render({"a": 1}),
+                content_type=content_type,
+            )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    mock_decode.assert_not_called()
+    event_stream.refresh_from_db()
+    assert event_stream.events_received == 1
+    assert "Invalid required claims configuration" in (
+        event_stream.test_error_message
+    )
