@@ -168,6 +168,7 @@ class Oauth2JwtAuthentication(EventStreamAuthentication):
     jwks_url: str
     audience: str
     access_token: str
+    required_claims: Optional[dict] = None
 
     def authenticate(self, _body=None):
         """Handle OAuth2 JWT authentication."""
@@ -196,7 +197,7 @@ class Oauth2JwtAuthentication(EventStreamAuthentication):
                 options["verify_aud"] = True
 
             signing_key = jwks_client.get_signing_key_from_jwt(token)
-            jwt_decode(
+            claims = jwt_decode(
                 token,
                 signing_key.key,
                 algorithms=["RS256"],
@@ -207,6 +208,65 @@ class Oauth2JwtAuthentication(EventStreamAuthentication):
             message = f"JWT error: {err}"
             logger.warning(message)
             raise AuthenticationFailed(message) from err
+
+        if self.required_claims:
+            _validate_required_claims(self.required_claims, claims)
+
+
+def _validate_required_claims(
+    required: dict, claims: dict, prefix: str = ""
+) -> None:
+    """Check that the decoded JWT claims satisfy the required claims.
+
+    Matching rules:
+      * Scalars must be equal.
+      * If the token claim is a list it must contain the required
+        value, or every required value when a list is required.
+      * Nested objects are matched recursively.
+
+    Claim values are deliberately left out of error messages.
+    """
+    for name, expected in required.items():
+        path = f"{prefix}{name}"
+        if not isinstance(claims, dict) or name not in claims:
+            _claim_failure(f"JWT is missing required claim '{path}'")
+
+        actual = claims[name]
+        if isinstance(expected, dict):
+            if not isinstance(actual, dict):
+                _claim_failure(
+                    f"JWT claim '{path}' does not match the required value"
+                )
+            _validate_required_claims(expected, actual, f"{path}.")
+        elif not _claim_value_matches(expected, actual):
+            _claim_failure(
+                f"JWT claim '{path}' does not match the required value"
+            )
+
+
+def _claim_value_matches(expected, actual) -> bool:
+    if isinstance(actual, list):
+        wanted = expected if isinstance(expected, list) else [expected]
+        return all(
+            any(_scalar_equal(item, value) for value in actual)
+            for item in wanted
+        )
+    if isinstance(expected, list):
+        # A scalar claim can't contain several required values
+        return len(expected) == 1 and _scalar_equal(expected[0], actual)
+    return _scalar_equal(expected, actual)
+
+
+def _scalar_equal(expected, actual) -> bool:
+    # Avoid Python treating True == 1 and False == 0 as matches
+    if isinstance(expected, bool) or isinstance(actual, bool):
+        return expected is actual
+    return expected == actual
+
+
+def _claim_failure(message: str):
+    logger.warning(message)
+    raise AuthenticationFailed(message)
 
 
 @dataclass
