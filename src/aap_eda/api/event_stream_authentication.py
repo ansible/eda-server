@@ -248,19 +248,37 @@ def _claim_value_matches(expected, actual) -> bool:
     if isinstance(actual, list):
         wanted = expected if isinstance(expected, list) else [expected]
         return all(
-            any(_scalar_equal(item, value) for value in actual)
+            any(_strict_equal(item, value) for value in actual)
             for item in wanted
         )
     if isinstance(expected, list):
         # A scalar claim can't contain several required values
-        return len(expected) == 1 and _scalar_equal(expected[0], actual)
-    return _scalar_equal(expected, actual)
+        return len(expected) == 1 and _strict_equal(expected[0], actual)
+    return _strict_equal(expected, actual)
 
 
-def _scalar_equal(expected, actual) -> bool:
-    # Avoid Python treating True == 1 and False == 0 as matches
+def _strict_equal(expected, actual) -> bool:
+    """Deep equality that never treats booleans as equal to integers.
+
+    Python's ``==`` considers True == 1 and False == 0, including inside
+    dicts and lists, so containers are compared element by element.
+    """
     if isinstance(expected, bool) or isinstance(actual, bool):
         return expected is actual
+    if isinstance(expected, dict) or isinstance(actual, dict):
+        return (
+            isinstance(expected, dict)
+            and isinstance(actual, dict)
+            and expected.keys() == actual.keys()
+            and all(_strict_equal(expected[k], actual[k]) for k in expected)
+        )
+    if isinstance(expected, list) or isinstance(actual, list):
+        return (
+            isinstance(expected, list)
+            and isinstance(actual, list)
+            and len(expected) == len(actual)
+            and all(map(_strict_equal, expected, actual))
+        )
     return expected == actual
 
 

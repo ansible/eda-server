@@ -29,6 +29,11 @@ TOKEN_CLAIMS = {
     "email_verified": True,
     "level": 1,
     "realm_access": {"roles": ["eda", "admin"], "tier": "gold"},
+    "permissions": [
+        {"name": "eda", "admin": True, "level": 1},
+        {"name": "ops", "admin": False, "level": 0},
+    ],
+    "matrix": [[1, 0], [True, False]],
 }
 
 
@@ -67,6 +72,11 @@ def _authenticate(required_claims, claims=None):
         # nested objects are matched recursively
         {"realm_access": {"roles": "eda"}},
         {"realm_access": {"roles": ["admin", "eda"], "tier": "gold"}},
+        # dict and nested-list values inside list claims
+        {"permissions": [{"name": "eda", "admin": True, "level": 1}]},
+        {"permissions": [{"name": "ops", "admin": False, "level": 0}]},
+        {"matrix": [[True, False]]},
+        {"matrix": [[1, 0], [True, False]]},
     ],
 )
 def test_required_claims_satisfied(required_claims):
@@ -94,6 +104,30 @@ def test_required_claims_satisfied(required_claims):
         (
             {"realm_access": {"region": "us"}},
             "missing required claim 'realm_access.region'",
+        ),
+        # bool/int must not match inside dicts in a list claim; each of
+        # these would match a token element under Python's loose ==
+        (
+            {"permissions": [{"name": "eda", "admin": 1, "level": 1}]},
+            "claim 'permissions' does not match",
+        ),
+        (
+            {"permissions": [{"name": "eda", "admin": True, "level": True}]},
+            "claim 'permissions' does not match",
+        ),
+        (
+            {"permissions": [{"name": "ops", "admin": 0, "level": 0}]},
+            "claim 'permissions' does not match",
+        ),
+        # bool/int must not match inside nested lists (loose == would
+        # match [True, 0] to [1, 0] and [1, False] to [True, False])
+        ({"matrix": [[True, 0]]}, "claim 'matrix' does not match"),
+        ({"matrix": [[1, False]]}, "claim 'matrix' does not match"),
+        # element shape must match exactly
+        ({"matrix": [[1]]}, "claim 'matrix' does not match"),
+        (
+            {"permissions": [{"name": "eda", "admin": True}]},
+            "claim 'permissions' does not match",
         ),
     ],
 )
