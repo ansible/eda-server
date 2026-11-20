@@ -11,10 +11,13 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import json
+import time
 from unittest.mock import patch
 
 import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.renderers import JSONRenderer
@@ -277,3 +280,86 @@ def test_post_event_stream_with_corrupt_stored_required_claims(
     assert "Invalid required claims configuration" in (
         event_stream.test_error_message
     )
+
+
+@pytest.mark.parametrize(
+    ("token_signer", "auth_status"),
+    [
+        ("trusted", status.HTTP_200_OK),
+        ("untrusted", status.HTTP_403_FORBIDDEN),
+    ],
+)
+@pytest.mark.django_db
+def test_post_event_stream_legacy_credential_with_signed_jwt(
+    admin_client: APIClient,
+    preseed_credential_types,
+    token_signer,
+    auth_status,
+):
+    """Credentials saved before required_claims existed keep working.
+
+    Their stored inputs have no required_claims key at all. A real RS256
+    token is verified against a JWKS; only the JWKS fetch is stubbed.
+    """
+    header_key = "Authorization"
+    inputs = {
+        "auth_type": "oauth2-jwt",
+        "jwks_url": "https://my_as_server/.well-known/jwks.json",
+        "audience": "eda",
+        "http_header_key": header_key,
+    }
+    obj = create_event_stream_credential(
+        admin_client, enums.EventStreamCredentialType.OAUTH2_JWT.value, inputs
+    )
+    event_stream = create_event_stream(
+        admin_client,
+        {
+            "name": "test-es-legacy",
+            "eda_credential_id": obj["id"],
+            "event_stream_type": obj["credential_type"]["kind"],
+            "organization_id": get_default_test_org().id,
+            "test_mode": True,
+        },
+    )
+
+    # Rewrite stored inputs exactly as a pre-upgrade install has them
+    credential = models.EdaCredential.objects.get(pk=obj["id"])
+    credential.inputs = inputs_to_store(inputs)
+    credential.save(update_fields=["inputs"])
+    credential.refresh_from_db()
+    assert "required_claims" not in credential.inputs.get_secret_value()
+
+    trusted_key = rsa.generate_private_key(
+        public_exponent=65537, key_size=2048
+    )
+    jwk = json.loads(
+        jwt.algorithms.RSAAlgorithm.to_jwk(trusted_key.public_key())
+    )
+    jwk.update({"kid": "k1", "use": "sig", "alg": "RS256"})
+    signer = (
+        trusted_key
+        if token_signer == "trusted"
+        else rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    )
+    now = int(time.time())
+    token = jwt.encode(
+        {"iss": "https://idp.example.com", "aud": "eda", "exp": now + 300},
+        signer,
+        algorithm="RS256",
+        headers={"kid": "k1"},
+    )
+
+    content_type = "application/json"
+    with patch.object(
+        jwt.PyJWKClient, "fetch_data", return_value={"keys": [jwk]}
+    ):
+        response = admin_client.post(
+            event_stream_post_url(event_stream.uuid),
+            headers={
+                header_key: f"Bearer {token}",
+                "Content-Type": content_type,
+            },
+            data=JSONRenderer().render({"a": 1}),
+            content_type=content_type,
+        )
+    assert response.status_code == auth_status
