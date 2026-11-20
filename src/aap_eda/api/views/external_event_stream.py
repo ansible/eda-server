@@ -228,6 +228,26 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
             ]
         )
 
+    @staticmethod
+    def _parse_required_claims(value: Any) -> dict:
+        """Parse the optional required_claims credential input.
+
+        Input is validated when the credential is saved, but fail closed
+        if a stored value is somehow unparseable, since ignoring it would
+        silently skip claim validation.
+        """
+        if not value:
+            return {}
+        try:
+            claims = yaml.safe_load(value)
+        except yaml.YAMLError:
+            claims = None
+        if not isinstance(claims, dict):
+            message = "Invalid required claims configuration"
+            logger.error(message)
+            raise AuthenticationFailed(message)
+        return claims
+
     def _handle_auth(self, request, inputs):
         try:
             if inputs["auth_type"] == EventStreamAuthType.HMAC:
@@ -263,6 +283,9 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                     jwks_url=inputs["jwks_url"],
                     audience=inputs["audience"],
                     access_token=request.headers[inputs["http_header_key"]],
+                    required_claims=self._parse_required_claims(
+                        inputs.get("required_claims")
+                    ),
                 )
                 obj.authenticate()
             elif inputs["auth_type"] == EventStreamAuthType.OAUTH2:

@@ -67,6 +67,7 @@ VALID_FIELD_FORMATS = {
     "ssh_private_key",
     "url",
     "vault_id",
+    "yaml_dict",
 }
 OWASP_ITERATION_RECOMMENDATION = 600000
 MINIMUM_AES_SECRET_LEN = 12
@@ -630,7 +631,26 @@ def _validate_format(
     elif data_type == "aes_key":
         return _validate_aes_key(schema, data)
 
+    elif data_type == "yaml_dict":
+        return _validate_yaml_dict(data)
+
     return errors
+
+
+def _validate_yaml_dict(data: str) -> list[str]:
+    """Validate that the input is a JSON or YAML mapping.
+
+    Mirrors the rules applied to activation ``extra_var`` input.
+    """
+    try:
+        parsed = yaml.safe_load(data)
+    except yaml.YAMLError:
+        return ["Must be in JSON or YAML format"]
+
+    if not isinstance(parsed, dict):
+        return ["Must be in object format"]
+
+    return []
 
 
 def _validate_vault_id(data: str) -> list[str]:
