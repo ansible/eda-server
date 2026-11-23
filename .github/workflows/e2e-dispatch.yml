@@ -19,6 +19,7 @@ env:
   REGISTRY: quay.io
   QUAY_USER: ansible+eda_gha
   PYTEST_RETRIES: 2
+  UPSTREAM_REPOSITORY_ID: 493373516
 
 jobs:
   check-trigger:
@@ -195,27 +196,21 @@ jobs:
             pytest -vv --junit-xml=eda-qa-e2e-test-results.xml --reruns ${{ env.PYTEST_RETRIES }}
           fi
 
-      - name: Setup jUnit reporter
-        run: |
-          pip install httpie
-          echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
-
-      - name: Upload jUnit test results (APDE CI)
-        working-directory: ${{ env.EDA_QA_PATH }}
-        if: github.ref == 'refs/heads/main'
-        env:
-          PDE_UPLOAD_USER: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}
-          PDE_UPLOAD_PASSWORD: ${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}
-          PDE_UPLOAD_URL: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}
-        run: >-
-          http --check-status --ignore-stdin
-          --auth "$PDE_UPLOAD_USER:$PDE_UPLOAD_PASSWORD"
-          -f POST "$PDE_UPLOAD_URL/api/results/upload/"
-          xunit_xml@eda-qa-e2e-test-results.xml
-          component_name=eda
-          git_commit_sha=${{ env.GIT_SHA }}
-          git_repository_url="https://github.com/${{ github.repository }}"
-
+      - name: Upload eda jUnit test reports to the unified dashboard
+        if: >-
+          !cancelled()
+          && github.event_name == 'push'
+          && env.UPSTREAM_REPOSITORY_ID == github.repository_id
+          && github.ref_name == github.event.repository.default_branch
+        uses: ansible/gh-action-record-test-results@58376e7785cbb37b4ca0c0638edf9db4e21fd0b6
+        with:
+          aggregation-server-url: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}
+          http-auth-password: >-
+            ${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}
+          http-auth-username: >-
+            ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}
+          project-component-name: eda
+          test-result-files: ${{ env.EDA_QA_PATH }}/eda-qa-e2e-test-results.xml
 
       - name: Print EDA logs
         if: always()
@@ -301,26 +296,21 @@ jobs:
         run: |
           pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml --reruns ${{ env.PYTEST_RETRIES }}
 
-      - name: Setup jUnit reporter
-        run: |
-          pip install httpie
-          echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
-
-      - name: Upload jUnit test results (APDE CI)
-        working-directory: ${{ env.EDA_QA_PATH }}
-        if: github.ref == 'refs/heads/main'
-        env:
-          PDE_UPLOAD_USER: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}
-          PDE_UPLOAD_PASSWORD: ${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}
-          PDE_UPLOAD_URL: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}
-        run: >-
-          http --check-status --ignore-stdin
-          --auth "$PDE_UPLOAD_USER:$PDE_UPLOAD_PASSWORD"
-          -f POST "$PDE_UPLOAD_URL/api/results/upload/"
-          xunit_xml@eda-qa-e2e-multinode-test-results.xml
-          component_name=eda
-          git_commit_sha=${{ env.GIT_SHA }}
-          git_repository_url="https://github.com/${{ github.repository }}"
+      - name: Upload eda jUnit test reports to the unified dashboard
+        if: >-
+          !cancelled()
+          && github.event_name == 'push'
+          && env.UPSTREAM_REPOSITORY_ID == github.repository_id
+          && github.ref_name == github.event.repository.default_branch
+        uses: ansible/gh-action-record-test-results@58376e7785cbb37b4ca0c0638edf9db4e21fd0b6
+        with:
+          aggregation-server-url: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}
+          http-auth-password: >-
+            ${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}
+          http-auth-username: >-
+            ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}
+          project-component-name: eda
+          test-result-files: ${{ env.EDA_QA_PATH }}/eda-qa-e2e-multinode-test-results.xml
 
       - name: Update deployment status
         if: always() && github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
