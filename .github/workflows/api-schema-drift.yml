@@ -1,0 +1,87 @@
+---
+# Drift detection: regenerate the OpenAPI spec from code and fail if the
+# committed openapi.yaml is out of sync. Ensures developers commit spec
+# changes alongside code changes.
+#
+# Jira: AAP-86437
+name: "API: Schema Drift Detection"
+
+on:
+  pull_request:
+    branches:
+      - main
+      - stable-*
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Check schema drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EDA_SECRET_KEY: "insecure-dev-key-for-schema-gen"
+      POETRY_NO_INTERACTION: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify committed spec exists
+        run: |
+          if ! git show HEAD:openapi.yaml > /dev/null 2>&1; then
+            echo "::error::openapi.yaml is not in the commit — the baseline spec must be committed."
+            exit 1
+          fi
+
+      - name: Install poetry
+        run: pipx install poetry
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: "poetry"
+
+      - name: Install dependencies
+        run: poetry install -E all --only main
+
+      - name: Regenerate spec from code
+        run: poetry run python3 scripts/genschema.py
+
+      - name: Check for drift
+        run: |
+          set +e
+          git diff --exit-code openapi.yaml
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "No schema drift detected."
+          elif [ "$rc" -eq 1 ]; then
+            echo ""
+            echo "::error::Committed openapi.yaml is out of sync with code."
+            echo "::error::Regenerate with 'task genschema' and commit the result."
+            echo ""
+            echo "## Schema Drift Detected" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "The committed \`openapi.yaml\` does not match what \`drf-spectacular\` generates from the current code." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**To fix:** run \`task genschema\` and commit the updated \`openapi.yaml\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            TOTAL_LINES=$(git diff openapi.yaml | wc -l)
+            echo "Showing first 100 of $TOTAL_LINES diff lines:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```diff' >> "$GITHUB_STEP_SUMMARY"
+            git diff openapi.yaml | head -100 >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          else
+            echo "::error::git diff failed with exit code $rc"
+            exit "$rc"
+          fi

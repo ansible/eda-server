@@ -33,8 +33,6 @@ paths:
       tags:
       - activation-instances
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -76,8 +74,6 @@ paths:
       tags:
       - activation-instances
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -102,8 +98,6 @@ paths:
       tags:
       - activation-instances
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -153,8 +147,6 @@ paths:
       tags:
       - activations
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -182,8 +174,6 @@ paths:
               $ref: '#/components/schemas/ActivationCreate'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -233,8 +223,6 @@ paths:
       tags:
       - activations
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -257,8 +245,6 @@ paths:
       tags:
       - activations
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -291,8 +277,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedActivationUpdate'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -324,8 +308,6 @@ paths:
       tags:
       - activations
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -359,8 +341,6 @@ paths:
               $ref: '#/components/schemas/ActivationCopy'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -391,8 +371,6 @@ paths:
       tags:
       - activations
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -415,8 +393,6 @@ paths:
       tags:
       - activations
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -446,8 +422,6 @@ paths:
       tags:
       - activations
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -540,8 +514,6 @@ paths:
       tags:
       - audit-rules
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -626,8 +598,6 @@ paths:
       tags:
       - audit-rules
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -706,8 +676,6 @@ paths:
       tags:
       - audit-rules
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -731,8 +699,6 @@ paths:
       tags:
       - audit-rules
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -749,8 +715,6 @@ paths:
       tags:
       - auth
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -774,8 +738,6 @@ paths:
               $ref: '#/components/schemas/Login'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '403':
@@ -828,8 +790,6 @@ paths:
       tags:
       - config
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -869,8 +829,6 @@ paths:
       tags:
       - credential-input-sources
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -898,8 +856,6 @@ paths:
               $ref: '#/components/schemas/CredentialInputSourceCreate'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -932,8 +888,6 @@ paths:
       tags:
       - credential-input-sources
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -967,8 +921,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCredentialInputSourceUpdate'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -995,8 +947,6 @@ paths:
       tags:
       - credential-input-sources
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -1032,8 +982,6 @@ paths:
       tags:
       - credential-types
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1061,8 +1009,6 @@ paths:
               $ref: '#/components/schemas/CredentialTypeCreate'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -1086,8 +1032,6 @@ paths:
       tags:
       - credential-types
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1121,8 +1065,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCredentialTypeCreate'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1145,8 +1087,6 @@ paths:
       tags:
       - credential-types
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -1180,8 +1120,6 @@ paths:
               $ref: '#/components/schemas/CredentialTypeTest'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '202':
@@ -1214,8 +1152,6 @@ paths:
       tags:
       - decision-environments
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1244,8 +1180,6 @@ paths:
               $ref: '#/components/schemas/DecisionEnvironmentCreate'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -1270,8 +1204,6 @@ paths:
       tags:
       - decision-environments
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1305,8 +1237,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedDecisionEnvironmentCreate'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1335,8 +1265,6 @@ paths:
       tags:
       - decision-environments
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -1394,8 +1322,6 @@ paths:
       tags:
       - eda-credentials
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1423,8 +1349,6 @@ paths:
               $ref: '#/components/schemas/EdaCredentialCreate'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -1490,8 +1414,6 @@ paths:
       tags:
       - eda-credentials
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1524,8 +1446,6 @@ paths:
       tags:
       - eda-credentials
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1559,8 +1479,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedEdaCredentialUpdate'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1588,8 +1506,6 @@ paths:
       tags:
       - eda-credentials
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -1621,8 +1537,6 @@ paths:
               $ref: '#/components/schemas/EdaCredentialCopy'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -1659,8 +1573,6 @@ paths:
             schema:
               $ref: '#/components/schemas/EdaCredentialTest'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '202':
@@ -1698,8 +1610,6 @@ paths:
       tags:
       - event-streams
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1727,8 +1637,6 @@ paths:
               $ref: '#/components/schemas/EventStreamIn'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -1788,8 +1696,6 @@ paths:
       tags:
       - event-streams
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1813,8 +1719,6 @@ paths:
       tags:
       - event-streams
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1847,8 +1751,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedEventStreamIn'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1875,8 +1777,6 @@ paths:
       tags:
       - event-streams
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -1915,8 +1815,6 @@ paths:
       tags:
       - feature_flags
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1943,8 +1841,6 @@ paths:
       tags:
       - feature_flags
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1961,8 +1857,6 @@ paths:
       tags:
       - feature_flags_state
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -1998,8 +1892,6 @@ paths:
             schema:
               $ref: '#/components/schemas/LogPurgeRequest'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '202':
@@ -2050,8 +1942,6 @@ paths:
       tags:
       - organizations
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2061,37 +1951,6 @@ paths:
                 $ref: '#/components/schemas/PaginatedOrganizationList'
           description: Return a list of organizations.
       x-ai-description: List all organizations
-    post:
-      operationId: organizations_create
-      description: Create a new organization
-      tags:
-      - organizations
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrganizationCreate'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/OrganizationCreate'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/OrganizationCreate'
-        required: true
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - EDAJWTAuthentication: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Organization'
-          description: Return the new organization.
-        '403':
-          description: Create is prohibited
-      x-ai-description: Create new organization
   /organizations/{id}/teams/:
     get:
       operationId: organizations_teams_list
@@ -2133,8 +1992,6 @@ paths:
       tags:
       - organizations
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2157,8 +2014,6 @@ paths:
       tags:
       - organizations
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2168,67 +2023,6 @@ paths:
                 $ref: '#/components/schemas/Organization'
           description: ''
       x-ai-description: Retrieve single organization
-    patch:
-      operationId: organizations_partial_update
-      description: Partially update an organization
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this organization.
-        required: true
-      tags:
-      - organizations
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedOrganizationCreate'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedOrganizationCreate'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedOrganizationCreate'
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - EDAJWTAuthentication: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Organization'
-          description: Update successful. Return an updated organization.
-        '403':
-          description: Update is prohibited
-      x-ai-description: Partially update existing organization
-    delete:
-      operationId: organizations_destroy
-      description: Delete an organization by id
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this organization.
-        required: true
-      tags:
-      - organizations
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - EDAJWTAuthentication: []
-      responses:
-        '204':
-          description: Delete successful.
-        '409':
-          description: Default Organization cannot be deleted.
-        '403':
-          description: Delete is prohibited
-      x-ai-description: Delete existing organization
   /projects/:
     get:
       operationId: projects_list
@@ -2259,8 +2053,6 @@ paths:
       tags:
       - projects
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2288,8 +2080,6 @@ paths:
               $ref: '#/components/schemas/ProjectCreateRequest'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -2315,8 +2105,6 @@ paths:
       tags:
       - projects
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2350,8 +2138,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProjectUpdateRequest'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2380,8 +2166,6 @@ paths:
       tags:
       - projects
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -2401,8 +2185,6 @@ paths:
       tags:
       - projects
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '202':
@@ -2449,8 +2231,6 @@ paths:
       tags:
       - role_definitions
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2478,8 +2258,6 @@ paths:
               $ref: '#/components/schemas/RoleDefinitionCreate'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -2510,8 +2288,6 @@ paths:
       tags:
       - role_definitions
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2546,8 +2322,6 @@ paths:
               $ref: '#/components/schemas/RoleDefinitionCreate'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2588,8 +2362,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedRoleDefinition'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2619,8 +2391,6 @@ paths:
       tags:
       - role_definitions
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -2663,8 +2433,6 @@ paths:
       tags:
       - role_definitions
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2711,8 +2479,6 @@ paths:
       tags:
       - role_definitions
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2736,8 +2502,6 @@ paths:
       tags:
       - role_metadata
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2782,8 +2546,6 @@ paths:
       tags:
       - role_team_access
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2837,8 +2599,6 @@ paths:
       tags:
       - role_team_access
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2882,8 +2642,6 @@ paths:
       tags:
       - role_team_assignments
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2911,8 +2669,6 @@ paths:
               $ref: '#/components/schemas/RoleTeamAssignmentCreate'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -2944,8 +2700,6 @@ paths:
       tags:
       - role_team_assignments
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -2976,8 +2730,6 @@ paths:
       tags:
       - role_team_assignments
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -3022,8 +2774,6 @@ paths:
       tags:
       - role_user_access
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3077,8 +2827,6 @@ paths:
       tags:
       - role_user_access
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3113,8 +2861,6 @@ paths:
       tags:
       - role_user_assignments
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3142,8 +2888,6 @@ paths:
               $ref: '#/components/schemas/RoleUserAssignmentCreate'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -3166,8 +2910,6 @@ paths:
       tags:
       - role_user_assignments
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3189,8 +2931,6 @@ paths:
       tags:
       - role_user_assignments
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -3226,8 +2966,6 @@ paths:
       tags:
       - rulebooks
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3274,8 +3012,6 @@ paths:
       tags:
       - rulebooks
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3302,8 +3038,6 @@ paths:
       tags:
       - rulebooks
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3327,8 +3061,6 @@ paths:
       tags:
       - rulebooks
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3345,8 +3077,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3358,8 +3088,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3383,8 +3111,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -3411,8 +3137,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3436,8 +3160,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3462,8 +3184,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3495,8 +3215,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3524,8 +3242,6 @@ paths:
               $ref: '#/components/schemas/Resource'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -3550,8 +3266,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3587,8 +3301,6 @@ paths:
               $ref: '#/components/schemas/Resource'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3623,8 +3335,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedResource'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3648,8 +3358,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -3678,8 +3386,6 @@ paths:
               $ref: '#/components/schemas/BulkResourceUpdateRequest'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3740,8 +3446,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3777,8 +3481,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3807,8 +3509,6 @@ paths:
               $ref: '#/components/schemas/ServiceRoleTeamAssignmentRequest'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3837,8 +3537,6 @@ paths:
               $ref: '#/components/schemas/ServiceRoleTeamAssignmentBatch'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3867,8 +3565,6 @@ paths:
               $ref: '#/components/schemas/ServiceRoleTeamAssignmentBatch'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3897,8 +3593,6 @@ paths:
               $ref: '#/components/schemas/ServiceRoleTeamAssignmentRequest'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3935,8 +3629,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -3972,8 +3664,6 @@ paths:
       tags:
       - service-index
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4002,8 +3692,6 @@ paths:
               $ref: '#/components/schemas/ServiceRoleUserAssignmentRequest'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4032,8 +3720,6 @@ paths:
               $ref: '#/components/schemas/ServiceRoleUserAssignmentBatch'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4062,8 +3748,6 @@ paths:
               $ref: '#/components/schemas/ServiceRoleUserAssignmentBatch'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4092,8 +3776,6 @@ paths:
               $ref: '#/components/schemas/ServiceRoleUserAssignmentRequest'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4110,8 +3792,6 @@ paths:
       tags:
       - status
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       - {}
       responses:
@@ -4168,8 +3848,6 @@ paths:
       tags:
       - teams
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4179,37 +3857,6 @@ paths:
                 $ref: '#/components/schemas/PaginatedTeamList'
           description: Return a list of teams.
       x-ai-description: List all teams
-    post:
-      operationId: teams_create
-      description: Create a new team
-      tags:
-      - teams
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TeamCreate'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TeamCreate'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TeamCreate'
-        required: true
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - EDAJWTAuthentication: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Team'
-          description: Return the new team.
-        '403':
-          description: Create is prohibited
-      x-ai-description: Create new team
   /teams/{id}/:
     get:
       operationId: teams_retrieve
@@ -4224,8 +3871,6 @@ paths:
       tags:
       - teams
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4235,65 +3880,6 @@ paths:
                 $ref: '#/components/schemas/TeamDetail'
           description: Return a team by its id.
       x-ai-description: Retrieve single team
-    patch:
-      operationId: teams_partial_update
-      description: Partially update a team
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this team.
-        required: true
-      tags:
-      - teams
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedTeamUpdate'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedTeamUpdate'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedTeamUpdate'
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - EDAJWTAuthentication: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Team'
-          description: Update successful. Return an updated team.
-        '403':
-          description: Update is prohibited
-      x-ai-description: Partially update existing team
-    delete:
-      operationId: teams_destroy
-      description: Delete a team by id
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this team.
-        required: true
-      tags:
-      - teams
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - EDAJWTAuthentication: []
-      responses:
-        '204':
-          description: Delete successful.
-        '403':
-          description: Delete is prohibited
-      x-ai-description: Delete existing team
   /users/:
     get:
       operationId: users_list
@@ -4333,8 +3919,6 @@ paths:
       tags:
       - users
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4344,37 +3928,6 @@ paths:
                 $ref: '#/components/schemas/PaginatedUserListList'
           description: Return a list of users.
       x-ai-description: List all users
-    post:
-      operationId: users_create
-      description: Create a user
-      tags:
-      - users
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserCreateUpdate'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/UserCreateUpdate'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UserCreateUpdate'
-        required: true
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - EDAJWTAuthentication: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserDetail'
-          description: Return the created user.
-        '403':
-          description: Create is prohibited
-      x-ai-description: Create new user
   /users/{id}/:
     get:
       operationId: users_retrieve
@@ -4389,8 +3942,6 @@ paths:
       tags:
       - users
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4416,16 +3967,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedUserCreateUpdate'
+              $ref: '#/components/schemas/PatchedUserUpdateIsSuperuser'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedUserCreateUpdate'
+              $ref: '#/components/schemas/PatchedUserUpdateIsSuperuser'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedUserCreateUpdate'
+              $ref: '#/components/schemas/PatchedUserUpdateIsSuperuser'
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4437,28 +3986,6 @@ paths:
         '403':
           description: Update is prohibited
       x-ai-description: Partially update existing user
-    delete:
-      operationId: users_destroy
-      description: Delete a user by id
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this user.
-        required: true
-      tags:
-      - users
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - EDAJWTAuthentication: []
-      responses:
-        '204':
-          description: The user has been deleted successful.
-        '403':
-          description: Delete is prohibited
-      x-ai-description: Delete existing user
   /users/me/:
     get:
       operationId: get_current_user
@@ -4466,8 +3993,6 @@ paths:
       tags:
       - users
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4477,34 +4002,6 @@ paths:
                 $ref: '#/components/schemas/UserDetail'
           description: Return current user.
       x-ai-description: User Get current user
-    patch:
-      operationId: update_current_user
-      description: Update current user.
-      tags:
-      - users
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedCurrentUserUpdate'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedCurrentUserUpdate'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedCurrentUserUpdate'
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - EDAJWTAuthentication: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserDetail'
-          description: Return current user.
-      x-ai-description: User Update current user
   /users/me/awx-tokens/:
     get:
       operationId: users_me_awx_tokens_list
@@ -4531,8 +4028,6 @@ paths:
       tags:
       - users
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4560,8 +4055,6 @@ paths:
               $ref: '#/components/schemas/AwxTokenCreate'
         required: true
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '201':
@@ -4585,8 +4078,6 @@ paths:
       tags:
       - users
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '200':
@@ -4609,8 +4100,6 @@ paths:
       tags:
       - users
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - EDAJWTAuthentication: []
       responses:
         '204':
@@ -6137,16 +5626,16 @@ components:
       - state
     ImportStateEnum:
       enum:
+      - completed
+      - failed
       - pending
       - running
-      - failed
-      - completed
       type: string
       description: |-
+        * `completed` - Completed
+        * `failed` - Failed
         * `pending` - Pending
         * `running` - Running
-        * `failed` - Failed
-        * `completed` - Completed
     JWTToken:
       type: object
       properties:
@@ -6157,13 +5646,13 @@ components:
     LogLevelEnum:
       enum:
       - debug
-      - info
       - error
+      - info
       type: string
       description: |-
         * `debug` - debug
-        * `info` - info
         * `error` - error
+        * `info` - info
     LogPurgeRequest:
       type: object
       description: Serializer for the asynchronous log purge endpoint.
@@ -6376,18 +5865,6 @@ components:
       - modified_by
       - name
       - resource
-    OrganizationCreate:
-      type: object
-      properties:
-        name:
-          type: string
-          description: The name of this resource.
-          maxLength: 512
-        description:
-          type: string
-          description: The organization description.
-      required:
-      - name
     OrganizationRef:
       type: object
       properties:
@@ -7391,23 +6868,6 @@ components:
             - username
         injectors:
           description: Injectors of the credential type
-    PatchedCurrentUserUpdate:
-      type: object
-      properties:
-        first_name:
-          type: string
-          maxLength: 150
-        last_name:
-          type: string
-          maxLength: 150
-        email:
-          type: string
-          format: email
-          title: Email address
-          maxLength: 254
-        password:
-          type: string
-          writeOnly: true
     PatchedDecisionEnvironmentCreate:
       type: object
       description: Serializer for creating the DecisionEnvironment.
@@ -7463,16 +6923,6 @@ components:
           type: string
           format: uuid
           nullable: true
-    PatchedOrganizationCreate:
-      type: object
-      properties:
-        name:
-          type: string
-          description: The name of this resource.
-          maxLength: 512
-        description:
-          type: string
-          description: The organization description.
     PatchedProjectUpdateRequest:
       type: object
       properties:
@@ -7619,36 +7069,9 @@ components:
           readOnly: true
           nullable: true
           description: The user who created this resource.
-    PatchedTeamUpdate:
+    PatchedUserUpdateIsSuperuser:
       type: object
       properties:
-        name:
-          type: string
-          description: The name of this resource.
-          maxLength: 512
-        description:
-          type: string
-          description: The team description.
-    PatchedUserCreateUpdate:
-      type: object
-      properties:
-        username:
-          type: string
-          description: The user's log in name.
-        first_name:
-          type: string
-          maxLength: 150
-        last_name:
-          type: string
-          maxLength: 150
-        email:
-          type: string
-          format: email
-          title: Email address
-          maxLength: 254
-        password:
-          type: string
-          writeOnly: true
         is_superuser:
           type: boolean
           title: Superuser status
@@ -8076,13 +7499,13 @@ components:
     RestartPolicyEnum:
       enum:
       - always
-      - on-failure
       - never
+      - on-failure
       type: string
       description: |-
         * `always` - always
-        * `on-failure` - on-failure
         * `never` - never
+        * `on-failure` - on-failure
     RoleDefinition:
       type: object
       properties:
@@ -8716,29 +8139,29 @@ components:
       - source_info
     StatusEnum:
       enum:
-      - starting
-      - running
-      - pending
-      - failed
-      - stopping
-      - stopped
-      - deleting
       - completed
-      - unresponsive
+      - deleting
       - error
+      - failed
+      - pending
+      - running
+      - starting
+      - stopped
+      - stopping
+      - unresponsive
       - workers offline
       type: string
       description: |-
-        * `starting` - starting
-        * `running` - running
-        * `pending` - pending
-        * `failed` - failed
-        * `stopping` - stopping
-        * `stopped` - stopped
-        * `deleting` - deleting
         * `completed` - completed
-        * `unresponsive` - unresponsive
+        * `deleting` - deleting
         * `error` - error
+        * `failed` - failed
+        * `pending` - pending
+        * `running` - running
+        * `starting` - starting
+        * `stopped` - stopped
+        * `stopping` - stopping
+        * `unresponsive` - unresponsive
         * `workers offline` - workers offline
     StatusResponse:
       type: object
@@ -8906,21 +8329,6 @@ components:
       - organization
       - related
       - url
-    TeamCreate:
-      type: object
-      properties:
-        name:
-          type: string
-          description: The name of this resource.
-          maxLength: 512
-        description:
-          type: string
-          description: The team description.
-        organization_id:
-          type: integer
-      required:
-      - name
-      - organization_id
     TeamDetail:
       type: object
       properties:
@@ -9090,34 +8498,6 @@ components:
       - object_role_assignments
       - related
       - url
-      - username
-    UserCreateUpdate:
-      type: object
-      properties:
-        username:
-          type: string
-          description: The user's log in name.
-        first_name:
-          type: string
-          maxLength: 150
-        last_name:
-          type: string
-          maxLength: 150
-        email:
-          type: string
-          format: email
-          title: Email address
-          maxLength: 254
-        password:
-          type: string
-          writeOnly: true
-        is_superuser:
-          type: boolean
-          title: Superuser status
-          description: Designates that this user has all permissions without explicitly
-            assigning them.
-      required:
-      - password
       - username
     UserDetail:
       type: object
@@ -9351,9 +8731,6 @@ components:
       type: apiKey
       name: X-DAB-JW-TOKEN
       in: header
-    basicAuth:
-      type: http
-      scheme: basic
     cookieAuth:
       type: apiKey
       in: cookie

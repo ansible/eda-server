@@ -330,6 +330,13 @@ tasks:
     cmds:
       - kind delete cluster --name ${KIND_CLUSTER_NAME:-kind}
 
+  genschema:
+    desc: "Regenerate the committed openapi.yaml from the current code."
+    env:
+      EDA_SECRET_KEY: '{{.EDA_SECRET_KEY | default "insecure-dev-key-for-schema-gen"}}'
+    cmds:
+      - poetry run python3 scripts/genschema.py
+
   macpodman:
     desc: "Run eda_podman.sh with specified CLI arguments."
     summary: |
