@@ -50,20 +50,39 @@ def _stabilize_yaml(path):
             i += 1
 
     # Sort description enum lines: "* `value` - label"
+    # Each item may have indented continuation lines; keep them
+    # attached to their bullet when sorting.
     enum_line_re = re.compile(r"^(\s+)\* `([^`]+)` - ")
     i = 0
     while i < len(lines):
         m = enum_line_re.match(lines[i])
         if m:
+            indent = m.group(1)
+            items = []
             j = i
-            block = []
-            while j < len(lines) and enum_line_re.match(lines[j]):
-                block.append(lines[j])
-                j += 1
-            if len(block) > 1:
-                block.sort(key=lambda l: enum_line_re.match(l).group(2))
-                lines[i:j] = block
-            i += len(block)
+            while j < len(lines):
+                bm = enum_line_re.match(lines[j])
+                if bm:
+                    items.append([lines[j]])
+                    j += 1
+                    while j < len(lines) and not enum_line_re.match(lines[j]):
+                        line = lines[j]
+                        if line.strip() == "" or (
+                            not line.startswith(indent + " ")
+                            and not line.startswith(indent + "\t")
+                        ):
+                            break
+                        items[-1].append(line)
+                        j += 1
+                else:
+                    break
+            if len(items) > 1:
+                items.sort(
+                    key=lambda item: enum_line_re.match(item[0]).group(2)
+                )
+                flat = [line for item in items for line in item]
+                lines[i:j] = flat
+            i += sum(len(item) for item in items)
         else:
             i += 1
 
