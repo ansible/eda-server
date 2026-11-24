@@ -14,7 +14,7 @@
 
 
 import pytest
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf as lazy_fixture
 
 from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP, ActivationStatus
 from aap_eda.core.exceptions import (
