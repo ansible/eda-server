@@ -605,6 +605,22 @@ EVENT_STREAM_OAUTH2_JWT_INPUTS = {
             ),
         },
         {
+            "id": "required_claims",
+            "label": "Required Claims",
+            "type": "string",
+            "format": "yaml_dict",
+            "multiline": True,
+            "help_text": (
+                "Additional claims that must be present in the JWT, in "
+                "JSON or YAML format. Scalar values must match exactly. "
+                "If the claim in the token is a list, it must contain the "
+                "required value (or all of the required values, if a list "
+                "is given). Nested objects are matched recursively. e.g. "
+                '{"iss": "https://idp.example.com", '
+                '"groups": ["eda-senders"]}'
+            ),
+        },
+        {
             "id": "http_header_key",
             "label": HTTP_HEADER_LABEL,
             "type": "string",
@@ -2139,7 +2155,8 @@ CREDENTIAL_TYPES = [
             "Credential for Event Streams that use OAuth2 with JWT. "
             "This needs a JWKS URL which will be used to fetch the "
             "public key and validate the incoming token. If an audience "
-            "is specified we will check the audience in the JWT claims."
+            "is specified we will check the audience in the JWT claims. "
+            "Any required claims specified will also be validated."
         ),
     },
     {
