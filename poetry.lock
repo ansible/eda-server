@@ -2616,22 +2616,22 @@ testing = ["fields", "hunter", "process-tests", "pytest-xdist", "six", "virtuale
 
 [[package]]
 name = "pytest-django"
-version = "4.5.2"
+version = "4.14.0"
 description = "A Django plugin for pytest."
 optional = false
-python-versions = ">=3.5"
+python-versions = ">=3.10"
 groups = ["test"]
 files = [
-    {file = "pytest-django-4.5.2.tar.gz", hash = "sha256:d9076f759bb7c36939dbdd5ae6633c18edfc2902d1a69fdbefd2426b970ce6c2"},
-    {file = "pytest_django-4.5.2-py3-none-any.whl", hash = "sha256:c60834861933773109334fe5a53e83d1ef4828f2203a1d6a0fa9972f4f75ab3e"},
+    {file = "pytest_django-4.14.0-py3-none-any.whl", hash = "sha256:c533b08d89cc675efcd5398eea270b34547e35f9a3608e2c9748dd88428ea187"},
+    {file = "pytest_django-4.14.0.tar.gz", hash = "sha256:26787dd3f422cfbab8f55b80a776e2edea7a11092cb74e960bef1312515708ef"},
 ]
 
 [package.dependencies]
-pytest = ">=5.4.0"
+pytest = ">=7.0.0"
 
 [package.extras]
+django = ["django (>=5.2)"]
 docs = ["sphinx", "sphinx-rtd-theme"]
-testing = ["Django", "django-configurations (>=2.0)"]
 
 [[package]]
 name = "pytest-env"
