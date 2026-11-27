@@ -1,0 +1,10 @@
+---
+title: Committed OpenAPI specification with CI drift and breaking-change detection
+type:
+  - added
+breaking: false
+summary: >-
+  Added a committed OpenAPI specification (openapi.yaml) generated from code
+  with drf-spectacular. CI now regenerates the spec and fails when the
+  committed spec drifts from the code, detects breaking API changes with
+  oasdiff, and asks for a changelog fragment when the spec changes.
