@@ -93,12 +93,14 @@ tzdata = "*"
 
 
 [tool.poetry.group.test.dependencies]
-pytest = "*"
+# pytest 9.1 introduces changes that duplicate the captured log messages:
+# https://github.com/pytest-dev/pytest/issues/15064
+pytest = "<9.1"
 pytest-env = "*"
 pytest-django = "*"
 pytest-asyncio = "*"
 requests = { version = "*", python = "<4.0" }
-pytest-cov = "^4.1.0"
+pytest-cov = "*"
 pytest-lazy-fixtures = "*"
 requests-mock = "*"
 httpie = "^3.2.3"
