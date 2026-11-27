@@ -597,8 +597,7 @@ def test_gw_handler_no_request_attribute(
     instance.id = 1
     instance.credential_type = mtls_credential_type
     # No _request attribute
-    if hasattr(instance, "_request"):
-        delattr(instance, "_request")
+    del instance._request
 
     gw_handler(models.EdaCredential, instance)
 
